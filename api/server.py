@@ -886,6 +886,10 @@ def local_model_folders():
 def local_models_open_folder():
     """Opens the models folder in Explorer (only that folder - this never opens a path the page sends)."""
     folder = paths.model_dirs(shared.app_state["settings"])[0]
+    if not config.IS_WINDOWS:                              # os.startfile exists only on Windows
+        return JSONResponse({"ok": False, "folder": folder,
+                             "message": f"Opening the folder is only available on Windows. It is: {folder}"},
+                            status_code=501)
     os.makedirs(folder, exist_ok=True)
     os.startfile(folder)                                   # noqa: S606 - a fixed, app-owned folder
     return {"ok": True, "folder": folder}

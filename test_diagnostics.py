@@ -4,6 +4,7 @@ recognises them afterwards), where a loaded model sits, and the in-process
 Windows GPU counters. Everything runs on synthetic headers and a temporary
 models.ini - the real one is never touched."""
 import os
+import sys
 import shutil
 import struct
 import tempfile
@@ -242,6 +243,7 @@ class FitPolicyTests(Workspace):
         row = diagnostics.assess("Llama", self.cfg("Llama"), {"usable_mb": 1000, "plan_usable_mb": 3000})
         self.assertEqual(row["usable_mb"], 3000)
 
+    @unittest.skipUnless(sys.platform == "win32", "looks up drive letters (Windows)")
     def test_apply_all_writes_the_policy_then_the_plans_with_one_backup(self):
         gpu = {"name": "Test GPU", "total_mb": 4000, "used_mb": 900, "other_mb": 900, "usable_mb": 2844,
                "plan_other_mb": 900, "plan_usable_mb": 2844, "model_mb": 0, "spilled_mb": 0}

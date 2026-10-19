@@ -3,6 +3,7 @@ the way cmd sets them, every console child without a window, and which windows c
 import importlib.machinery
 import importlib.util
 import os
+import sys
 import shutil
 import subprocess
 import tempfile
@@ -58,6 +59,7 @@ class LauncherTests(unittest.TestCase):
             self.assertEqual(os.environ.get("AW_TEST_TWO"), "two words")
             self.assertNotIn("AW_TEST_NO", os.environ)
 
+    @unittest.skipUnless(sys.platform == "win32", "subprocess.DETACHED_PROCESS exists only on Windows")
     def test_console_children_get_no_window_but_own_console_launches_keep_theirs(self):
         seen = []
         original = subprocess.Popen.__init__

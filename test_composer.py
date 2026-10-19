@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 import os
+import sys
 import re
 import tempfile
 import unittest
@@ -58,6 +59,7 @@ class FileStoreTests(unittest.TestCase):
                 self.store.save(name, data)
             self.assertIn(why, str(e.exception))
 
+    @unittest.skipUnless(sys.platform == "win32", "a backslash is a path separator only on Windows")
     def test_names_are_made_safe(self):
         meta = self.store.save("..\\..\\evil:name.txt", _b64("hello"))
         self.assertEqual(meta["name"], "evil_name.txt")

@@ -2,6 +2,7 @@
 history fitting, reasoning-model output, background turns, the local model
 catalog, and local-only API access."""
 import os
+import sys
 import tempfile
 import threading
 import time
@@ -140,6 +141,7 @@ class ModelCatalogTests(unittest.TestCase):
         llama_local.update_model_config("Huihui-Qwen3.5-9B", ctx_size=4096)
         self.assertEqual(llama_local.model_context_limit("Huihui-Qwen3.5-9B"), 4096)
 
+    @unittest.skipUnless(sys.platform == "win32", "models.ini uses Windows paths")
     def test_eviction_goes_through_the_smallest_model(self):
         names = ["Huihui-Qwen3.5-9B", "Mid-Text", "Tiny-Text", "Unknown-Model"]
         self.assertEqual(llama_local.cheapest_other_model("Mid-Text", names), "Tiny-Text")

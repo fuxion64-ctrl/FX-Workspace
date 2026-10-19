@@ -2989,7 +2989,10 @@ select.input { padding-right: 6px; height: 30px; font-size: 12.5px; flex: 0 0 au
 .badge.bump { animation: bump .45s var(--ease-spring); }
 .overlay:not(.hidden) { animation: fade-in .2s ease-out; }
 .overlay:not(.hidden) .modal { animation: modal-in .34s var(--ease-spring); }
-.modal-content.tab-in { animation: settle .28s var(--ease-out); }
+/* A short slide, never a fade from invisible: when the window isn't drawing frames (behind another window,
+   minimised) a fade stays at its first frame and the page reads as blank. */
+.modal-content.tab-in { animation: tab-slide .22s var(--ease-out); }
+@keyframes tab-slide { from { transform: translateY(6px); } }
 .panel { animation: panel-in .3s var(--ease-out); }
 .plan-step.active .plan-mark { animation: pulse-ring 1.6s ease-out infinite; }
 .welcome:not(.hidden) > * { animation: settle .6s var(--ease-out) backwards; }
@@ -3935,6 +3938,8 @@ html.voice-on .voice-btn { color: var(--accent); }
   background: var(--bg); color: var(--text); }
 .voice-stage[hidden] { display: none; }
 .vs-close { position: absolute; top: 14px; right: 14px; z-index: 1; }
+/* The desktop app draws the window's own buttons over the top-right corner: the close button sits below them. */
+:root.fx-desktop .voice-stage:not([data-dock="mini"]) .vs-close { top: 60px; right: 16px; }
 .vs-temp { position: absolute; top: 20px; left: 20px; font-size: 12px; color: var(--muted); }
 .vs-center { display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: 8px; width: min(760px, 100%); min-height: 0; overflow-y: auto; }
 .vs-orb-wrap { position: relative; width: min(70vmin, 620px, 57vh); aspect-ratio: 1; flex-shrink: 0; transition: width .3s var(--ease); }
@@ -5218,23 +5223,19 @@ function fallbackCopy(text, done) { const ta = document.createElement('textarea'
 /* ===========================================================================
    Appearance
    =========================================================================== */
-// The desktop app's window buttons (minimise / maximise / close) match the bar under them: its background and the
-// theme's text colour. Called when the theme, the side panel or the size changes.
+// The desktop app's window buttons (minimise / maximise / close) match the bar under them. Their colours come
+// from the theme's own values (--bg, --text) - which change the moment the theme does - never from what is on
+// screen: that is mid-fade right after a switch, and under an open Settings window it's the dark scrim.
 function syncTitleBar() {
   if (!window.fxDesktop || !window.fxDesktop.setTitleBar) return;
-  requestAnimationFrame(() => {
-    let el = document.elementFromPoint(window.innerWidth - 70, 18), bg = '';
-    while (el && el !== document.documentElement) {
-      const c = getComputedStyle(el).backgroundColor;
-      if (c && !/^rgba\(\s*0,\s*0,\s*0,\s*0\s*\)$|^transparent$/.test(c) && !/,\s*0(\.0+)?\)$/.test(c)) { bg = c; break; }
-      el = el.parentElement;
-    }
-    bg = bg || getComputedStyle(document.body).backgroundColor;
-    // the panel open: a thin strip above its header holds the buttons; closed: the top bar's full height
-    window.fxDesktop.setTitleBar(bg, getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#ece9e2', S.panelOpen ? 34 : 52);
-  });
+  const cs = getComputedStyle(document.documentElement);
+  let bg = cs.getPropertyValue('--bg').trim();
+  if (!/^(#[0-9a-f]{3,8}|rgba?\()/i.test(bg)) bg = getComputedStyle(document.body).backgroundColor;   // a theme whose --bg isn't a plain colour
+  const fg = cs.getPropertyValue('--text').trim() || '#ece9e2';
+  window.fxDesktop.setTitleBar(bg, fg, S.panelOpen ? 34 : 52);
 }
 window.addEventListener('resize', () => { clearTimeout(syncTitleBar.t); syncTitleBar.t = setTimeout(syncTitleBar, 150); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => syncTitleBar());
 function applyAppearance() {
   const s = S.settings, root = document.documentElement;
   const look = LOOKS.includes(s.look) ? s.look : 'studio';
@@ -5278,7 +5279,7 @@ function applyAppearance() {
   renderAgentControls();
   if (lookChanged) applyLayout();
   Ambient.sync();   // the theme may add or remove moving background bodies
-  setTimeout(syncTitleBar, 60);             // after the new colours are in place
+  syncTitleBar();                           // the theme's values are already the new ones
   Overlay.layout();                         // the Studio look's Overlay layout
   if (Overlay.active()) Overlay.paint();
   SecretFx.sync();                          // Judaism Mode's effects (off unless it's on)
@@ -5289,22 +5290,32 @@ function applyAppearance() {
    theme or the chosen accent (a custom accent can be very light or very dark).
    --accent-text, --warn-text and --danger-text are the theme's own colors,
    moved toward the text color only as far as that takes. */
+// Text colours fitted to 4.5:1 on this theme's grounds. All reads first, then all writes: a write between reads
+// made the browser restyle the whole page for each read (~265 ms a call). Results are kept per theme, so a theme
+// seen before costs nothing.
+const fittedColors = new Map();
 function fitTextColors() {
-  const root = document.documentElement;
-  ['--accent-text', '--warn-text', '--danger-text', '--ok-text'].forEach(v => root.style.removeProperty(v));
-  const probe = document.createElement('i');
-  probe.style.display = 'none'; document.body.appendChild(probe);
-  const rgb = v => { probe.style.color = `var(${v})`; const m = getComputedStyle(probe).color.match(/[\d.]+/g) || [0, 0, 0]; return m.slice(0, 3).map(Number); };
-  const lum = c => { const [r, g, b] = c.map(x => { x /= 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
-  const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
-  const grounds = ['--bg', '--surface', '--surface-2'].map(rgb), ink = rgb('--text');
-  for (const [src, out] of [['--accent', '--accent-text'], ['--warn', '--warn-text'], ['--danger', '--danger-text'], ['--ok', '--ok-text']]) {
-    const base = rgb(src);
-    let t = 0, c = base;
-    while (t < 1 && Math.min(...grounds.map(g => ratio(c, g))) < 4.55) { t = Math.min(1, t + 0.04); c = base.map((x, i) => Math.round(x + (ink[i] - x) * t)); }
-    root.style.setProperty(out, `rgb(${c.join(', ')})`);
+  const root = document.documentElement, d = root.dataset;
+  const key = [d.skin, d.theme, d.look, d.tone, d.secret, d.contrast, root.style.getPropertyValue('--accent')].join('|');
+  let out = fittedColors.get(key);
+  if (!out) {
+    const probe = document.createElement('i');
+    probe.style.display = 'none'; document.body.appendChild(probe);
+    const cs = getComputedStyle(probe);
+    const rgb = v => { probe.style.color = `var(${v})`; const m = cs.color.match(/[\d.]+/g) || [0, 0, 0]; return m.slice(0, 3).map(Number); };
+    const lum = c => { const [r, g, b] = c.map(x => { x /= 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+    const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+    const grounds = ['--bg', '--surface', '--surface-2'].map(rgb), ink = rgb('--text');
+    out = [['--accent', '--accent-text'], ['--warn', '--warn-text'], ['--danger', '--danger-text'], ['--ok', '--ok-text']].map(([src, name]) => {
+      const base = rgb(src);
+      let t = 0, c = base;
+      while (t < 1 && Math.min(...grounds.map(g => ratio(c, g))) < 4.55) { t = Math.min(1, t + 0.04); c = base.map((x, i) => Math.round(x + (ink[i] - x) * t)); }
+      return [name, `rgb(${c.join(', ')})`];
+    });
+    probe.remove();
+    fittedColors.set(key, out);
   }
-  probe.remove();
+  for (const [name, value] of out) if (root.style.getPropertyValue(name) !== value) root.style.setProperty(name, value);
 }
 function updateGreeting() {
   const h = new Date().getHours();
@@ -5323,12 +5334,21 @@ async function loadSettings() {
   applyAppearance();
 }
 // extra: sent with the request but not a setting (e.g. which model a per-model choice is for).
+// What the look depends on: applyAppearance runs again only when one of these changed (it costs a full restyle).
+const LOOK_KEYS = ['appearance', 'color_mode', 'theme', 'look', 'accent', 'layout', 'chat_font', 'studio_layout', 'user_name',
+                   'terminal_phosphor', 'unlocked_themes', 'effort', 'effort_by_model', 'prompt_prep', 'prompt_prep_by_model', 'response_mode'];
+const lookKey = s => JSON.stringify(LOOK_KEYS.map(k => (s || {})[k]));
 async function saveSettings(partial, extra) {
+  const before = lookKey(S.settings);
   Object.assign(S.settings, partial);
-  applyAppearance();
+  if (lookKey(S.settings) !== before) applyAppearance();       // a theme switch already applied it, with its transition
   try {
     const data = await api('/api/settings', { ...partial, ...(extra || {}) });
-    if (data.settings) { S.settings = data.settings; store.set('settings', S.settings); applyAppearance(); }
+    if (data.settings) {
+      const mine = lookKey(S.settings);
+      S.settings = data.settings; store.set('settings', S.settings);
+      if (lookKey(S.settings) !== mine) applyAppearance();     // the server changed something that shows
+    }
   } catch (e) { toast(`Could not save: ${e.message || 'is the server running?'}`); }
 }
 
@@ -5373,7 +5393,7 @@ function togglePanel(force, remember = true) {
   // Opening the Workspace panel yourself closes the design preview, which had taken its place.
   if (S.panelOpen && remember && !$('design-panel').hidden && !liveLook()) DesignPanel.close();
   $('app').classList.toggle('panel-closed', !S.panelOpen);
-  setTimeout(syncTitleBar, 60);
+  syncTitleBar();
   $('panel-btn').setAttribute('aria-pressed', String(S.panelOpen));
   if (remember) store.set('panelOpen2.' + look(), S.panelOpen);
   if (S.panelOpen) { drawTelemetry(); followActivity(); }
@@ -12463,6 +12483,27 @@ function openRobloxInfo() { if (S.roblox && S.roblox.connected) openPanel('conte
 // Older links (and server suggestions) say "model" or "resources"; both now live in Models.
 // "General" (just your name) was folded into Appearance.
 const TAB_ALIAS = { model: 'models', resources: 'models', general: 'appearance' };
+// The page's own errors go to data/logs/client.log (POST /api/client-log), so a problem seen only in the desktop
+// window can be read afterwards.
+function clientLog(kind, message, detail = '') {
+  try { fetch('/api/client-log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, message: String(message).slice(0, 1000), detail: String(detail).slice(0, 3000) }) }).catch(() => {}); } catch (e) { /* never in the way */ }
+}
+window.addEventListener('error', e => clientLog('error', e.message, (e.error && e.error.stack) || `${e.filename}:${e.lineno}`));
+window.addEventListener('unhandledrejection', e => clientLog('rejection', (e.reason && e.reason.message) || e.reason, e.reason && e.reason.stack));
+// Settings open but showing nothing: what the page looks like then.
+function checkSettingsShown(tab) {
+  setTimeout(() => {
+    const box = $('settings'), body = $('settings-body');
+    if (!box || box.classList.contains('hidden') || S.settingsTab !== tab) return;
+    const r = body.getBoundingClientRect(), cs = getComputedStyle(body), first = body.firstElementChild;
+    if (body.innerText.trim().length > 20 && r.height > 50 && +cs.opacity > 0.5) return;
+    clientLog('settings-blank', `tab ${tab}`, JSON.stringify({ len: body.innerHTML.length, text: body.innerText.length, rect: [r.x, r.y, r.width, r.height],
+      opacity: cs.opacity, visibility: cs.visibility, display: cs.display, anim: cs.animationName + '/' + cs.animationPlayState, cls: body.className,
+      scroll: [body.scrollTop, body.scrollHeight], first: first ? [first.tagName, getComputedStyle(first).opacity, JSON.stringify(first.getBoundingClientRect())] : null,
+      settings: Object.keys(S.settings || {}).length, motion: document.documentElement.dataset.motion, look: document.documentElement.dataset.look,
+      skin: document.documentElement.dataset.skin, win: [innerWidth, innerHeight], head: body.innerHTML.slice(0, 200) }));
+  }, 1800);
+}
 function openSettings(tab) {
   if ($('app').classList.contains('drawer')) toggleSidebar(false);
   $('settings').classList.remove('hidden'); settingsTab(tab || S.settingsTab || 'appearance');
@@ -12681,7 +12722,20 @@ const SETTINGS_PAGES = [
 ];
 const pageOf = tab => (SETTINGS_PAGES.find(([, parts]) => parts.some(([id]) => id === tab)) || SETTINGS_PAGES[0]);
 function settingsTab(tab) {
+  try { return settingsTabNow(tab); }
+  catch (e) { settingsFailed(TAB_ALIAS[tab] || tab, e); }
+}
+function settingsFailed(tab, e) {
+  console.error('Settings page failed', tab, e);
+  clientLog('settings-failed', `tab ${tab}: ${(e && e.message) || e}`, e && e.stack);
+  const body = $('settings-body');
+  if (!body || (S.settingsTab && S.settingsTab !== tab)) return;
+  body.innerHTML = `<div class="state-card danger" role="alert"><span class="sc-ico">${icon('i-alert', 'sm')}</span><div class="grow"><b>This page couldn't load</b>
+    <p>${esc(String((e && e.message) || e).slice(0, 200))}</p><button type="button" class="btn sm" onclick="settingsTab('${esc(tab)}')">Try again</button></div></div>`;
+}
+function settingsTabNow(tab) {
   tab = TAB_ALIAS[tab] || tab;
+  checkSettingsShown(tab);
   S.settingsTab = tab;
   const [page, parts] = pageOf(tab);
   document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.tab === page));
@@ -12701,12 +12755,7 @@ function settingsTab(tab) {
   (async () => {
     if (!S.settings || !Object.keys(S.settings).length) { body.innerHTML = SKELETON_TEXT; await loadSettings(); }
     if (S.settingsTab === tab) await r();
-  })().catch(e => {
-    console.error('Settings page failed', tab, e);
-    if (S.settingsTab !== tab) return;
-    body.innerHTML = `<div class="state-card danger" role="alert"><span class="sc-ico">${icon('i-alert', 'sm')}</span><div class="grow"><b>This page couldn't load</b>
-      <p>${esc(String((e && e.message) || e).slice(0, 200))} - the app may still be starting.</p><button type="button" class="btn sm" onclick="settingsTab('${tab}')">Try again</button></div></div>`;
-  });
+  })().catch(e => settingsFailed(tab, e));
 }
 // What is on each page, so searching "dark", "seed" or "proxy" finds the right one.
 const SETTINGS_WORDS = {
@@ -12915,11 +12964,17 @@ async function renderModelsTab() {
   S.modelConfigs = (cfg && cfg.models) || []; S.modelDefaults = (cfg && cfg.defaults) || {};
   if (S.settingsTab !== 'models') return;
   renderModelsCached();
+  // The context limits come after (the first read of every model's header is slow); the page is usable meanwhile.
+  if (!S.ctxInfo) api('/api/local-models/ctx-info').then(d => {
+    S.ctxInfo = (d && d.models) || {};
+    const typing = document.activeElement && document.activeElement.closest && document.activeElement.closest('#settings-body input');
+    if (S.settingsTab === 'models' && !typing) renderModelsCached();
+  }).catch(() => {});
 }
 // Under the Context box: the most the model was trained for, and the most that fits in this GPU with its current
-// settings - each a button that fills the box (Save keeps it). From /api/local-models/config's ctx_info.
+// settings - each a button that fills the box (Save keeps it). From /api/local-models/ctx-info (S.ctxInfo).
 function ctxHelp(c, i) {
-  const x = c.ctx_info || {}, n = v => Number(v).toLocaleString();
+  const x = (S.ctxInfo || {})[c.name] || {}, n = v => Number(v).toLocaleString();
   if (!x.trained && x.fits == null) return '';
   const fits = x.fits, max = x.trained, fitsAll = max && fits != null && fits >= max;
   const btn = (v, label, title) => `<button type="button" class="btn sm ghost" title="${esc(title)}" onclick="setCtxBox(${i}, ${v})">${label}</button>`;

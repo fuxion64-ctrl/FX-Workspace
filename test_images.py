@@ -3,6 +3,7 @@ giving the GPU back to the chat model, when a turn is offered generate_image, th
 file endpoint, and the page. No engine, GPU or network: made images go to a temporary folder, never data/."""
 import base64
 import os
+import sys
 import shutil
 import tempfile
 import unittest
@@ -79,6 +80,7 @@ class SettingsTests(unittest.TestCase):
         # The step cache turned Krea 2's sky to grain (2026-10-01): Best never uses it.
         self.assertEqual([k for k, m in image_gen.MODELS.items() if m["step_cache"]], ["fast", "balanced"])
 
+    @unittest.skipUnless(sys.platform == "win32", "needs Windows drive-letter paths")
     def test_single_file_checkpoints_are_detected_and_load_with_model_flag(self):
         with tempfile.TemporaryDirectory() as tmp:
             os.makedirs(os.path.join(tmp, "models"))
@@ -112,6 +114,7 @@ class SettingsTests(unittest.TestCase):
                     self.assertNotIn("--vae", args)
                     self.assertNotIn("--diffusion-model", args)
 
+    @unittest.skipUnless(sys.platform == "win32", "needs Windows drive-letter paths")
     def test_extra_roots_find_a_model_left_behind(self):
         tmp = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp, True)
@@ -458,6 +461,7 @@ class WarmTests(unittest.TestCase):
         image_gen._warmed_at.update(self.saved[0])
         image_gen._proc = self.saved[1]
 
+    @unittest.skipUnless(sys.platform == "win32", "needs Windows drive-letter paths")
     def test_reads_every_file_then_skips_fresh_ones(self):
         said = []
         image_gen._warm_wait("balanced", progress=said.append)
@@ -468,6 +472,7 @@ class WarmTests(unittest.TestCase):
         image_gen._warmed_at.update({p: 0 for p in image_gen._warmed_at})
         self.assertEqual(len(image_gen._warm_todo("balanced")), 3)               # long ago: read again
 
+    @unittest.skipUnless(sys.platform == "win32", "needs Windows drive-letter paths")
     def test_background_warm_and_the_switch(self):
         self.assertTrue(image_gen.warm("balanced"))
         image_gen._warm_thread.join(5)
@@ -484,6 +489,7 @@ class WarmTests(unittest.TestCase):
         self.addCleanup(setattr, image_gen, "_proc_key", saved_key)
         self.assertEqual(image_gen._warm_todo("balanced"), [])
 
+    @unittest.skipUnless(sys.platform == "win32", "needs Windows drive-letter paths")
     def test_stop_while_reading(self):
         with self.assertRaises(image_gen.ImageError) as e:
             image_gen._warm_wait("balanced", should_cancel=lambda: True)

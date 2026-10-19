@@ -1,6 +1,7 @@
 """Videos (video_gen.py) and deleting for good from the image and video trash. Nothing touches data/ or runs the
 engine: the folders are temporary and sd-cli is mocked."""
 import json
+import sys
 import os
 import tempfile
 import unittest
@@ -104,6 +105,7 @@ class VideoGenerateTests(_Dirs):
             clip = video_gen.generate("a cat walking", **kw)
         return clip, calls[0]
 
+    @unittest.skipUnless(sys.platform == "win32", "needs Windows drive-letter paths")
     def test_full_vae_by_default_and_never_offload(self):
         # The tiny decoder flickers (video_gen.clean_settings), so the full VAE is the default.
         clip, args = self._run(size="landscape", length="short")
@@ -115,6 +117,7 @@ class VideoGenerateTests(_Dirs):
         self.assertTrue(os.path.exists(os.path.join(self.vdir, clip["id"] + ".json")))
         self.assertTrue(clip["best"])
 
+    @unittest.skipUnless(sys.platform == "win32", "needs Windows drive-letter paths")
     def test_fast_preview_uses_the_tiny_decoder(self):
         clip, args = self._run(best=False)
         self.assertIn("--tae", args)
@@ -130,6 +133,7 @@ class VideoGenerateTests(_Dirs):
         self.assertAlmostEqual(video_gen.estimate_left(p, 832, 480, 49, 4, False, 30), 71, delta=1)
         self.assertEqual(video_gen.parse_progress(log[:60])["stage"], "encoding")
 
+    @unittest.skipUnless(sys.platform == "win32", "needs Windows drive-letter paths")
     def test_anime_adds_its_lora_and_prefix(self):
         clip, args = self._run(key="anime")
         prompt = args[args.index("-p") + 1]
@@ -138,6 +142,7 @@ class VideoGenerateTests(_Dirs):
         self.assertIn("--lora-model-dir", args)
         self.assertEqual(clip["prompt"], "a cat walking")          # what the user wrote is what is shown and saved
 
+    @unittest.skipUnless(sys.platform == "win32", "needs Windows drive-letter paths")
     def test_image_to_video_passes_the_picture(self):
         pic = os.path.join(self.tmp.name, "p.png")
         open(pic, "wb").close()

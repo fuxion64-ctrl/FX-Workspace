@@ -2,6 +2,7 @@
 named folders, and nothing else. Lockdown, per-tool overrides, tainted
 requests, secret files, this app's own folder and path tricks all still ask."""
 import json
+import sys
 import os
 import shutil
 import subprocess
@@ -89,6 +90,7 @@ class DecisionTests(unittest.TestCase):
         self.assertEqual(self.d("copy_path", {"source": out, "destination": inside}), "ask")
         self.assertEqual(self.d("move_path", {"source": inside, "destination": out}), "ask")
 
+    @unittest.skipUnless(sys.platform == "win32", "needs Windows paths (backslashes, case-insensitive NTFS)")
     def test_path_tricks_do_not_escape(self):
         self.assertEqual(self.d("write_file", {"filename": os.path.join(self.rule, "..", "other", "x.txt")}), "ask")
         self.assertEqual(self.d("write_file", {"filename": self.rule + "-evil\\x.txt"}), "ask")   # prefix, not inside
@@ -96,6 +98,7 @@ class DecisionTests(unittest.TestCase):
         self.assertEqual(self.d("rename_path", {"path": os.path.join(self.rule, "a"), "new_name": ".."}), "ask")
         self.assertEqual(self.d("write_file", {"filename": os.path.join(self.rule.upper(), "CASE.txt")}), "auto")
 
+    @unittest.skipUnless(sys.platform == "win32", "needs NTFS junctions (cmd /c mklink /J)")
     def test_a_junction_inside_the_folder_does_not_widen_it(self):
         link = os.path.join(self.rule, "link")
         made = subprocess.run(["cmd", "/c", "mklink", "/J", link, self.outside], capture_output=True).returncode == 0
@@ -142,6 +145,7 @@ class FolderRuleReplayTests(unittest.TestCase):
             "tools": {"mode": "real"},
         }
 
+    @unittest.skipUnless(sys.platform == "win32", "needs Windows paths (backslashes)")
     def test_inside_runs_without_a_card_and_stays_undoable(self):
         with tempfile.TemporaryDirectory() as sandbox:
             os.makedirs(os.path.join(sandbox, "game"))

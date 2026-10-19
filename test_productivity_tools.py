@@ -3,6 +3,7 @@ the same OS boundaries sys_tools.py mocks (schtasks.exe, powershell.exe)
 plus desktop_input's real capture_screenshot()/find_window()."""
 import tempfile
 import unittest
+import sys
 from unittest.mock import MagicMock, patch
 
 import productivity_tools as pt
@@ -218,6 +219,7 @@ class ScreenshotToFileTests(unittest.TestCase):
         fake_img.save.assert_called_once()
         self.assertIn("1920x1080", result["message"])
 
+    @unittest.skipUnless(sys.platform == "win32", "window focusing is Windows-only")
     def test_focuses_window_first_when_given(self):
         fake_img = MagicMock()
         with patch.object(pt.di, "find_window", return_value=(42, "Notepad")) as find_window, \

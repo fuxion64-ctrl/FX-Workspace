@@ -29,8 +29,8 @@ function harness() {
 }
 
 test('both shipped scripts parse and the Agent menu links the editor',()=>{
-  const start=html.indexOf('<script>\r\n'),end=html.lastIndexOf('</script>');
-  assert.ok(start>=0 && end>start);new vm.Script(html.slice(start+8,end));new vm.Script(source);
+  const open=/<script>\r?\n/.exec(html),start=open?open.index:-1,end=html.lastIndexOf('</script>');
+  assert.ok(start>=0 && end>start);new vm.Script(html.slice(start+open[0].length,end));new vm.Script(source);
   assert.ok(html.includes("['systemmessage', 'System message']"));
   assert.ok(html.includes('systemmessage: renderSystemMessage'));
 });
