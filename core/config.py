@@ -143,6 +143,7 @@ DEFAULT_SETTINGS = {
     "start_with_windows": False,        # the desktop app starts when you sign in (Electron's login item)
     "start_hidden": True,               # ...in the tray, without a window
     "idle_unload": "15",                # minutes hidden and unused before the model leaves the GPU (idle_unload.py)
+    "chat_warmup": True,                # typing a message loads the local chat model meanwhile (/api/local-models/warm)
     "unlocked_themes": [],              # secret themes found (index.html SECRET_THEMES); never switched on by itself
     **image_gen.DEFAULT_SETTINGS,       # Settings > Images (image_gen.py)
     # MossadGPT's world monitor (osint/): feeds collected on this PC while it's on screen.
@@ -294,7 +295,7 @@ def clean_privacy_settings(s: dict) -> dict:
     out = {"search_mode": s.get("search_mode") if s.get("search_mode") in SEARCH_MODES else "standard"}
     for key, default in (("search_preview", False), ("search_history", False), ("overlay_clickthrough", False),
                          ("overlay_window", False), ("close_to_tray", True), ("start_with_windows", False),
-                         ("start_hidden", True), ("search_sources", True)):
+                         ("start_hidden", True), ("search_sources", True), ("chat_warmup", True)):
         out[key] = s.get(key) if isinstance(s.get(key), bool) else default
     out["mini_place"] = s.get("mini_place") if s.get("mini_place") in MINI_PLACES else "studio"
     out["idle_unload"] = str(s.get("idle_unload")) if str(s.get("idle_unload")) in IDLE_UNLOAD else "15"

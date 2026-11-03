@@ -101,7 +101,9 @@ class SettingsTests(unittest.TestCase):
 
     def test_connections_and_web_search_and_network_are_one_part_each(self):
         self.assertIn("const SETTINGS_STACKS = { connections: ['connectors', 'mcp', 'channels'], webnet: ['websearch', 'network'] };", HTML)
-        self.assertIn("['websearch', [['connections', 'Connections'], ['remote', 'Phone access'], ['webnet', 'Web search and network']]]", HTML)
+        # 1.4.6: nine pages by goal - web search and the network have their own page, connectors theirs.
+        self.assertIn("['webnet', [['webnet', 'Web search and network'], ['privacy', 'Privacy']]]", HTML)
+        self.assertIn("['connections', [['connections', 'Connectors and channels'], ['remote', 'Phone access']]]", HTML)
         # Every renderer of a section draws into its own section, and checks its section is showing.
         for name in ("connectors", "mcp", "channels", "websearch", "network"):
             self.assertIn(f"setBody('{name}')", HTML)

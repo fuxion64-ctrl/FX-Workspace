@@ -424,6 +424,7 @@ def get_local_models():
 class SettingsUpdate(BaseModel):
     model_replies_only: bool | None = None   # Settings > This PC: no automatic model use outside replies (model_monitor)
     close_to_tray: bool | None = None        # closing the window keeps the app in the tray (desktop/main.js)
+    chat_warmup: bool | None = None          # load the local chat model while a message is typed
     mini_place: str | None = None            # the mini window's place (mini_window.py)
     start_with_windows: bool | None = None   # the desktop app starts at sign-in...
     start_hidden: bool | None = None         # ...in the tray
@@ -1477,6 +1478,8 @@ def warm_local_model(body: WarmRequest):
     model = (body.model or "").strip()
     if body.mode != config.MODE_LOCAL or not model:
         return {"started": False, "reason": "No local model is chosen."}
+    if (shared.app_state.get("settings") or {}).get("chat_warmup") is False:
+        return {"started": False, "reason": "Loading while you type is off (Settings > Chat models)."}
     if model_monitor.blocked("Loading ahead while you type", shared.app_state.get("settings")):
         return {"started": False, "reason": "Model use outside replies is off (Settings > This PC)."}
     if _warming["model"] or _model_loading() or shared.state_lock.locked() or local_runtime.busy() or labs.gpu_busy():

@@ -5272,6 +5272,11 @@ html.voice-on .idle-screen { display: none !important; }
 :root[data-ui="new"] .modal-nav .nav-group { margin: 14px 10px 4px; font-size: 12px; font-weight: 500; color: var(--muted); }
 :root[data-ui="new"] .modal-nav .nav-sep { height: 1px; background: var(--border); margin: 12px 8px; }
 :root[data-ui="new"] .modal-nav .nav-item { padding-block: 7px; }
+/* 1.4.6: the open page's parts, under it - text only, indented to its label, a hairline down their left side */
+.nav-sub { display: flex; flex-direction: column; gap: 1px; margin: 2px 0 6px 21px; padding-left: 10px; border-left: 1px solid var(--border); }
+:root[data-ui="new"] .modal-nav .nav-part { padding: 5px 10px; font-size: 13.5px; color: var(--muted); }
+:root[data-ui="new"] .modal-nav .nav-part.active { color: var(--text); }
+:root[data-ui="new"] .modal-nav .nav-item.open:not(.active) { color: var(--text); }
 :root[data-ui="new"] .modal-content > h3, :root[data-ui="new"] #settings-body > h3 { font-family: var(--serif); font-weight: 400; font-size: 27px; letter-spacing: -0.01em; }
 :root[data-ui="new"] .modal-content { padding-inline: clamp(24px, 4vw, 56px); }
 :root[data-ui="new"] .set-group { border-radius: 14px; }
@@ -5876,12 +5881,14 @@ html.voice-on .idle-screen { display: none !important; }
       <!-- Six pages (the redesign, D48); a page with several parts shows them as tabs at its top. The search still
            knows what is on every part. -->
       <label class="set-search"><svg class="icon sm"><use href="#i-search"/></svg><input type="search" id="set-q" placeholder="Search settings" aria-label="Search settings" autocomplete="off" oninput="settingsSearch(this.value)" onkeydown="if(event.key==='Enter'){const b=document.querySelector('.modal-nav .nav-item:not([hidden])');if(b)b.click();}"></label>
-      <button class="nav-item" data-tab="appearance" onclick="settingsTab('appearance')"><svg class="icon sm"><use href="#i-brush"/></svg><span>General</span></button>
+      <button class="nav-item" data-tab="appearance" onclick="settingsTab('appearance')"><svg class="icon sm"><use href="#i-brush"/></svg><span>Appearance</span></button>
+      <button class="nav-item" data-tab="models" onclick="settingsTab('models')"><svg class="icon sm"><use href="#i-cpu"/></svg><span>Models</span></button>
       <button class="nav-item" data-tab="agent" onclick="settingsTab('agent')"><svg class="icon sm"><use href="#i-bolt"/></svg><span>Assistant</span></button>
-      <button class="nav-item" data-tab="models" onclick="settingsTab('models')"><svg class="icon sm"><use href="#i-cpu"/></svg><span>Models</span><i class="nav-dot" id="diag-dot" hidden></i></button>
-      <button class="nav-item" data-tab="permissions" onclick="settingsTab('permissions')"><svg class="icon sm"><use href="#i-shield"/></svg><span>Permissions</span></button>
-      <button class="nav-item" data-tab="voice" onclick="settingsTab('voice')"><svg class="icon sm"><use href="#i-mic"/></svg><span>Voice and images</span></button>
-      <button class="nav-item" data-tab="websearch" onclick="settingsTab('connections')"><svg class="icon sm"><use href="#i-globe"/></svg><span>Connections</span><i class="nav-dot" id="net-dot" hidden></i></button>
+      <button class="nav-item" data-tab="memory" onclick="settingsTab('memory')"><svg class="icon sm"><use href="#i-bookmark"/></svg><span>Memory</span></button>
+      <button class="nav-item" data-tab="webnet" onclick="settingsTab('webnet')"><svg class="icon sm"><use href="#i-globe"/></svg><span>Web and privacy</span><i class="nav-dot" id="net-dot" hidden></i></button>
+      <button class="nav-item" data-tab="connections" onclick="settingsTab('connections')"><svg class="icon sm"><use href="#i-plug"/></svg><span>Connections</span></button>
+      <button class="nav-item" data-tab="data" onclick="settingsTab('data')"><svg class="icon sm"><use href="#i-folder"/></svg><span>Data and files</span></button>
+      <button class="nav-item" data-tab="diagnostics" onclick="settingsTab('diagnostics')"><svg class="icon sm"><use href="#i-activity"/></svg><span>Diagnostics</span><i class="nav-dot" id="diag-dot" hidden></i></button>
       <button class="nav-item nav-about" data-tab="about" onclick="settingsTab('about')"><svg class="icon sm"><use href="#i-help"/></svg><span>About</span></button>
       <div class="nav-empty" id="set-q-empty" hidden>No setting matches.</div>
     </nav>
@@ -9337,7 +9344,7 @@ const promptEl = $('prompt');
 // with a load from disk. Asked at most once a minute; the server skips it when the model is loaded or anything is busy.
 let warmAskedAt = 0;
 function warmLocalModel() {
-  if (S.mode !== 'local' || !S.pinned || Date.now() - warmAskedAt < 60000) return;
+  if (S.mode !== 'local' || !S.pinned || S.settings?.chat_warmup === false || Date.now() - warmAskedAt < 60000) return;
   warmAskedAt = Date.now();
   api('/api/local-models/warm', { mode: S.mode, model: S.pinned }).catch(() => {});
 }
@@ -14678,15 +14685,17 @@ document.addEventListener('keydown', e => {
   else Find.open();
 });
 // The six pages and their parts (D48). The first part is where the page opens.
+// 1.4.6: nine pages by what you want to do (they were 18): each page's parts are its sections. Connectors, MCP
+// servers and Channels stay one Connections part; Web search and Network one part (how traffic leaves this PC).
 const SETTINGS_PAGES = [
   ['appearance', [['appearance', 'Appearance']]],
-  ['agent', [['agent', 'How it answers'], ['systemmessage', 'System message'], ['memory', 'Memory'], ['skills', 'Skills'], ['knowledge', 'Knowledge'], ['proactive', 'Proactive help']]],
-  ['models', [['models', 'Models'], ['diagnostics', 'Diagnostics']]],
-  ['permissions', [['permissions', 'Permissions'], ['privacy', 'Privacy'], ['data', 'Data and files']]],
-  ['voice', [['voice', 'Voice'], ['images', 'Images']]],
-  // 1.4.3: Connectors, MCP servers and Channels are one Connections part (everything that links the app to the
-  // outside, a section each); Web search and Network one part (how traffic leaves this PC).
-  ['websearch', [['connections', 'Connections'], ['remote', 'Phone access'], ['webnet', 'Web search and network']]],
+  ['models', [['models', 'Chat models'], ['images', 'Pictures'], ['voice', 'Voice']]],
+  ['agent', [['agent', 'How it answers'], ['systemmessage', 'System message'], ['skills', 'Skills'], ['proactive', 'Proactive help'], ['permissions', 'Permissions']]],
+  ['memory', [['memory', 'Memory and profile'], ['knowledge', 'Your files']]],
+  ['webnet', [['webnet', 'Web search and network'], ['privacy', 'Privacy']]],
+  ['connections', [['connections', 'Connectors and channels'], ['remote', 'Phone access']]],
+  ['data', [['data', 'Data and files']]],
+  ['diagnostics', [['diagnostics', 'Diagnostics']]],
   ['about', [['about', 'About']]],
 ];
 const pageOf = tab => (SETTINGS_PAGES.find(([, parts]) => parts.some(([id]) => id === tab)) || SETTINGS_PAGES[0]);
@@ -14777,7 +14786,7 @@ function searchHighlight(q, tries = 8) {
 }
 // What is on each page, so searching "dark", "seed" or "proxy" finds the right one.
 const SETTINGS_WORDS = {
-  appearance: 'appearance theme dark light look studio focus operator command classic sunrise terminal eclipse aurora claude chatgpt grok gemini accent color font serif sans density compact idle motion animation reduced text size larger contrast notifications sound focus assist do not disturb name window thinking mark orbs legacy tray start with windows mini window',
+  appearance: 'appearance theme dark light look studio focus operator command classic sunrise terminal eclipse aurora claude chatgpt grok gemini accent color font serif sans density compact idle motion animation reduced text size larger contrast notifications sound focus assist do not disturb name window thinking mark orbs legacy tray start with windows mini window extras overlay panels phosphor interface new legacy fade',
   voice: 'voice talk speak microphone mic listen hands-free speed language hebrew russian whisper piper',
   systemmessage: 'system message instructions prompt variant presets compact detailed original custom assistant name',
   memory: 'memory remember forget facts about me profile about you topics sensitive import export',
@@ -14785,7 +14794,7 @@ const SETTINGS_WORDS = {
   knowledge: 'knowledge base files folders documents search rag index pdf',
   connectors: 'connectors integrations github notion brave home assistant git fetch playwright mcp one click',
   proactive: 'proactive help suggestions observer nudges screen activity',
-  models: 'models local llama llama-server gguf favorite load gpu layers context benchmark cloud',
+  models: 'models local llama llama-server gguf favorite load gpu layers context benchmark cloud ready while i type warm preload tune speed moe advanced',
   agent: 'agent effort quick balanced thorough reviewed cross-checked workflow prompt prep revisions routing careful honest truthful fact check tools by itself auto browser response mode raw enhanced ground rules',
   images: 'images pictures draw flux z-image krea quality size seed filter gpu vram engine move drive disk speed warm step cache',
   websearch: 'web search privacy private maximum local only providers brave tavily searxng history cache keys browser built-in edge window',
@@ -14867,7 +14876,9 @@ function settingsSearch(q) {
   const words = q.split(/\s+/).filter(Boolean);
   let any = false;
   document.querySelectorAll('.modal-nav .nav-item').forEach(b => {
-    const hay = `${b.textContent} ${pageOf(b.dataset.tab)[1].map(([id, label]) => `${label} ${SETTINGS_WORDS[id] || ''}`).join(' ')}`.toLowerCase();
+    // A page matches on all its parts' words; a part under the open page (1.4.6) on its own.
+    const parts = b.dataset.tab ? pageOf(b.dataset.tab)[1] : [[b.dataset.part, '']];
+    const hay = `${b.textContent} ${parts.map(([id, label]) => `${label} ${SETTINGS_WORDS[id] || ''}`).join(' ')}`.toLowerCase();
     const show = !words.length || words.every(w => hay.includes(w));
     b.hidden = !show; any = any || show;
   });
@@ -14936,12 +14947,15 @@ function renderAppearance() {
     network: 'The route (Direct, a proxy, Tor), download and upload speed, the kill switch and the VPN.',
     session: 'Whether this is a temporary chat, and the web search mode in use.' }[name],
     sw({ ...OVERLAY_PANELS[name], ...(panels[name] || {}) }.shown === true, `overlayPanel('${name}', ${!({ ...OVERLAY_PANELS[name], ...(panels[name] || {}) }.shown === true)})`));
-  const overlayGroup = `<div class="set-group"><div class="gt">Studio layout <small>· ${cur === 'studio' ? 'how the Studio look shows live information' : 'applies to the Studio look'}</small></div>
+  // 1.4.6: the Overlay's own options moved to Extras (overlayExtras); the mini window and the app window stay here.
+  const overlayExtras = `<div class="set-group"><div class="gt">Overlay panels <small>· ${cur === 'studio' ? 'small live panels over the Studio look' : 'applies to the Studio look'}</small></div>
       ${rowHtml('Layout', 'Overlay puts small live panels over the workspace. Ctrl+Alt+O hides them.', seg([['classic', 'Classic'], ['overlay', 'Overlay']], layout, "(v=>saveSettings({studio_layout:v}).then(renderAppearance))"))}
       ${layout === 'overlay' || s.overlay_window ? `${Object.keys(OVERLAY_PANELS).map(panelRow).join('')}
       ${rowHtml('Click-through', 'Clicks pass through the panels.', sw(!!s.overlay_clickthrough, `saveSettings({overlay_clickthrough:${!s.overlay_clickthrough}}).then(renderAppearance)`))}
       ${rowHtml('Opacity', `${Math.round((s.overlay_opacity || .88) * 100)}%`, `<input type="range" min="0.3" max="1" step="0.02" value="${s.overlay_opacity || .88}" aria-label="Overlay opacity" style="max-width:180px" onchange="saveSettings({overlay_opacity:+this.value}).then(renderAppearance)">`)}
       ${rowHtml('Reset positions', 'Docks every panel back in its corner.', `<button class="btn sm" onclick="resetOverlay()">Reset</button>`)}` : ''}
+    </div>`;
+  const overlayGroup = `<div class="set-group"><div class="gt">Mini window</div>
       ${rowHtml('Mini window', 'The live panels in a small always-on-top window - over Roblox Studio, in a corner, or where you drag it. Ctrl+Alt+M, the tray, or ask the assistant.', sw(!!s.overlay_window, `saveSettings({overlay_window:${!s.overlay_window}}).then(renderAppearance)`))}
       ${s.overlay_window ? rowHtml('Where it sits', 'Over Roblox Studio follows it as it moves; dragging the window sets it to "Where I put it".',
         seg([['studio', 'Over Studio'], ['tr', 'Top right'], ['br', 'Bottom right'], ['tl', 'Top left'], ['bl', 'Bottom left'], ['free', 'Where I put it']], s.mini_place || 'studio', "(v=>saveSettings({mini_place:v}).then(renderAppearance))")) : ''}
@@ -14962,15 +14976,13 @@ function renderAppearance() {
   $('settings-body').innerHTML = `<h3>Appearance</h3><p class="lead">Colors, light or dark, and how the workspace is laid out.</p>
     <div class="set-group">
       ${rowHtml('What should I call you?', 'Used in the greeting on the home screen.', `<input class="input" style="max-width:220px" value="${esc(s.user_name || '')}" placeholder="Your name" aria-label="Your name" onchange="saveSettings({user_name:this.value})">`)}
-      ${rowHtml('Interface', 'New: the calmer 2026 design - one Customize menu, waiting items on Home, new type. Legacy: everything as it was.', seg([['new', 'New'], ['legacy', 'Legacy']], s.ui_style === 'legacy' ? 'legacy' : 'new', "(v=>changeAppearance({ui_style:v}).then(()=>{buildNewNav();renderAppearance()}))"))}
     </div>
     <div class="set-group"><div class="gt">Regular <small>· hover a card to preview its motion${cur === 'operator' && fam === 'classic' ? ' · in Classic, Operator has its own console colors: graphite at night, cool grey by day' : ''}</small></div><div class="theme-cards families">${APPEARANCES.filter(id => !AI_APPEARANCES.includes(id)).map(famCard).join('')}</div>
       <div class="gt gt-sub">AI-inspired <small>· looks like the assistants people already use. Not made by or tied to them.</small></div>
       <div class="theme-cards families">${AI_APPEARANCES.map(famCard).join('')}</div>
       ${rowHtml('Light or dark', 'Follow Windows switches with the system.', seg([['light', 'Light'], ['dark', 'Dark'], ['system', 'Follow Windows']], ['light', 'dark'].includes(s.color_mode) ? s.color_mode : 'system', "(v=>setColorMode(v).then(renderAppearance))"))}
-      ${fam === 'terminal' ? rowHtml('Phosphor at night', 'Bright green on black, with scanlines.', sw(!!s.terminal_phosphor, `saveSettings({terminal_phosphor:${!s.terminal_phosphor}, appearance:'terminal'}).then(renderAppearance)`)) : ''}
     </div>
-    <details class="set-more"${['focus', 'operator', 'command'].includes(cur) || layout === 'overlay' ? ' open' : ''}><summary>Layout and windows <small>· Studio, Focus, Operator, Command - the Overlay, the app window</small></summary>
+    <details class="set-more"${['focus', 'operator', 'command'].includes(cur) ? ' open' : ''}><summary>Layout and windows <small>· Studio, Focus, Operator, Command - the mini window, the app window</small></summary>
     <div class="set-group"><div class="gt">Look</div><div class="look-cards">${LOOKS.map(lookCard).join('')}</div></div>
     ${overlayGroup}
     <div class="set-group">
@@ -14981,7 +14993,6 @@ function renderAppearance() {
       <div class="row${dis(op)}"><div class="row-text"><b>Reply font</b><small>${op ? `${opName} uses sans throughout for density.` : 'Serif reads like a letter; sans is more compact.'}</small></div>${seg([['serif', 'Serif'], ['sans', 'Sans']], s.chat_font || 'serif', "(v=>saveSettings({chat_font:v}).then(renderAppearance))")}</div>
       <div class="row${dis(op)}"><div class="row-text"><b>Density</b><small>${op ? `${opName} is already compact.` : 'Compact fits more on smaller screens.'}</small></div>${seg([['comfortable', 'Comfortable'], ['compact', 'Compact']], s.layout || 'comfortable', "(v=>saveSettings({layout:v}).then(renderAppearance))")}</div>
       ${rowHtml('Idle screen', 'A calm screen with the time when nothing happens. Any key brings it back.', seg([['off', 'Off'], ['5', '5 min'], ['10', '10 min'], ['30', '30 min']], String(s.ambient_idle ?? '10'), "(v=>saveSettings({ambient_idle:v}).then(renderAppearance))"))}
-      ${rowHtml('Write replies in', 'Each new word fades in with the theme.', sw(store.get('animateReplies', true) !== false, `store.set('animateReplies', ${store.get('animateReplies', true) === false});renderAppearance()`))}
       <div class="row tm-row"><div class="row-text"><b>Thinking mark</b><small>What moves while it works. Orbs fly into a new pattern for each kind of work. Auto: orbs (turning nodes in the Claude look), while ChatGPT, Grok and Gemini keep their own mark. Legacy: each appearance's mark from before.</small>
         <span class="tm-preview" aria-hidden="true"><span class="think" data-act="think"><i></i><i></i><i></i><i></i><i></i></span><span class="tm-act">Thinking</span></span></div>
         ${seg([['auto', 'Auto'], ['orbs', 'Orbs'], ['legacy', 'Legacy']], ['orbs', 'legacy'].includes(s.think_mark) ? s.think_mark : 'auto', "(v=>saveSettings({think_mark:v}).then(()=>{Orbs.sync();renderAppearance()}))")}</div>
@@ -15000,7 +15011,15 @@ function renderAppearance() {
     <div class="set-group"${classic && !secret ? '' : ' style="opacity:.45;pointer-events:none"'}><div class="gt">Accent <small>· ${classic && !secret ? 'the assistant\'s color: the mark, Send, selections, and the "working" glow' : `${secret ? 'This theme' : APPEARANCE_INFO[fam].name} uses its own colors; accent applies to Classic`}</small></div><div class="swatches">
       ${accents.map(([c, n, show]) => `<button class="swatch ${(s.accent || '') === c ? 'on' : ''}" style="background:${show || c}" title="${n}" aria-label="${n}" onclick="saveSettings({accent:'${c}'}).then(renderAppearance)"></button>`).join('')}
       <input type="color" value="${esc(s.accent || '#e5a830')}" onchange="saveSettings({accent:this.value}).then(renderAppearance)" style="width:32px;height:32px;border:0;background:none;padding:0;cursor:pointer" title="Custom color" aria-label="Custom accent color">
-    </div></div>`;
+    </div></div>
+    <details class="set-more"${layout === 'overlay' ? ' open' : ''}><summary>Extras <small>· the older interface, Terminal's phosphor, the fade-in, the Overlay panels</small></summary>
+    <div class="set-group">
+      ${rowHtml('Interface', 'New: the calmer 2026 design - one Customize menu, waiting items on Home, new type. Legacy: everything as it was.', seg([['new', 'New'], ['legacy', 'Legacy']], s.ui_style === 'legacy' ? 'legacy' : 'new', "(v=>changeAppearance({ui_style:v}).then(()=>{buildNewNav();renderAppearance()}))"))}
+      ${rowHtml('Write replies in', 'Each new word fades in with the theme.', sw(store.get('animateReplies', true) !== false, `store.set('animateReplies', ${store.get('animateReplies', true) === false});renderAppearance()`))}
+      ${fam === 'terminal' ? rowHtml('Phosphor at night', 'Bright green on black, with scanlines.', sw(!!s.terminal_phosphor, `saveSettings({terminal_phosphor:${!s.terminal_phosphor}, appearance:'terminal'}).then(renderAppearance)`)) : ''}
+    </div>
+    ${overlayExtras}
+    </details>`;
   thinkMarkPreview();
   notifyQuietHint();
 }
@@ -15112,7 +15131,7 @@ async function renderSpeedTune() {
   const body = $('settings-body');
   if (S.settingsTab !== 'models' || !body || !d.models.length) return;
   let box = $('speed-tune');
-  if (!box) { box = document.createElement('div'); box.id = 'speed-tune'; box.className = 'set-group'; const moe = $('moe-test'); moe ? moe.before(box) : body.appendChild(box); }
+  if (!box) { box = document.createElement('div'); box.id = 'speed-tune'; box.className = 'set-group'; const moe = $('moe-test'); moe ? moe.before(box) : ($('models-adv') || body).appendChild(box); }
   const res = d.results || {}, run = d.state.running, sp = v => v == null ? '–' : `${Math.round(v)} tok/s`;
   const pick = S.speedPick && d.models.some(m => m.name === S.speedPick) ? S.speedPick : (d.models.find(m => m.moe) || d.models[0]).name;
   const tuned = d.models.filter(m => res[m.name]);
@@ -15134,7 +15153,7 @@ async function renderMoeTest() {
   const body = $('settings-body');
   if (S.settingsTab !== 'models' || !body || !d.models.length) return;
   let box = $('moe-test');
-  if (!box) { box = document.createElement('div'); box.id = 'moe-test'; box.className = 'set-group'; body.appendChild(box); }
+  if (!box) { box = document.createElement('div'); box.id = 'moe-test'; box.className = 'set-group'; ($('models-adv') || body).appendChild(box); }
   const res = d.results || {}, run = d.state.running, sp = v => v == null ? '–' : `${v} tok/s`;
   box.innerHTML = `<div class="gt">MoE expert cache <small>· measured, never assumed</small></div>
     <p class="muted">Keeps recently used experts in graphics memory. On 8-12 GB cards it can also make writing slower, so the test runs the same prompt with and without it and keeps a size only if writing is at least 5% faster and prompt speed doesn't drop. About 15 minutes per model; chats wait meanwhile.</p>
@@ -15203,16 +15222,21 @@ function renderModelsCached() {
       ${S.bench.loadError ? `<p class="lead" role="alert">Couldn't load benchmark results: ${esc(S.bench.loadError)}</p>` : ''}
       <div class="list-box">${rows || (S.localModelsError ? `<div class="list-row" role="alert">Couldn't load the model list: ${esc(S.localModelsError)} <button class="af-link" onclick="renderModelsTab()">Retry</button></div>` : '<div class="list-row muted">llama-server reported no models and models.ini lists none. Check that run.bat started it.</div>')}</div>
       <p class="set-note" style="margin:10px 0 0">More GPU layers is faster but needs more video memory. If a model won't load, lower GPU layers or context.</p></div>
+    <div class="set-group">
+      ${rowHtml('Get models ready while I type', 'Starts loading the chat model (and the picture model, when you ask for a picture) as soon as you type, so replies start sooner. Off: nothing loads until you send.', sw(s.chat_warmup !== false, `saveSettings({chat_warmup:${s.chat_warmup === false}, image_warmup:${s.chat_warmup === false}}).then(renderModelsCached)`))}
+    </div>
     <div class="set-group add-models"><div class="gt">Add models <small>· any llama.cpp .gguf</small></div>
       ${rowHtml('Models folder', `Put .gguf files here, then scan. <span class="mono">${esc((S.modelFolders?.folders || [])[0] || 'local\\models')}</span>`,
         `<span class="row-acts"><button class="btn sm" onclick="openModelsFolder()">${icon('i-folder', 'xs')}Open</button><button class="btn sm primary" id="scan-models" onclick="scanModels(this)">${icon('i-search', 'xs')}Scan for models</button></span>`)}
       <div class="add-model-file"><input class="input mono" id="add-model-path" placeholder="Or paste a model file's path - D:\\models\\my-model-Q4_K_M.gguf" aria-label="Path of a .gguf model file" onkeydown="if(event.key==='Enter')addModelFile()"><button class="btn sm" onclick="addModelFile()">${icon('i-plus', 'xs')}Add</button></div>
       <p class="set-note">Each new model gets an entry in <span class="mono">models.ini</span> (named after the file; a vision model's mmproj file beside it is attached), and llama-server restarts so it shows up. Or find one below - it picks the file that fits this PC.</p></div>
     ${finderGroup()}
-    ${llamaBuildGroup()}
     <div class="set-group"><div class="gt">Cloud text models <small>· in Cloud and Auto; with favorites starred, Auto picks only from them</small></div>
       <div class="list-box">${cloudRows(S.cloudText, 'favorite_cloud_text_models') || '<div class="list-row muted">None configured.</div>'}</div>
-      <div class="gt" style="margin-top:14px">Cloud vision models</div><div class="list-box">${cloudRows(S.cloudVision, 'favorite_cloud_vision_models') || '<div class="list-row muted">None configured.</div>'}</div></div>`;
+      <div class="gt" style="margin-top:14px">Cloud vision models</div><div class="list-box">${cloudRows(S.cloudVision, 'favorite_cloud_vision_models') || '<div class="list-row muted">None configured.</div>'}</div></div>
+    <details class="set-more" id="models-adv"${S.modelsAdvOpen ? ' open' : ''} ontoggle="S.modelsAdvOpen=this.open"><summary>Advanced <small>· the llama.cpp build, Tune speed, the MoE expert cache</small></summary>
+    ${llamaBuildGroup()}
+    </details>`;
 }
 // Which llama.cpp runs the local models (llama_builds.py, D51): the newest stock build, or PrismML's fork for the
 // models only it loads (Ternary Bonsai 2). Auto restarts llama-server on the fork for those, and back after.
@@ -15890,11 +15914,9 @@ function renderAgent() {
   $('settings-body').innerHTML = `<h3>How it answers</h3>
     <div class="set-group">
       ${rowHtml('Response mode', 'Raw sends only the chat - no rules, tools or memory.', seg([['enhanced', 'Enhanced'], ['raw', 'Raw']], s.response_mode === 'raw' ? 'raw' : 'enhanced', "(v=>saveSettings({response_mode:v}).then(()=>{renderAgent();renderPrivacyHint();renderSetupBtn();}))"))}
-      ${rowHtml('System message', ({compact:'Compact', detailed:'Detailed', original:'Original', custom:'Custom'})[s.system_message_variant] || 'Compact', `<button class="btn sm" onclick="settingsTab('systemmessage')">Change</button>`)}
       ${rowHtml('Effort', `How long it may work on one request - now ${esc(EFFORT_NAMES[S.effort ? S.effort.applied : s.effort || 'normal'] || 'Balanced')}. Also beside the message box.`, `<button class="btn sm" onclick="closeSettings();openSetup($('setup-btn'), 'effort')">Change</button>`)}
       ${rowHtml('Cross-check', `<span id="settings-cross-check-desc">${esc(crossCheckDescription())}</span>`, `<button type="button" class="switch ${s.cross_check === true ? 'on' : ''}" id="settings-cross-check" role="switch" aria-label="Cross-check" aria-describedby="settings-cross-check-desc" aria-checked="${s.cross_check === true}" onclick="setCrossCheck(S.settings.cross_check !== true)"></button>`)}
       ${rowHtml('Check answers', 'Flags made-up sources, and claims that no tool backs up.', sw(s.careful_mode !== false, `saveSettings({careful_mode:${s.careful_mode === false}}).then(renderAgent)`))}
-      ${rowHtml('Look things up on the web', 'When a question needs current facts. Sources are numbered.', sw(s.web_auto_search !== false, `saveSettings({web_auto_search:${s.web_auto_search === false}}).then(renderAgent)`))}
       ${rowHtml('Turn on helpful tools by itself', 'Only tools that read or make things, never ones that change your PC. Each is listed under the reply.', sw(s.auto_tools !== false, `saveSettings({auto_tools:${s.auto_tools === false}}).then(renderAgent)`))}
     </div>
     <details class="set-more">
@@ -15997,15 +16019,17 @@ async function renderWebSearch() {
       ${rowHtml('Search with first', 'DuckDuckGo needs no key and is always the fallback.', seg([['duckduckgo', 'DuckDuckGo'], ['brave', 'Brave'], ['tavily', 'Tavily'], ['searxng', 'SearXNG']], s.web_search_provider || 'duckduckgo', "(v=>saveSettings({web_search_provider:v}).then(()=>{S.searchModes=null;renderWebSearch()}))"))}
       ${rowHtml('Forums and Q&A sites too', 'Also searches Hacker News, Stack Exchange, Discourse forums, Lemmy, GitHub issues, Wikipedia and arXiv when a question fits them - where fixes and first-hand answers are. Each sees the search words.',
         sw(s.search_sources !== false, `saveSettings({search_sources:${s.search_sources === false}}).then(renderWebSearch)`))}
-      ${rowHtml('SearXNG address', 'Your own instance (JSON API on). Maximum Privacy uses only this.', `<input class="input" style="max-width:240px" value="${esc(s.searxng_url || '')}" placeholder="http://127.0.0.1:8888" aria-label="SearXNG address" onchange="saveSettings({searxng_url:this.value}).then(()=>{S.searchModes=null;renderWebSearch()})">`)}
+      ${(s.web_search_provider === 'searxng' || mode === 'max') ? rowHtml('SearXNG address', 'Your own instance (JSON API on). Maximum Privacy uses only this.', `<input class="input" style="max-width:240px" value="${esc(s.searxng_url || '')}" placeholder="http://127.0.0.1:8888" aria-label="SearXNG address" onchange="saveSettings({searxng_url:this.value}).then(()=>{S.searchModes=null;renderWebSearch()})">`) : ''}
       ${rowHtml('Test connection', 'One real search, through the route.', `<button class="btn" id="ws-test" onclick="testSearch(this)">${icon('i-activity', 'xs')}Test</button>`)}
       <div id="ws-test-out"></div>
       <div id="search-keys"></div>
+    </div>
+    <details class="set-more"${S.webMore ? ' open' : ''} ontoggle="S.webMore=this.open">
+    <summary>More options <small>· the assistant's browser, research and finance, history and cache</small></summary>
+    <div class="set-group"><div class="gt">The assistant's browser</div>
       ${rowHtml('Built-in browser', 'The assistant\'s browser runs hidden and shows in the Browser panel. Off: its own Edge window.', sw(s.browser_builtin !== false, `saveSettings({browser_builtin:${s.browser_builtin === false}}).then(renderWebSearch)`))}
       ${rowHtml('Use the browser when blocked', 'Standard mode only, when a site refuses a direct request.', sw(s.web_browser_fallback !== false, `saveSettings({web_browser_fallback:${s.web_browser_fallback === false}}).then(renderWebSearch)`))}
     </div>
-    <details class="set-more"${S.webMore ? ' open' : ''} ontoggle="S.webMore=this.open">
-    <summary>More options <small>· research and finance, history and cache</small></summary>
     <div class="set-group"><div class="gt">Research and finance</div>
       ${rowHtml('Research depth', 'Deeper reads more sources and takes longer. Ultra-deep can take hours.', seg(Object.entries(RESEARCH_DEPTHS).map(([v, [l]]) => [v, l]), s.research_depth || 'auto', "(v=>saveSettings({research_depth:v}).then(renderWebSearch))"))}
       ${rowHtml('SEC contact (optional)', '"Name email@domain" - sent only to sec.gov.', `<input class="input" style="max-width:260px" value="${esc(s.sec_contact || '')}" placeholder="Jane Doe jane@example.com" aria-label="SEC contact" onchange="saveSettings({sec_contact:this.value}).then(()=>{ if (this.value && !S.settings.sec_contact) toast('That isn\\'t in the form Name email@domain, so it wasn\\'t saved.'); renderWebSearch(); })">`)}
@@ -16086,12 +16110,6 @@ async function renderImages(data) {
         <div class="list-box">${missing.map(m => `<div class="list-row"><div class="grow">${esc(m.name)}<small>${esc(m.about)} · ${esc(m.by)}</small></div></div>`).join('')}</div>
         <p class="set-note">They come with the image setup (image_setup.py); getting them from here arrives with the new downloader.</p></details>` : ''}
       ${rowHtml('Default size', 'Bigger takes a little longer.', seg(sizes, s.image_size || 'square', "(v=>saveSettings({image_size:v}).then(()=>renderImages()))"))}</div>
-    <div class="set-group"><div class="gt">Speed</div>
-      ${rowHtml('Get ready as soon as you ask', 'Loads the model while the prompt is written.', sw(s.image_warmup !== false, `saveSettings({image_warmup:${s.image_warmup === false}}).then(()=>renderImages())`))}
-      ${rowHtml('Free the GPU while drawing', 'The chat model steps out, then comes back with your next message.', sw(s.image_free_gpu !== false, `saveSettings({image_free_gpu:${s.image_free_gpu === false}}).then(()=>renderImages())`))}
-      ${rowHtml('Keep the engine ready', `Then it lets go of the memory. ${st.running ? `Now ready: <b>${esc(st.loaded || '')}</b>.` : 'Not running.'}`,
-        seg([['2', '2 min'], ['5', '5 min'], ['15', '15 min'], ['60', '1 h']], String(s.image_keep_minutes ?? 5), "(v=>saveSettings({image_keep_minutes:+v}).then(()=>renderImages()))") + (st.running ? ` <button class="btn sm" onclick="api('/api/images/unload', {}).then(()=>renderImages())">Unload now</button>` : ''))}
-    </div>
     <div class="set-group"><div class="gt">Files</div>
       <div class="im-files">${icon('i-disk')}<div class="grow"><span class="mono">${esc(st.root)}</span><small>${st.engine ? 'Engine and models · every file checked against its published SHA-256 (manifest.json)' : 'Not set up yet'}${(st.extra_roots || []).length ? ` · some models still in ${st.extra_roots.map(esc).join(', ')}` : ''}</small></div>
         <button class="btn sm" onclick="openMoveImages()" ${st.engine && !(mv && mv.state === 'running') ? '' : 'disabled'}>Move to another drive…</button></div>
@@ -16101,8 +16119,12 @@ async function renderImages(data) {
       ${rowHtml('Prompt filter', 'Refuses sexual images of real people and sexual violence. It reads only your words. Anything sexual involving minors is always refused - that can\'t be turned off.', sw(s.image_filter !== false, `saveSettings({image_filter:${s.image_filter === false}}).then(()=>renderImages())`))}
     </div>
     <details class="set-more"${S.imagesMore ? ' open' : ''} ontoggle="S.imagesMore=this.open">
-      <summary>More options <small>· step cache, room kept for drawing, licences</small></summary>
+      <summary>More options <small>· the GPU while drawing, keeping the engine ready, step cache, licences</small></summary>
       <div class="set-group">
+        ${rowHtml('Free the GPU while drawing', 'The chat model steps out, then comes back with your next message.', sw(s.image_free_gpu !== false, `saveSettings({image_free_gpu:${s.image_free_gpu === false}}).then(()=>renderImages())`))}
+        ${rowHtml('Keep the engine ready', `Then it lets go of the memory. ${st.running ? `Now ready: <b>${esc(st.loaded || '')}</b>.` : 'Not running.'}`,
+          seg([['2', '2 min'], ['5', '5 min'], ['15', '15 min'], ['60', '1 h']], String(s.image_keep_minutes ?? 5), "(v=>saveSettings({image_keep_minutes:+v}).then(()=>renderImages()))") + (st.running ? ` <button class="btn sm" onclick="api('/api/images/unload', {}).then(()=>renderImages())">Unload now</button>` : ''))}
+        <p class="set-note">Loading while you type is one switch for chat and pictures, in Chat models.</p>
         ${rowHtml('Step cache', 'About 3× faster for Fast and Balanced. Best never uses it.', sw(s.image_speed_boost !== false, `saveSettings({image_speed_boost:${s.image_speed_boost === false}}).then(()=>renderImages())`))}
         ${rowHtml('Room kept for drawing', 'More: fewer out-of-memory stops. Less: a little faster.', seg([['1', '1 GB'], ['1.5', '1.5 GB'], ['2', '2 GB'], ['3', '3 GB']], reserve, "(v=>saveSettings({image_vram_reserve:+v}).then(()=>renderImages()))"))}
       </div>
@@ -16209,23 +16231,23 @@ async function renderVoice() {
     <div class="set-group"><div class="gt">Language</div>
       ${rowHtml('Language', 'Detect answers in the language you speak.', `<select class="input" style="max-width:260px" aria-label="Voice language" onchange="saveSettings({voice_lang:this.value}).then(renderVoice)">${langOpts}</select>`)}
       ${lang === 'auto' ? rowHtml('Also listen for', 'Besides English. Fewer is more reliable.', `<span class="vc-langs">${Object.keys(langs).filter(k => k !== 'en').map(k => `<button type="button" class="chip${extra.includes(k) ? ' on' : ''}" aria-pressed="${extra.includes(k)}" onclick="toggleVoiceLang('${k}')">${esc(langName(k))}</button>`).join('')}</span>`) : ''}
-      ${lang !== 'en' ? rowHtml('Model for other languages', 'Small hears better; Base is quicker.', seg([['small', 'Small · 488 MB'], ['base', 'Base · 148 MB']], s.voice_multi_model || 'small', "(v=>saveSettings({voice_multi_model:v}).then(renderVoice))")) : ''}
-    </div>
-    <div class="set-group"><div class="gt">How it listens</div>
-      ${rowHtml('Listener (English)', 'Accurate also hears punctuation.', seg([['accurate', 'Accurate'], ['whisper', 'Whisper']], s.voice_listener || 'accurate', "(v=>saveSettings({voice_listener:v}).then(renderVoice))"))}
-      ${!accurateOn ? rowHtml('Whisper model', 'Bigger hears better, more slowly.', `<select class="input" style="max-width:280px" onchange="saveSettings({voice_model:this.value}).then(renderVoice)">${opt(c.models, s.voice_model || 'base.en', d.models)}</select>`) : ''}
-      ${rowHtml('Wait after you stop', 'Longer if it cuts you off.', seg([['short', 'Short'], ['normal', 'Medium'], ['long', 'Long']], s.voice_patience || 'normal', "(v=>saveSettings({voice_patience:v}).then(renderVoice))"))}
-      ${rowHtml('Microphone sensitivity', 'Lower it in a noisy room.', seg([['low', 'Low'], ['normal', 'Medium'], ['high', 'High']], s.voice_sensitivity || 'normal', "(v=>saveSettings({voice_sensitivity:v}).then(renderVoice))"))}
     </div>
     <div class="set-group"><div class="gt">In a conversation</div>
       ${rowHtml('Read replies aloud', 'Off: it only listens.', sw(s.voice_speak_replies !== false, `saveSettings({voice_speak_replies:${s.voice_speak_replies === false}}).then(renderVoice)`))}
       ${rowHtml('Hands-free', 'Listens again after it speaks.', sw(s.voice_conversation !== false, `saveSettings({voice_conversation:${s.voice_conversation === false}}).then(renderVoice)`))}
       ${rowHtml('Interrupt by talking', 'Talking over it stops it.', sw(s.voice_barge_in !== false, `saveSettings({voice_barge_in:${s.voice_barge_in === false}}).then(renderVoice)`))}
       ${rowHtml('Live conversation', 'Listens while you talk and answers in about a second - waits through pauses, says “mm-hm”, lets you cut in. Off: the turn-based mode. Other languages need the GPU listener.', sw(s.voice_duplex !== false, `saveSettings({voice_duplex:${s.voice_duplex === false}}).then(renderVoice)`))}
-      ${rowHtml('GPU listener', 'Hears Hebrew, Russian and Auto on the graphics card - under a second instead of ~6 s. Uses ~0.5 GB of VRAM.', sw(!!s.voice_gpu, `saveSettings({voice_gpu:${!s.voice_gpu}}).then(renderVoice)`))}
+      ${rowHtml('Wait after you stop', 'Longer if it cuts you off.', seg([['short', 'Short'], ['normal', 'Medium'], ['long', 'Long']], s.voice_patience || 'normal', "(v=>saveSettings({voice_patience:v}).then(renderVoice))"))}
+      ${rowHtml('Microphone sensitivity', 'Lower it in a noisy room.', seg([['low', 'Low'], ['normal', 'Medium'], ['high', 'High']], s.voice_sensitivity || 'normal', "(v=>saveSettings({voice_sensitivity:v}).then(renderVoice))"))}
     </div>
     <details class="set-more"${S.voiceMore ? ' open' : ''} ontoggle="S.voiceMore=this.open">
-      <summary>More options <small>· quick replies, captions, sounds, memory</small></summary>
+      <summary>More options <small>· the listening engines, quick replies, captions, sounds, memory</small></summary>
+      <div class="set-group"><div class="gt">Listening engines</div>
+        ${rowHtml('Listener (English)', 'Accurate also hears punctuation.', seg([['accurate', 'Accurate'], ['whisper', 'Whisper']], s.voice_listener || 'accurate', "(v=>saveSettings({voice_listener:v}).then(renderVoice))"))}
+        ${!accurateOn ? rowHtml('Whisper model', 'Bigger hears better, more slowly.', `<select class="input" style="max-width:280px" onchange="saveSettings({voice_model:this.value}).then(renderVoice)">${opt(c.models, s.voice_model || 'base.en', d.models)}</select>`) : ''}
+        ${lang !== 'en' ? rowHtml('Model for other languages', 'Small hears better; Base is quicker.', seg([['small', 'Small · 488 MB'], ['base', 'Base · 148 MB']], s.voice_multi_model || 'small', "(v=>saveSettings({voice_multi_model:v}).then(renderVoice))")) : ''}
+        ${rowHtml('GPU listener', 'Hears Hebrew, Russian and Auto on the graphics card - under a second instead of ~6 s. Uses ~0.5 GB of VRAM.', sw(!!s.voice_gpu, `saveSettings({voice_gpu:${!s.voice_gpu}}).then(renderVoice)`))}
+      </div>
       <div class="set-group">
         ${rowHtml('Quick replies', 'Answers as soon as you finish a sentence. English only.', sw(s.voice_live !== false, `saveSettings({voice_live:${s.voice_live === false}}).then(renderVoice)`))}
         ${rowHtml('Show reply captions', 'Its answer under the orb.', sw(!!s.voice_captions, `saveSettings({voice_captions:${!s.voice_captions}}).then(renderVoice)`))}
@@ -16282,26 +16304,20 @@ async function renderNetwork() {
   catch (e) { body.innerHTML = `<h3>Network</h3><p class="lead" role="alert">Couldn't load the network settings: ${esc(e.message)} <button class="af-link" onclick="renderNetwork()">Retry</button></p>`; return; }
   if (!setShowing('network')) return;
   const n = d.settings, r = d.routes.other;
-  const comp = c => `<div class="row"><div class="row-text"><b>${esc(d.components[c])}</b><small>now: ${esc(d.routes[c].label)}</small></div>${seg([['app', 'App route'], ['direct', 'Direct'], ['proxy', 'Proxy'], ['tor', 'Tor']], n.net_components[c] || 'app', `(v=>saveNet({net_components:{${c}:v}}))`)}</div>`;
+  S.netNow = n;                                      // hideMyIp and the parts' routes change one part, keep the rest
+  const comp = c => `<div class="row"><div class="row-text"><b>${esc(d.components[c])}</b><small>now: ${esc(d.routes[c].label)}</small></div>${seg([['app', 'Same as above'], ['direct', 'Direct'], ['proxy', 'Proxy'], ['tor', 'Tor']], n.net_components[c] || 'app', `(v=>saveNet({net_components:{...S.netNow.net_components,${c}:v}}))`)}</div>`;
   const v = d.vpn || {};
   // One line each (D49); per-component routes, the speed indicator and the connection log fold under More options.
   body.innerHTML = `<h3>Network</h3><p class="lead">How this app reaches the internet. Searches, cloud models and downloads all follow this route - anything that tries to go around it is blocked.</p>
     ${d.blocked ? `<div class="net-alert">${icon('i-alert', 'sm')}<span><b>Blocked:</b> ${esc(d.blocked.reason)}</span><button class="btn sm" onclick="goDirectSession(true)">Go direct for this session</button></div>` : ''}
     ${d.session_direct ? `<div class="net-alert warn">${icon('i-alert', 'sm')}<span>Going <b>direct</b> for this session, by your choice.</span><button class="btn sm" onclick="goDirectSession(false)">Use the route again</button></div>` : ''}
-    <div class="set-group"><div class="gt">App-wide route</div>
-      ${seg(NET_ROUTES, n.net_route, "(v=>saveNet({net_route:v}))")}
-      <p class="lead net-route-now">Now: <b>${esc(r.label)}</b>${r.routed ? ` · names are resolved by the ${r.scheme === 'http' || r.scheme === 'https' ? 'proxy (CONNECT)' : 'proxy (socks5h)'}` : ''}${n.net_route === 'system' && !d.system_proxy ? ' · Windows has no proxy set, so this is direct' : ''}</p>
-      ${n.net_route === 'proxy' ? rowHtml('Proxy address', 'SOCKS5 or HTTP, e.g. socks5://127.0.0.1:1080', `<input class="input" style="max-width:260px" value="${esc(n.net_proxy || '')}" placeholder="socks5://127.0.0.1:1080" aria-label="Proxy address" onchange="saveNet({net_proxy:this.value})">`) : ''}
-    </div>
-    ${torGroup(d)}
-    <div class="set-group"><div class="gt">Kill switch <small>· always on</small></div>
-      <p class="set-note" style="margin:0">If the proxy or Tor goes down, traffic stops - it never goes direct by itself.</p>
-      ${rowHtml('Go direct for this session', d.session_direct ? 'On until you turn it off or restart.' : 'Off.', sw(d.session_direct, `goDirectSession(${!d.session_direct})`))}
-    </div>
+    ${hideIpGroup(d)}
     <div class="set-group"><div class="gt">VPN <small>· it can see one, not turn it on or off</small></div>
       ${rowHtml('VPN status', v.checked ? (v.active ? `Connected: ${esc((v.adapters || []).map(a => a.name).join(', '))}${v.all_traffic ? ' · all traffic goes through it' : ' · not the default route (split tunnel?)'}` : 'No VPN or tunnel adapter is up.') : (v.note || 'Not checked yet.'), `<button class="btn" onclick="refreshVpn(this)">${icon('i-retry', 'xs')}Check</button>`)}
       ${rowHtml('Require a VPN', 'Blocks this app\'s traffic when no VPN is up.', sw(n.net_require_vpn, `saveNet({net_require_vpn:${!n.net_require_vpn}})`))}
     </div>
+    <details class="set-more"${S.netMore ? ' open' : ''} ontoggle="S.netMore=this.open">
+    <summary>More options <small>· checks, each part's route, speed indicator, connection log</small></summary>
     <div class="set-group"><div class="gt">Check what leaves this PC</div>
       ${rowHtml('Public IP address', d.public && d.public.ip ? `${esc(d.public.ip)} · ${esc([d.public.city, d.public.country].filter(Boolean).join(', ') || '?')} · ${esc(d.public.org || '')} (through ${esc(d.public.route)})` : 'Asked only when you click (ipinfo.io).', `<button class="btn" onclick="netIp(this)">${icon('i-globe', 'xs')}Show</button>`)}
       ${rowHtml('Leak test', 'IP, DNS, WebRTC and what this app listens on.', `<button class="btn" onclick="leakTest(this)">${icon('i-shield', 'xs')}Run leak test</button>`)}
@@ -16309,9 +16325,7 @@ async function renderNetwork() {
       ${rowHtml('Speed test', '10 MB from Cloudflare, through the route.', `<button class="btn" onclick="speedTest(this)">${icon('i-gauge', 'xs')}Run</button>`)}
       <div id="speed-out"></div>
     </div>
-    <details class="set-more"${S.netMore ? ' open' : ''} ontoggle="S.netMore=this.open">
-    <summary>More options <small>· each part's route, speed indicator, connection log</small></summary>
-    <div class="set-group"><div class="gt">Each part <small>· follows the app route unless you pick one</small></div>${['search', 'models', 'other'].map(comp).join('')}</div>
+    <div class="set-group"><div class="gt">Each part <small>· follows Hide my IP unless you pick one</small></div>${['search', 'models', 'other'].map(comp).join('')}</div>
     <div class="set-group"><div class="gt">Speed indicator</div>
       ${rowHtml('Show it in the top bar', 'Speed, route and search mode.', sw(n.net_indicator, `saveNet({net_indicator:${!n.net_indicator}})`))}
       ${rowHtml('Count', '', seg([['app', 'This app only'], ['system', 'Whole PC']], n.net_indicator_scope, "(v=>saveNet({net_indicator_scope:v}))"))}
@@ -16372,30 +16386,49 @@ async function dataClear(kind, btn) {
   } catch (e) { toast(e.message); }
   renderDataFiles();
 }
-/* Tor (1.4.4): the app ships its own (tor_service.py) - one switch sends web searches and page reads through it,
-   or the whole app (the route above). Its status shows while it connects; bridges for networks that block Tor. A Tor
-   already running on this PC (Tor Browser, the Expert Bundle) can be used instead. */
-function torGroup(d) {
-  const n = d.settings, t = d.tor || {}, comps = n.net_components || {};
-  const usesTor = n.net_route === 'tor' || Object.values(comps).includes('tor');
-  const searchTor = comps.search === 'tor' || (n.net_route === 'tor' && (comps.search || 'app') === 'app');
+/* Hide my IP (1.4.6): one choice for what the five places on this page did - the app-wide route, "Search through
+   Tor", "Which Tor", "Tor port" and the kill switch. Off · When searching (web searches and the pages it reads go
+   through Tor) · For everything (the whole app through Tor) · My own proxy (Windows' or an address). The app's own Tor
+   (tor_service.py) is used; without it, a Tor already running on this PC (Tor Browser, the Expert Bundle) is found by
+   itself. Its status and New identity show beside it; bridges only when Tor can't connect (or are already set). The
+   kill switch is always on and needs no row: if Tor or the proxy goes down, traffic stops. */
+function hideIpMode(n) {
+  const c = n.net_components || {};
+  return n.net_route === 'tor' ? 'all' : c.search === 'tor' ? 'search' : ['proxy', 'system'].includes(n.net_route) ? 'proxy' : 'off';
+}
+function hideMyIp(v) {
+  const n = S.netNow || {}, c = { ...(n.net_components || {}) }, t = S.netTor || {};
+  const src = t.available ? 'builtin' : 'external';
+  if (v === 'off') return saveNet({ net_route: 'direct', net_components: { ...c, search: c.search === 'tor' ? 'app' : c.search } });
+  if (v === 'search') return saveNet({ net_route: n.net_route === 'tor' ? 'direct' : n.net_route, net_components: { ...c, search: 'tor' }, net_tor_source: src });
+  if (v === 'all') return saveNet({ net_route: 'tor', net_components: { search: 'app', models: 'app', other: 'app' }, net_tor_source: src });
+  return saveNet({ net_route: n.net_proxy ? 'proxy' : 'system', net_components: { ...c, search: c.search === 'tor' ? 'app' : c.search } });
+}
+function hideIpGroup(d) {
+  const n = d.settings, t = S.netTor = d.tor || {}, mode = hideIpMode(n), tor = mode === 'search' || mode === 'all';
   const builtin = t.available && n.net_tor_source !== 'external';
-  const rows = [];
-  if (t.available) rows.push(rowHtml('Search through Tor', 'Web searches and the pages it reads go through the built-in Tor - your IP stays hidden from the sites. Slower, and some sites refuse Tor. Everything else keeps the route above.',
-    sw(searchTor, `saveNet({net_components:{search:'${searchTor ? 'app' : 'tor'}'}, net_tor_source:'builtin'})`)));
-  if (usesTor && t.available) rows.push(rowHtml('Which Tor', builtin ? `The one built into this app (Tor ${esc(t.version || '')}) - nothing to install or start.` : 'One already running on this PC: Tor Browser (9150) or the Tor Expert Bundle (9050).',
-    seg([['builtin', 'Built in'], ['external', 'Tor on this PC']], builtin ? 'builtin' : 'external', "(v=>saveNet({net_tor_source:v}))")));
-  if (usesTor && !builtin) rows.push(rowHtml('Tor port', 'Auto finds Tor (9050) or Tor Browser (9150).', seg([['0', 'Auto'], ['9050', '9050'], ['9150', '9150']], String(n.net_tor_port || 0), "(v=>saveNet({net_tor_port:Number(v)}))")));
-  if (usesTor && builtin) {
-    rows.push(`<div class="row"><div class="row-text"><b>Status</b><small id="tor-status" aria-live="polite">${torStatusText(t)}</small></div><div class="tor-acts" id="tor-acts">${torActs(t)}</div></div>`);
-    rows.push(rowHtml('Bridges', 'For networks that block Tor. Snowflake works out of the box; obfs4 needs bridge lines from bridges.torproject.org.',
-      seg([['off', 'Off'], ['snowflake', 'Snowflake'], ['obfs4', 'obfs4']], n.net_tor_bridges || 'off', "(v=>saveNet({net_tor_bridges:v}))")));
-    if (n.net_tor_bridges === 'obfs4') rows.push(`<div class="row tor-bridges"><div class="row-text"><b>obfs4 bridge lines</b><small>One per line, as bridges.torproject.org gives them.</small></div>
-      <textarea class="input mono" rows="3" spellcheck="false" aria-label="obfs4 bridge lines" placeholder="obfs4 1.2.3.4:443 FINGERPRINT cert=… iat-mode=0" onchange="saveNet({net_tor_bridge_lines:this.value})">${esc(n.net_tor_bridge_lines || '')}</textarea></div>`);
+  const desc = { off: 'Sites see this PC’s own address.', search: 'Web searches and the pages it reads go through Tor - the sites don’t see your address. Slower; some sites refuse Tor. Models and downloads go direct.',
+    all: 'Everything this app sends goes through Tor - searches, cloud models and downloads. Slowest.', proxy: 'Everything goes through a proxy you choose - Windows’ own, or an address.' }[mode];
+  const rows = [rowHtml('Hide my IP', desc, seg([['off', 'Off'], ['search', 'When searching'], ['all', 'For everything'], ['proxy', 'My own proxy']], mode, 'hideMyIp'))];
+  if (tor && builtin) {
+    rows.push(`<div class="row"><div class="row-text"><b>Tor</b><small id="tor-status" aria-live="polite">${torStatusText(t)}</small></div><div class="tor-acts" id="tor-acts">${torActs(t)}</div></div>`);
+    if (t.state === 'failed' || (n.net_tor_bridges || 'off') !== 'off') {
+      rows.push(rowHtml('Bridges', 'This network may block Tor. Snowflake works out of the box; obfs4 needs bridge lines from bridges.torproject.org.',
+        seg([['off', 'Off'], ['snowflake', 'Snowflake'], ['obfs4', 'obfs4']], n.net_tor_bridges || 'off', "(v=>saveNet({net_tor_bridges:v}))")));
+      if (n.net_tor_bridges === 'obfs4') rows.push(`<div class="row tor-bridges"><div class="row-text"><b>obfs4 bridge lines</b><small>One per line, as bridges.torproject.org gives them.</small></div>
+        <textarea class="input mono" rows="3" spellcheck="false" aria-label="obfs4 bridge lines" placeholder="obfs4 1.2.3.4:443 FINGERPRINT cert=… iat-mode=0" onchange="saveNet({net_tor_bridge_lines:this.value})">${esc(n.net_tor_bridge_lines || '')}</textarea></div>`);
+    }
+    if (t.state === 'connecting') torPoll();
+  } else if (tor) {
+    rows.push(rowHtml('Tor', 'Uses the Tor already running on this PC (Tor Browser or the Expert Bundle), found by itself.', ''));
   }
-  if (!rows.length) return '';
-  if (usesTor && builtin && t.state === 'connecting') torPoll();
-  return `<div class="set-group" id="tor-group"><div class="gt">Tor <small>· hides your IP from the sites it reaches</small></div>${rows.join('')}</div>`;
+  if (mode === 'proxy') {
+    rows.push(rowHtml('Which proxy', n.net_route === 'system' && !d.system_proxy ? 'Windows has no proxy set - traffic is stopped until one is.' : 'Windows’ own proxy setting, or an address of yours.',
+      seg([['system', 'Windows’ proxy'], ['proxy', 'An address']], n.net_route === 'system' ? 'system' : 'proxy', "(v=>saveNet({net_route:v}))")));
+    if (n.net_route === 'proxy') rows.push(rowHtml('Proxy address', 'SOCKS5 or HTTP, e.g. socks5://127.0.0.1:1080', `<input class="input" style="max-width:260px" value="${esc(n.net_proxy || '')}" placeholder="socks5://127.0.0.1:1080" aria-label="Proxy address" onchange="saveNet({net_proxy:this.value})">`));
+  }
+  const note = mode === 'off' ? '' : '<p class="set-note" style="margin:6px 0 0">If Tor or the proxy goes down, traffic stops - it never goes direct by itself.</p>';
+  return `<div class="set-group" id="tor-group">${rows.join('')}${note}</div>`;
 }
 function torStatusText(t) {
   if (t.state === 'ready') return `Connected${t.seconds ? ` in ${Math.round(t.seconds)} s` : ''}${t.bridges && t.bridges !== 'off' ? ` · through ${esc(t.bridges)} bridges` : ''} · each chat gets its own circuit`;
@@ -20348,24 +20381,33 @@ async function loadWaiting() {
 setTimeout(loadWaiting, 3000); setInterval(() => { if (S.view === 'home' && !document.hidden) loadWaiting(); }, 120000);
 
 /* ---- New UI: Settings as one "Customize" list, grouped - no tabs inside pages ------------------------------------- */
-const NEW_NAV = [
-  ['Assistant', [['agent', 'How it answers', 'i-bolt'], ['systemmessage', 'System message', 'i-message'], ['memory', 'Memory', 'i-bookmark'], ['skills', 'Skills', 'i-sparkle'],
-                 ['knowledge', 'Knowledge', 'i-book'], ['connections', 'Connections', 'i-plug'], ['proactive', 'Proactive help', 'i-bulb']]],
-  ['App', [['appearance', 'Appearance', 'i-brush'], ['models', 'Models', 'i-cpu'], ['voice', 'Voice', 'i-mic'], ['images', 'Images', 'i-image'],
-           ['permissions', 'Permissions', 'i-shield'], ['privacy', 'Privacy', 'i-lock'], ['data', 'Data and files', 'i-folder']]],
-  ['Network', [['webnet', 'Web search and network', 'i-globe'], ['remote', 'Phone access', 'i-message'], ['diagnostics', 'Diagnostics', 'i-activity']]],
-  ['', [['about', 'About', 'i-help']]],
-];
+// 1.4.6: the nine pages (SETTINGS_PAGES), and under the open one its parts - 18 entries in three groups before.
+const NEW_NAV = [['appearance', 'Appearance', 'i-brush'], ['models', 'Models', 'i-cpu'], ['agent', 'Assistant', 'i-bolt'],
+  ['memory', 'Memory', 'i-bookmark'], ['webnet', 'Web and privacy', 'i-globe'], ['connections', 'Connections', 'i-plug'],
+  ['data', 'Data and files', 'i-folder'], ['diagnostics', 'Diagnostics', 'i-activity'], ['about', 'About', 'i-help']];
 function buildNewNav() {
   const nav = document.querySelector('.modal-nav'); if (!nav) return;
   let box = nav.querySelector('.nav-new');
   if (!box) { box = document.createElement('div'); box.className = 'nav-new'; nav.querySelector('#set-q-empty').before(box); }
-  box.innerHTML = NEW_NAV.map(([group, items]) => `${group ? `<div class="nav-group">${group}</div>` : '<div class="nav-sep"></div>'}${items.map(([tab, label, ic]) =>
-    `<button class="nav-item" data-tab="${tab}" data-part="${tab}" onclick="settingsTab('${tab}')">${icon(ic)}<span>${label}</span></button>`).join('')}`).join('');
-  if (S.settingsTab) markNewNav(S.settingsTab);
+  const open = S.settingsTab ? pageOf(S.settingsTab)[0] : null;
+  box.dataset.open = open || '';
+  box.innerHTML = NEW_NAV.map(([page, label, ic]) => {
+    const parts = (SETTINGS_PAGES.find(([p]) => p === page) || [, []])[1];
+    const sub = page === open && parts.length > 1 ? `<div class="nav-sub" role="group" aria-label="${esc(label)}">${parts.map(([tab, l]) =>
+      `<button class="nav-item nav-part" data-part="${tab}" onclick="settingsTab('${tab}')"><span>${esc(l)}</span></button>`).join('')}</div>` : '';
+    return `<button class="nav-item" data-tab="${page}" data-page="${page}" onclick="settingsTab('${parts[0] ? parts[0][0] : page}')"${page === open ? ' aria-expanded="true"' : parts.length > 1 ? ' aria-expanded="false"' : ''}>${icon(ic)}<span>${label}</span></button>${sub}`;
+  }).join('');
+  if (S.settingsTab) markNewNav(S.settingsTab, true);
   const h = nav.querySelector('h2'); if (h) h.textContent = document.documentElement.dataset.ui === 'legacy' ? 'Settings' : 'Customize';
 }
-function markNewNav(tab) { document.querySelectorAll('.nav-new .nav-item').forEach(b => b.classList.toggle('active', b.dataset.part === tab)); }
+function markNewNav(tab, built) {
+  const [page, parts] = pageOf(tab), box = document.querySelector('.nav-new');
+  if (!built && box && box.dataset.open !== page) { buildNewNav(); return; }   // another page opened: its parts show
+  document.querySelectorAll('.nav-new .nav-item[data-page]').forEach(b => {
+    b.classList.toggle('open', b.dataset.page === page); b.classList.toggle('active', b.dataset.page === page && parts.length < 2);
+  });
+  document.querySelectorAll('.nav-new .nav-part').forEach(b => b.classList.toggle('active', b.dataset.part === tab));
+}
 // The first start (1.4.3: three short steps): a chat model that suits this PC (one click), a look, and what stays on
 // this PC. Skippable at every step, shown once (this browser remembers); Settings > About shows it again. Nothing
 // goes to the network until the model's download is clicked (model_finder.starter needs none).

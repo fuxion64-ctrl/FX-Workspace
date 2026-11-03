@@ -114,7 +114,15 @@ class PageScriptTests(unittest.TestCase):
         page = CalmMotionTests.page
         self.assertIn("['data', 'Data and files', 'i-folder']", page)
         self.assertIn("data: renderDataFiles", page)
-        self.assertIn("function torGroup(d)", page)
+        self.assertIn("function hideIpGroup(d)", page)       # 1.4.6: Tor's rows became one "Hide my IP" choice
+
+    def test_one_switch_stops_loading_while_typing(self):
+        # 1.4.6 (a user's request): "Get models ready while I type" off - typing loads nothing, chat or pictures.
+        from core import config
+        self.assertTrue(config.clean_privacy_settings({})["chat_warmup"])
+        self.assertFalse(config.clean_privacy_settings({"chat_warmup": False})["chat_warmup"])
+        self.assertIn("S.settings?.chat_warmup === false", CalmMotionTests.page)
+        self.assertIn("saveSettings({chat_warmup:${s.chat_warmup === false}, image_warmup:", CalmMotionTests.page)
 
 
 if __name__ == "__main__":
