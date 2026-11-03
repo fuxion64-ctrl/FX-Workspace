@@ -302,13 +302,35 @@ def single_instance() -> bool:
         except OSError:
             return False
     import ctypes
-    ctypes.windll.kernel32.CreateMutexW(None, False, "Local\\AgenticWorkspaceLauncher")
-    return ctypes.windll.kernel32.GetLastError() != 183            # ERROR_ALREADY_EXISTS
+    k32 = ctypes.windll.kernel32
+    k32.CreateMutexW.restype = ctypes.c_void_p
+    handle = k32.CreateMutexW(None, False, "Local\\AgenticWorkspaceLauncher")
+    if k32.GetLastError() != 183:                                  # ERROR_ALREADY_EXISTS
+        return True
+    # Not ours: let go of this handle, or the mutex would outlive the other launcher and a later try could never
+    # take it (wait_for_previous asks again).
+    k32.CloseHandle(ctypes.c_void_p(handle))
+    return False
+
+
+def wait_for_previous(limit: float = 30.0) -> bool:
+    """Reopened right after quitting (1.4.6): the old launcher is still stopping llama-server and letting go of port
+    8000 for a few seconds. This copy used to give up at once - the desktop app then said "the server stopped while
+    starting" - so now it waits for the old one to finish, then starts. False when the old one is still running
+    for real (it answers) or doesn't finish in time."""
+    end = time.time() + limit
+    while time.time() < end:
+        if answers(f"{APP_URL}/api/settings", 1.0):
+            return False
+        time.sleep(0.5)
+        if single_instance():
+            return True
+    return False
 
 
 def main() -> int:
     os.chdir(BASE)
-    if not single_instance():
+    if not single_instance() and not wait_for_previous():
         # Already starting or running: show its window (when it's still starting, its own window is coming).
         # No logging here - the running launcher has the log open. Under the desktop app, Electron shows it.
         sys.stdout = sys.stderr = open(os.devnull, "w")

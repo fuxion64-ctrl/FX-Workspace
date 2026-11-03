@@ -132,8 +132,190 @@ MODELS = {
                                "high contrast, jpeg artifacts, watermark, signature, text",
                    "about": "Pony's clean anime look with warm, glowing backlight - just describe the picture."},
 }
+CATALOG = tuple(MODELS)              # the models this app knows and can set up; yours join them (add_model)
 QUALITIES = tuple(MODELS)
-SIZES = {"square": (1024, 1024), "portrait": (832, 1216), "landscape": (1216, 832), "wide": (1344, 768), "tall": (768, 1344)}
+
+
+# ---- your own models (1.4.6) --------------------------------------------------------------------------------------
+# Images › Add a model: a single-file checkpoint already on this PC (SD 1.x, SD 2.x or SDXL; .safetensors or .gguf)
+# joins the list with settings that suit its kind. The kind is read from the file's own tensor names, never guessed
+# from its name. Kept in data/image_models.json; the file stays where it is, and removing it from the list leaves it.
+CUSTOM_PATH = os.path.join(ROOT, "data", "image_models.json")
+MODEL_EXT = (".safetensors", ".gguf", ".ckpt")
+KINDS = {   # what each kind is good with, from the base models' cards (steps, CFG, sampler, clip skip, seconds here)
+    "sd1": {"label": "SD 1.5", "steps": 25, "cfg": 7.0, "sampler": "euler_a", "clip_skip": 1, "seconds": 12,
+            "about": "An SD 1.5 model; works best near 512 px."},
+    "sd2": {"label": "SD 2.x", "steps": 25, "cfg": 7.0, "sampler": "euler_a", "clip_skip": 1, "seconds": 15,
+            "about": "An SD 2.x model; works best near 768 px."},
+    "sdxl": {"label": "SDXL", "steps": 25, "cfg": 6.0, "sampler": "euler_a", "clip_skip": 1, "seconds": 30,
+             "about": "An SDXL model; best at 1024x1024 or 832x1216."},
+}
+_ANIME = re.compile(r"anime|anything|pony|animagine|illustrious|noob|counterfeit|waifu|hentai|toon", re.I)
+_FAST = re.compile(r"turbo|lightning|hyper|lcm|\bdmd", re.I)
+
+
+class ModelFileError(ValueError):
+    """Why a file can't be added - said plainly (the page shows it)."""
+
+
+def _safetensors_names(path: str) -> list:
+    with open(path, "rb") as f:
+        n = int.from_bytes(f.read(8), "little")
+        if not 2 <= n < 200 * 2 ** 20:
+            raise ModelFileError("This doesn't look like a .safetensors file - its header can't be read.")
+        head = json.loads(f.read(n))
+    return [k for k in head if k != "__metadata__"]
+
+
+def _gguf_names(path: str) -> list:
+    """The tensor names in a GGUF file's header (the format llama.cpp and sd.cpp share)."""
+    import struct
+    with open(path, "rb") as f:
+        if f.read(4) != b"GGUF":
+            raise ModelFileError("This doesn't look like a .gguf file.")
+        version, n_tensors, n_kv = struct.unpack("<IQQ", f.read(20))
+        if version < 2 or n_tensors > 100_000 or n_kv > 100_000:
+            raise ModelFileError("This .gguf file's header can't be read (an unknown version).")
+        fixed = {0: 1, 1: 1, 2: 2, 3: 2, 4: 4, 5: 4, 6: 4, 7: 1, 10: 8, 11: 8, 12: 8}
+        string = lambda: f.read(struct.unpack("<Q", f.read(8))[0])          # noqa: E731
+
+        def skip(t):
+            if t in fixed:
+                f.seek(fixed[t], 1)
+            elif t == 8:
+                string()
+            elif t == 9:
+                inner, count = struct.unpack("<IQ", f.read(12))
+                if inner in fixed:
+                    f.seek(fixed[inner] * count, 1)
+                else:
+                    for _ in range(count):
+                        skip(inner)
+            else:
+                raise ModelFileError("This .gguf file's header can't be read.")
+        for _ in range(n_kv):
+            string()
+            skip(struct.unpack("<I", f.read(4))[0])
+        names = []
+        for _ in range(n_tensors):
+            names.append(string().decode("utf-8", "replace"))
+            dims = struct.unpack("<I", f.read(4))[0]
+            f.seek(8 * dims + 4 + 8, 1)                                       # the dims, its type, its offset
+        return names
+
+
+def model_kind(path: str) -> str:
+    """"sd1" | "sd2" | "sdxl" for a whole checkpoint the engine runs from one file; ModelFileError for anything else,
+    saying what it is when it can tell (a LoRA, a FLUX or SD3 part without its text encoder and VAE)."""
+    ext = os.path.splitext(path)[1].lower()
+    if ext == ".ckpt":
+        raise ModelFileError("A .ckpt file can run code when it's opened - convert it to .safetensors first.")
+    try:
+        names = _safetensors_names(path) if ext == ".safetensors" else _gguf_names(path)
+    except ModelFileError:
+        raise
+    except (OSError, ValueError, UnicodeDecodeError) as e:
+        raise ModelFileError(f"The file can't be read: {str(e)[:120]}")
+    has = lambda *parts: any(all(p in n for p in parts) for n in names)    # noqa: E731
+    if has("lora_") or (has("lora_up") or has("lora_down") or has(".lora.")) and not has("input_blocks"):
+        raise ModelFileError("This is a LoRA (a style add-on), not a model - LoRAs come with Labs' picture styles.")
+    if has("double_blocks") or has("joint_blocks") or has("cap_embedder"):
+        raise ModelFileError("This is a FLUX, SD3 or Z-Image part on its own - it needs its text encoder and VAE "
+                             "beside it, which this app can't add from one file yet.")
+    if not has("input_blocks"):
+        if any(n.startswith("blk.") for n in names) and has("token_embd"):
+            raise ModelFileError("This is a chat model - add it in Settings › Models, not here.")
+        raise ModelFileError("This file isn't a picture model the engine knows (SD 1.x, SD 2.x or SDXL).")
+    if not has("first_stage_model"):
+        raise ModelFileError("This model file has no VAE inside it - pick a full checkpoint (most are).")
+    if has("conditioner.embedders") or has("label_emb"):
+        return "sdxl"
+    if has("cond_stage_model.model.") or has("cond_stage_model.transformer.text_model.encoder.layers.22"):
+        return "sd2"
+    if has("cond_stage_model"):
+        return "sd1"
+    raise ModelFileError("This model has no text encoder inside it - pick a full checkpoint.")
+
+
+def _custom_load() -> list:
+    try:
+        with open(CUSTOM_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        return [m for m in data.get("models", []) if isinstance(m, dict) and str(m.get("key", "")).startswith("my_")]
+    except (OSError, ValueError, AttributeError):
+        return []
+
+
+def _custom_save(models: list) -> None:
+    os.makedirs(os.path.dirname(CUSTOM_PATH), exist_ok=True)
+    tmp = CUSTOM_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump({"models": models}, f, indent=1)
+    os.replace(tmp, CUSTOM_PATH)
+
+
+def _custom_register() -> None:
+    """Your models into MODELS (and QUALITIES), the catalogue first."""
+    global QUALITIES
+    for k in [k for k in MODELS if k not in CATALOG]:
+        MODELS.pop(k)
+    for m in _custom_load():
+        MODELS[m["key"]] = {k: v for k, v in m.items() if k != "key"}
+        _typical.setdefault(m["key"], float(KINDS.get(m.get("kind"), {}).get("seconds", 20)))
+    QUALITIES = tuple(MODELS)
+
+
+def add_model(path: str, name: str = "") -> dict:
+    """Add a checkpoint file to the list. Returns the new entry (with its key); ModelFileError says why not."""
+    path = os.path.abspath(str(path or "").strip().strip('"'))
+    if not os.path.isfile(path):
+        raise ModelFileError("There's no file there - check the path.")
+    if not path.lower().endswith(MODEL_EXT):
+        raise ModelFileError("Pick a .safetensors or .gguf model file.")
+    kind = model_kind(path)
+    have = _custom_load()
+    for m in have:
+        if os.path.normcase(m.get("checkpoint", "")) == os.path.normcase(path):
+            raise ModelFileError(f"It's in the list already, as {m['name']}.")
+    stem = os.path.splitext(os.path.basename(path))[0]
+    name = " ".join(str(name or "").split())[:60] or re.sub(r"[_-]+", " ", stem).strip()[:60]
+    k = KINDS[kind]
+    fast, anime = bool(_FAST.search(stem)), bool(_ANIME.search(stem))
+    entry = {"key": "my_" + hashlib.sha256(os.path.normcase(path).encode()).hexdigest()[:10],
+             "name": name, "by": "Added by you", "license": "its own licence - see where you got it",
+             "checkpoint": path, "kind": kind, "custom": True,
+             "clip_skip": 2 if anime else k["clip_skip"],
+             "steps": 8 if fast else k["steps"], "cfg": 2.0 if fast else k["cfg"], "sampler": k["sampler"],
+             "edit": False, "step_cache": False,
+             "about": f"{k['about']}{' Few-step (turbo) settings.' if fast else ''}",
+             "added": time.time()}
+    _custom_save(have + [entry])
+    _custom_register()
+    return entry
+
+
+def remove_model(key: str) -> bool:
+    """Take one of your models off the list (its file stays where it is)."""
+    have = _custom_load()
+    left = [m for m in have if m["key"] != key]
+    if len(left) == len(have):
+        return False
+    if _alive() and _proc_key == key:
+        _stop()
+    _custom_save(left)
+    _custom_register()
+    return True
+
+
+def usable(key: str | None) -> str | None:
+    """The model to draw with: the one asked for when it's on this PC, else the first that is (1.4.6 - the
+    default, Balanced, was asked for on PCs that never downloaded it). None when none is."""
+    if key in MODELS and installed(key):
+        return key
+    return next((k for k in MODELS if installed(k)), None)
+
+
+SIZES ={"square": (1024, 1024), "portrait": (832, 1216), "landscape": (1216, 832), "wide": (1344, 768), "tall": (768, 1344)}
 MAX_COUNT = 4                         # pictures per request (the engine allows 8; 4 keeps a request under ~2 min)
 DEFAULT_SETTINGS = {
     "image_root": DEFAULT_ROOT,       # where the engine and models are (image_setup.py)
@@ -162,6 +344,7 @@ _waiting = 0                          # requests queued behind the one drawing
 # Seconds a warm render takes here (measured 2026-10-01 on an RTX 3060 Ti at 1024x1024, desktop apps holding
 # 2.3 GB of VRAM, step cache on for fast/balanced); replaced by each real one.
 _typical = {"fast": 13.0, "balanced": 34.0, "best": 97.0, "animagine4": 25.0, "pony6": 30.0, "pony6_anime": 32.0, "pony6_warm": 32.0}
+_custom_register()                    # your own models join the list (add_model)
 _settings = lambda: {}                # noqa: E731
 _save_settings = None                 # a function that saves settings changes (move_models switches the folder)
 _idle_thread: threading.Thread | None = None
@@ -585,6 +768,8 @@ def generate(prompt: str, quality: str | None = None, size=None, seed: int | Non
     key = quality if quality in MODELS else cfg["image_quality"]
     if ref_image is not None and not MODELS[key]["edit"]:
         key = "fast"                                       # editing an attached image: FLUX.2 klein
+    elif quality not in MODELS:
+        key = usable(key) or key                           # the default isn't on this PC: one that is
     m = MODELS[key]
     w, h = parse_size(size)
     count = max(1, min(MAX_COUNT, int(count or 1)))
@@ -783,7 +968,10 @@ def status() -> dict:
             "warm": w if w["running"] else None, "last_error": _last_error, "last_code": _last_code,
             "move": dict(_move) if _move.get("state") not in (None, "idle") else None,
             "models": [{"quality": k, **{x: m[x] for x in ("name", "by", "license", "steps", "edit", "about", "step_cache")},
-                        "installed": installed(k), "seconds": round(_typical.get(k, 0))} for k, m in MODELS.items()],
+                        "installed": installed(k), "seconds": round(_typical.get(k, 0)),
+                        "custom": bool(m.get("custom")), "kind": m.get("kind", ""),
+                        **({"file": m["checkpoint"]} if m.get("custom") else {})} for k, m in MODELS.items()],
+            "default": usable(cfg["image_quality"]),        # what a picture uses when none is picked
             "sizes": {k: f"{w_}x{h_}" for k, (w_, h_) in SIZES.items()}}
 
 
@@ -1297,7 +1485,8 @@ def plan_move(dest: str, qualities: list) -> dict:
         return {"ok": False, "why": "Choose a folder like D:\\AgenticWorkspace\\Images."}
     if os.path.normcase(os.path.abspath(dest)) == os.path.normcase(os.path.abspath(src)):
         return {"ok": False, "why": "That is where the files are already."}
-    qualities = [q for q in qualities if q in MODELS and installed(q)]
+    # Your own models (add_model) stay where you keep them: only the app's own files move.
+    qualities = [q for q in qualities if q in MODELS and installed(q) and not MODELS[q].get("custom")]
     if not qualities:
         return {"ok": False, "why": "Pick at least one downloaded model."}
     files, seen = [], set()

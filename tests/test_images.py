@@ -41,6 +41,63 @@ class FilterTests(unittest.TestCase):
         self.assertIsNotNone(image_gen.check_prompt("a rape scene"))           # on unless turned off
 
 
+def _safetensors(path, names):
+    import json as _json
+    head = _json.dumps({n: {"dtype": "F16", "shape": [1], "data_offsets": [0, 2]} for n in names}).encode()
+    with open(path, "wb") as f:
+        f.write(len(head).to_bytes(8, "little") + head + b"\0\0")
+
+
+class YourModelsTests(unittest.TestCase):
+    """1.4.6: a checkpoint file you have joins the list; its kind is read from its tensor names."""
+    SD1 = ["model.diffusion_model.input_blocks.0.0.weight", "first_stage_model.decoder.conv_in.weight",
+           "cond_stage_model.transformer.text_model.embeddings.position_ids"]
+    XL = ["model.diffusion_model.input_blocks.0.0.weight", "model.diffusion_model.label_emb.0.0.weight",
+          "first_stage_model.decoder.conv_in.weight", "conditioner.embedders.1.model.ln_final.weight"]
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir, True)
+        p = mock.patch.object(image_gen, "CUSTOM_PATH", os.path.join(self.dir, "image_models.json"))
+        p.start()
+        self.addCleanup(p.stop)
+        self.addCleanup(image_gen._custom_register)
+
+    def file(self, name, names):
+        path = os.path.join(self.dir, name)
+        _safetensors(path, names)
+        return path
+
+    def test_kinds_are_read_from_the_file(self):
+        self.assertEqual(image_gen.model_kind(self.file("a.safetensors", self.SD1)), "sd1")
+        self.assertEqual(image_gen.model_kind(self.file("b.safetensors", self.XL)), "sdxl")
+        for names, word in ((["lora_unet_down_blocks_0.alpha"], "LoRA"), (["double_blocks.0.img_attn.qkv.weight"], "FLUX"),
+                            (["model.diffusion_model.input_blocks.0.0.weight"], "VAE")):
+            with self.assertRaises(image_gen.ModelFileError) as e:
+                image_gen.model_kind(self.file("x.safetensors", names))
+            self.assertIn(word, str(e.exception))
+        with self.assertRaises(image_gen.ModelFileError):
+            image_gen.model_kind(self.file("y.ckpt", self.SD1))                # pickles can run code
+
+    def test_add_and_remove_keep_the_file(self):
+        path = self.file("ponyRealism_v22.safetensors", self.XL)
+        m = image_gen.add_model(path)
+        self.assertIn(m["key"], image_gen.MODELS)
+        self.assertIn(m["key"], image_gen.QUALITIES)
+        self.assertEqual((m["kind"], m["clip_skip"]), ("sdxl", 2))              # an anime-family name: clip skip 2
+        self.assertTrue(image_gen.installed(m["key"]))
+        with self.assertRaises(image_gen.ModelFileError):
+            image_gen.add_model(path)                                          # once
+        self.assertTrue(image_gen.remove_model(m["key"]))
+        self.assertNotIn(m["key"], image_gen.MODELS)
+        self.assertTrue(os.path.exists(path))
+
+    def test_a_missing_default_falls_back_to_an_installed_model(self):
+        with mock.patch.object(image_gen, "installed", side_effect=lambda k, root=None: k == "pony6"):
+            self.assertEqual(image_gen.usable("balanced"), "pony6")
+            self.assertEqual(image_gen.usable("pony6"), "pony6")
+
+
 class ExpandPromptTests(unittest.TestCase):
     def test_the_new_area_gets_the_setting_not_the_subject(self):
         # 1.4.6: the whole prompt drew the subject again in the new strip (a second cabin beside the cabin).

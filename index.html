@@ -3450,6 +3450,16 @@ span.tier.input { padding: 0; border: 0; width: 8px; height: 8px; min-height: 0;
 .conn-foot { display: flex; align-items: center; gap: 6px; margin-top: auto; }
 .conn-foot .grow, .cfg-actions .grow { flex: 1; }
 .ro-name { display: flex; gap: 6px; align-items: center; }
+/* Your own picture models (1.4.6): Settings › Images' add row, a card's Remove, and Images' Add button. */
+.im-add { display: grid; gap: 6px; margin-top: 12px; }
+.im-add-row { display: flex; gap: 6px; align-items: center; }
+.im-add-row .input { flex: 1; min-width: 0; height: 30px; font-size: 12.5px; }
+.im-add-out { margin: 0; min-height: 1em; font-size: 12.5px; color: var(--muted); }
+.im-add-out.err { color: var(--danger-text); }
+.img-model-wrap { display: grid; gap: 4px; }
+.img-model-wrap > .img-model { height: 100%; }
+.im-remove { justify-self: start; font-size: 12px; }
+.iv-add-model { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
 /* Renaming a chat in place (1.4.6): the box takes the title's place - in a sidebar row or the top bar. */
 .rename-box { flex: 1; min-width: 0; height: 28px; padding: 0 8px; font-size: 13px; }
 .sb-row > .rename-box { margin: 2px 0; }
@@ -6814,7 +6824,17 @@ const ImagesView = (() => {
   const active = s => !!(s && (Object.keys(s.job || {}).length || s.warm || s.waiting || (s.move && s.move.state === 'running')));
   const secs = s => !Number.isFinite(s) || s <= 0 ? '' : s >= 90 ? `~${(s / 60).toFixed(1).replace(/\.0$/, '')} min` : `~${Math.round(s)} s`;
   const typical = q => { const m = ((st.status || {}).models || []).find(x => x.quality === q); return m && m.seconds ? m.seconds : { fast: 13, balanced: 34, best: 97 }[q]; };
-  const quality = () => st.ref ? 'fast' : (st.quality || (S.settings || {}).image_quality || 'balanced');
+  // What's on this PC (1.4.6): the picker lists only installed models - the app's own and the ones you added - and
+  // a choice that isn't installed falls back to the server's pick (status.default). It listed all nine before.
+  const models = () => (st.status || {}).models || [];
+  const installedModel = id => !models().length || models().some(m => m.quality === id && m.installed);
+  const choices = () => [...IMAGE_QUALITIES.filter(([id]) => installedModel(id)),
+    ...models().filter(m => m.custom && m.installed).map(m => [m.quality, m.name, `${m.name} · ${m.about}`])];
+  const quality = () => {
+    if (st.ref) return 'fast';
+    const want = st.quality || (S.settings || {}).image_quality || 'balanced';
+    return installedModel(want) ? want : ((st.status || {}).default || want);
+  };
   const size = () => st.size || (S.settings || {}).image_size || 'square';
   const find = id => (st.list || []).find(i => i.id === id);
 
@@ -6942,12 +6962,13 @@ const ImagesView = (() => {
       : `<button type="button" class="af-link" onclick="ImagesView.toggleNeg()">+ Leave something out</button>`);
     const seg = (items, cur, fn, cls = '') => `<div class="seg ${cls}" role="group">${items.join('')}</div>`;
     // A family (Pony V6 and its presets) is one button showing the chosen preset, plus a ▾ that lists them all.
-    const qBtns = IMAGE_QUALITIES.filter(([id]) => !imageFamilyOf(id) || IMAGE_FAMILIES[id]).map(([id, label, model]) => {
+    const qBtns = choices().filter(([id]) => !imageFamilyOf(id) || IMAGE_FAMILIES[id]).map(([id, label, model]) => {
       const fam = IMAGE_FAMILIES[id], cur = fam && fam.find(([v]) => v === q), pick = cur ? q : id, on = q === id || !!cur;
       const lock = st.ref && id !== 'fast' ? 'disabled' : '';
       const main = `<button type="button" class="${on ? 'on' : ''}${fam ? ' iv-fam' : ''}" aria-pressed="${on}" ${lock ? `${lock} title="Only Fast edits a picture"` : `title="${esc(fam && cur ? IMAGE_QUALITIES.find(x => x[0] === pick)[2] : model)}"`} onclick="ImagesView.set('quality','${pick}')"><span>${label}</span><small class="mono">${fam && cur && pick !== id ? esc(cur[1]) : secs(typical(pick))}</small></button>`;
       return fam ? `<span class="iv-famwrap${on ? ' on' : ''}">${main}<button type="button" class="iv-caret" ${lock} aria-haspopup="menu" aria-expanded="false" aria-label="${esc(label)} presets" title="Other ${esc(label)} presets" onclick="ImagesView.variants(this,'${id}')">${icon('i-chev', 'xs')}</button></span>` : main;
     });
+    qBtns.push(`<button type="button" class="iv-add-model" onclick="openSettings('images')" title="Add a model file you have, or get more">${icon('i-plus', 'xs')}<span>Add</span></button>`);
     const zBtns = IMAGE_SIZES.map(([id, label, w, h]) => `<button type="button" class="${z === id ? 'on' : ''}" aria-pressed="${z === id}" onclick="ImagesView.set('size','${id}')" title="${label}"><i class="glyph" style="width:${w}px;height:${h}px"></i><span>${label}</span></button>`);
     const nBtns = [1, 2, 4].map(n => `<button type="button" class="${st.count === n ? 'on' : ''}" aria-pressed="${st.count === n}" onclick="ImagesView.set('count',${n})">${n}</button>`);
     // Pony and its presets: Think first (image_plan.py), Check result, and sequences of the same character.
@@ -16004,6 +16025,27 @@ async function renderWebSearch() {
 /* ---- Settings > Voice (voice.py, voice_natural.py) ------------------------------------------
    What speaks (the natural voice - Kokoro - or the fast one - Piper), which voice, what listens
    (Parakeet, accurate; or Whisper), live captions (the secondary listener) and how it behaves. */
+/* Your own picture models (1.4.6, image_gen.add_model): a file on this PC joins the list; Browse opens Windows'
+   picker on the server, because a page in the desktop app can't learn a picked file's path. */
+async function browseImageModel(form) {
+  try { const r = await api('/api/images/models/browse', {}); if (r.ok && r.path) form.path.value = r.path; else if (!r.ok) toast(r.message); }
+  catch (e) { toast(e.message); }
+}
+async function addImageModel(form) {
+  const out = form.querySelector('.im-add-out'), path = form.path.value.trim();
+  if (!path) { form.path.focus(); return; }
+  out.textContent = 'Reading the file…'; out.classList.remove('err');
+  try {
+    const r = await api('/api/images/models/add', { path });
+    if (!r.ok) { out.textContent = r.message; out.classList.add('err'); return; }
+    toast(`Added ${r.model.name} - it's in Images now.`);
+    renderImages({ status: r.status });
+  } catch (e) { out.textContent = e.message; out.classList.add('err'); }
+}
+async function removeImageModel(key) {
+  try { const r = await api('/api/images/models/remove', { key }); if (!r.ok) { toast(r.message); return; } toast('Removed from the list - the file is still where it was.'); renderImages({ status: r.status }); }
+  catch (e) { toast(e.message); }
+}
 /* ---- Settings > Images (image_gen.py) ---------------------------------------------
    The defaults (quality, size), how fast it gets going (warming the files, the step cache, the GPU),
    where the files are - and moving them to a faster drive - and the prompt filter. Making and browsing
@@ -16018,16 +16060,31 @@ async function renderImages(data) {
   const st = data.status, s = S.settings;
   const QUAL = Object.fromEntries(IMAGE_QUALITIES.map(([id, label]) => [id, label]));
   const secs = n => n >= 90 ? `~${(n / 60).toFixed(1).replace(/\.0$/, '')} min` : `~${Math.round(n)} s`;
-  const card = m => { const on = (s.image_quality || 'balanced') === m.quality;
-    return `<button class="opt-card img-model ${on ? 'on' : ''}" ${m.installed ? '' : 'disabled'} onclick="saveSettings({image_quality:'${m.quality}'}).then(()=>renderImages())" aria-pressed="${on}">
-      <span class="im-top"><b>${QUAL[m.quality]}</b><span class="mono">${m.seconds ? secs(m.seconds) : ''}</span></span><span class="im-name">${esc(m.name)}</span><small>${esc(m.about)}</small>
-      <div class="for">${esc(m.by)} · ${m.steps} steps · ${esc(m.license)}${m.installed ? '' : ' · <span class="err">not downloaded</span>'}</div></button>`; };
+  // 1.4.6: the cards are the models on this PC (the app's and yours); the rest of the catalogue is listed under
+  // "Not on this PC" instead of as greyed-out choices, and a model file you have can be added.
+  const current = st.default || s.image_quality;
+  const card = m => { const on = current === m.quality;
+    return `<div class="img-model-wrap"><button class="opt-card img-model ${on ? 'on' : ''}" onclick="saveSettings({image_quality:'${m.quality}'}).then(()=>renderImages())" aria-pressed="${on}">
+      <span class="im-top"><b>${esc(QUAL[m.quality] || m.name)}</b><span class="mono">${m.seconds ? secs(m.seconds) : ''}</span></span><span class="im-name">${esc(m.name)}</span><small>${esc(m.about)}</small>
+      <div class="for">${esc(m.by)} · ${m.steps} steps · ${esc(m.license)}</div></button>
+      ${m.custom ? `<button type="button" class="af-link im-remove" onclick="removeImageModel('${m.quality}')" title="${esc(m.file || '')}">Remove from the list</button>` : ''}</div>`; };
+  const missing = st.models.filter(m => !m.installed && !m.custom);
   const sizes = Object.keys(st.sizes).map(k => [k, `${k[0].toUpperCase()}${k.slice(1)} <small>${st.sizes[k]}</small>`]);
   const reserve = String(s.image_vram_reserve ?? 1.5), mv = st.move;
   body.innerHTML = `<div id="img-root"><h3>Images</h3>
     <p class="lead">Made on this PC by <b>stable-diffusion.cpp</b> - nothing is sent anywhere. Ask in a chat, use <code>/image</code>, or open <button class="af-link" onclick="closeSettings();showPlace('images')">Images</button>. ${st.engine ? '' : `<span class="err">The engine isn't installed in ${esc(st.root)} - run <code>image_setup.py</code>.</span>`}</p>
-    <div class="set-group"><div class="gt">Default quality <small>· times measured on this PC</small></div>
-      <div class="opt-cards img-models">${st.models.map(card).join('')}</div>
+    <div class="set-group"><div class="gt">Default model <small>· the ones on this PC, times measured here</small></div>
+      <div class="opt-cards img-models">${st.models.filter(m => m.installed).map(card).join('') || '<p class="set-note">No picture model is on this PC yet - add one below.</p>'}</div>
+      <form class="im-add" onsubmit="event.preventDefault();addImageModel(this)">
+        <div class="row-text"><b>Add a model you have</b><small>A full SD 1.5, SD 2.x or SDXL checkpoint (.safetensors or .gguf). It stays where it is; its kind is read from the file.</small></div>
+        <div class="im-add-row"><input class="input mono" name="path" placeholder="E:\\Models\\myModel.safetensors" aria-label="The model file" spellcheck="false">
+          <button type="button" class="btn sm" onclick="browseImageModel(this.form)">${icon('i-folder', 'xs')}Browse…</button>
+          <button type="submit" class="btn sm primary">Add</button></div>
+        <p class="im-add-out" role="status" aria-live="polite"></p>
+      </form>
+      ${missing.length ? `<details class="set-more"><summary>Not on this PC <small>· ${missing.length} more the app can use</small></summary>
+        <div class="list-box">${missing.map(m => `<div class="list-row"><div class="grow">${esc(m.name)}<small>${esc(m.about)} · ${esc(m.by)}</small></div></div>`).join('')}</div>
+        <p class="set-note">They come with the image setup (image_setup.py); getting them from here arrives with the new downloader.</p></details>` : ''}
       ${rowHtml('Default size', 'Bigger takes a little longer.', seg(sizes, s.image_size || 'square', "(v=>saveSettings({image_size:v}).then(()=>renderImages()))"))}</div>
     <div class="set-group"><div class="gt">Speed</div>
       ${rowHtml('Get ready as soon as you ask', 'Loads the model while the prompt is written.', sw(s.image_warmup !== false, `saveSettings({image_warmup:${s.image_warmup === false}}).then(()=>renderImages())`))}

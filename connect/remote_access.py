@@ -42,7 +42,7 @@ OPEN_PATHS = ("/remote/login", "/remote/manifest.webmanifest", "/remote/icon.svg
 PHONE_BLOCKED = (("POST", "/api/settings"), ("POST", "/api/keys"), ("*", "/api/remote"), ("POST", "/api/permissions"),
                  ("POST", "/api/network"), ("POST", "/api/channels"), ("POST", "/api/mcp"), ("POST", "/api/connectors"),
                  ("POST", "/api/version/install"), ("POST", "/api/shell"), ("POST", "/api/notify/quiet/open"),
-                 ("*", "/api/data-files"))
+                 ("*", "/api/data-files"), ("POST", "/api/images/models"))
 
 _lock = threading.RLock()
 _fails: dict = {}                     # ip -> [failure times]

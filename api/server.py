@@ -9,6 +9,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
+import sys
 import shutil
 import threading
 import time
@@ -3138,6 +3140,49 @@ def storage():
 def images_status():
     """Polled by the page while a picture is drawn (Images view, the chat's drawing card)."""
     return image_gen.status()
+
+
+# ---- your own picture models (1.4.6): a checkpoint file on this PC joins the list (image_gen.add_model) ----------
+class ImageModelAdd(BaseModel):
+    path: str
+    name: str = ""
+
+
+class ImageModelKey(BaseModel):
+    key: str
+
+
+@app.post("/api/images/models/add")
+def images_model_add(body: ImageModelAdd):
+    try:
+        entry = image_gen.add_model(body.path, body.name)
+    except image_gen.ModelFileError as e:
+        return {"ok": False, "message": str(e)}
+    event_log.log_action(f"Images: added {entry['name']} ({image_gen.KINDS[entry['kind']]['label']}) from {entry['checkpoint']}.")
+    return {"ok": True, "model": entry, "status": image_gen.status()}
+
+
+@app.post("/api/images/models/remove")
+def images_model_remove(body: ImageModelKey):
+    if not image_gen.remove_model(body.key):
+        return {"ok": False, "message": "That model isn't one you added."}
+    event_log.log_action("Images: removed a model you added from the list (its file stays where it was).")
+    return {"ok": True, "status": image_gen.status()}
+
+
+@app.post("/api/images/models/browse")
+def images_model_browse():
+    """Windows' own file picker, on this PC: a page in the desktop app can't learn a picked file's path itself."""
+    script = ("import tkinter as t, tkinter.filedialog as f; r = t.Tk(); r.withdraw(); r.attributes('-topmost', True); "
+              "print(f.askopenfilename(title='Pick a picture model', filetypes=[('Picture models', '*.safetensors *.gguf'), "
+              "('All files', '*.*')]) or '')")
+    try:
+        out = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True, timeout=900,
+                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return {"ok": False, "message": f"The file picker didn't open: {str(e)[:160]}"}
+    path = (out.stdout or "").strip()
+    return {"ok": True, "path": os.path.normpath(path) if path else ""}
 
 
 _IMAGE_NAME = re.compile(r"\d{8}-\d{6}-[0-9a-f]{6}\.png")

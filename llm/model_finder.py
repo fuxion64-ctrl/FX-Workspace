@@ -31,6 +31,7 @@ from urllib.parse import quote
 
 import httpx
 
+import fast_download
 import netlayer
 import paths
 
@@ -273,13 +274,23 @@ def _fetch(c: httpx.Client, repo: str, part: dict, dest: str) -> None:
         with _lock:
             _state["done"] += part["size"]
         return
+    url = f"{HF}/{repo}/resolve/main/{quote(part['path'])}"
+    if part["size"] >= fast_download.MIN_SPLIT:
+        # In pieces over several connections, resumable piece by piece (1.4.6, fast_download.py).
+        def add(n):
+            with _lock:
+                _state["done"] += n
+        try:
+            fast_download.fetch(url, tmp, part["size"], cancel=_cancel, progress=add)
+        except fast_download.Cancelled as e:
+            raise InterruptedError(str(e))
+        return _finish(tmp, dest, part)
     have = os.path.getsize(tmp) if os.path.exists(tmp) else 0
     if have > part["size"]:
         os.remove(tmp)
         have = 0
     with _lock:
         _state["done"] += have
-    url = f"{HF}/{repo}/resolve/main/{quote(part['path'])}"
     headers = {"Range": f"bytes={have}-"} if have else {}
     with c.stream("GET", url, headers=headers) as r:
         if r.status_code == 416:
@@ -303,10 +314,16 @@ def _fetch(c: httpx.Client, repo: str, part: dict, dest: str) -> None:
                     f.write(chunk)
                     with _lock:
                         _state["done"] += len(chunk)
+    _finish(tmp, dest, part)
+
+
+def _finish(tmp: str, dest: str, part: dict) -> None:
     if os.path.getsize(tmp) != part["size"]:
         raise RuntimeError(f"{part['path']} is incomplete ({os.path.getsize(tmp)} of {part['size']} bytes) - try again to resume.")
     if not _matches_hash(tmp, part.get("sha256") or ""):
         os.remove(tmp)
+        if os.path.exists(tmp + ".json"):            # fast_download's piece record: never resume a bad file
+            os.remove(tmp + ".json")
         raise RuntimeError(f"{part['path']} doesn't match the SHA-256 Hugging Face publishes - it was deleted.")
     if _cancel.is_set():
         raise InterruptedError("Download cancelled; partial file kept.")
