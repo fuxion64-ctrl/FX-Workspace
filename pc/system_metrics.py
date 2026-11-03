@@ -235,11 +235,123 @@ def spilled_mb() -> float | None:
     return _LAST_PROCESS["shared_mb"]
 
 
+class _Nvml:
+    """The NVIDIA driver's own library (nvml.dll - what nvidia-smi itself reads), called in-process (1.4.6). A
+    reading takes ~0.01 ms instead of starting nvidia-smi (~60 ms idle, longer under load) every 1.5 s, and it
+    can't time out. memory_info v2 reports "used" without the driver's reserve, as nvidia-smi does."""
+    NOT_AVAILABLE = 2 ** 64 - 1
+
+    def __init__(self):
+        self.ok = False
+        if os.name != "nt":
+            return
+        try:
+            import ctypes
+            self.ctypes = ctypes
+            self.lib = ctypes.WinDLL("nvml.dll")
+            if self.lib.nvmlInit_v2() != 0:
+                return
+            self.dev = ctypes.c_void_p()
+            if self.lib.nvmlDeviceGetHandleByIndex_v2(0, ctypes.byref(self.dev)) != 0:
+                return
+            name = ctypes.create_string_buffer(96)
+            self.name = name.value.decode(errors="replace") if self.lib.nvmlDeviceGetName(self.dev, name, 96) == 0 else "NVIDIA GPU"
+
+            class Util(ctypes.Structure):
+                _fields_ = [("gpu", ctypes.c_uint), ("memory", ctypes.c_uint)]
+
+            class MemV2(ctypes.Structure):
+                _fields_ = [("version", ctypes.c_uint), ("total", ctypes.c_ulonglong), ("reserved", ctypes.c_ulonglong),
+                            ("free", ctypes.c_ulonglong), ("used", ctypes.c_ulonglong)]
+
+            class MemV1(ctypes.Structure):
+                _fields_ = [("total", ctypes.c_ulonglong), ("free", ctypes.c_ulonglong), ("used", ctypes.c_ulonglong)]
+            self.Util, self.MemV2, self.MemV1 = Util, MemV2, MemV1
+            self.v2 = hasattr(self.lib, "nvmlDeviceGetMemoryInfo_v2")
+            self.ok = True
+        except Exception:
+            self.ok = False
+
+    def _memory(self):
+        ctypes = self.ctypes
+        if self.v2:
+            m = self.MemV2(version=ctypes.sizeof(self.MemV2) | (2 << 24))
+            if self.lib.nvmlDeviceGetMemoryInfo_v2(self.dev, ctypes.byref(m)) == 0:
+                return m.used, m.total
+            self.v2 = False                                 # an older driver: v1 from now on
+        m = self.MemV1()
+        return (m.used, m.total) if self.lib.nvmlDeviceGetMemoryInfo(self.dev, ctypes.byref(m)) == 0 else (None, None)
+
+    def read(self) -> dict:
+        """The same shape as _parse_gpu_row, {} when nothing could be read. A part that fails is left out alone:
+        the load still shows when memory can't be read, and the other way round."""
+        if not self.ok:
+            return {}
+        try:
+            used, total = self._memory()
+            u = self.Util()
+            load = float(u.gpu) if self.lib.nvmlDeviceGetUtilizationRates(self.dev, self.ctypes.byref(u)) == 0 else None
+        except Exception:
+            return {}
+        mb = 1024 * 1024
+        used_mb = round(used / mb, 1) if used is not None and used != self.NOT_AVAILABLE else None
+        total_mb = round(total / mb, 1) if total else None
+        if used_mb is not None and total_mb and used_mb > total_mb * 1.02:
+            used_mb = None                                  # a wrapped reading is no reading (as in _parse_gpu_row)
+        if used_mb is None and load is None:
+            return {}
+        return {"name": self.name, "vram_used_mb": used_mb, "vram_total_mb": total_mb,
+                "vram_percent": round(used_mb / total_mb * 100, 1) if used_mb is not None and total_mb else None,
+                "gpu_percent": load if load is None or 0 <= load <= 100 else None}
+
+
+_NVML = None
+
+
 def _gpu_sample() -> dict:
+    global _NVML
+    if _NVML is None:
+        _NVML = _Nvml()
+    if _NVML.ok:
+        got = _NVML.read()
+        if got:
+            return got
     return _parse_gpu_row(_run_smi([
         "--query-gpu=memory.used,memory.total,utilization.gpu,name",
         "--format=csv,noheader,nounits",
     ]))
+
+
+_CPU = {"times": None, "value": None}
+
+
+def _cpu_percent() -> float | None:
+    """CPU use since the previous reading, whichever thread asks. psutil 7 keeps cpu_percent(interval=None)'s
+    "since the last call" per thread, and every background refresh here runs on a new thread - so each one was a
+    first call and read 0.0 (the System panel's "CPU 0.0%", 3 Nov 2026)."""
+    if psutil is None:
+        return None
+    now = psutil.cpu_times()
+    with _LOCK:
+        last = _CPU["times"]
+        total = sum(now) - sum(last) if last is not None else 0.0
+        # Windows counts CPU time in ~16 ms ticks: too soon after the last reading there is nothing to measure, so
+        # the older baseline stays and the last value is given again.
+        if last is None or total < 0.05:
+            if last is None:
+                _CPU["times"] = now
+            return _CPU["value"]
+        _CPU["times"] = now
+        busy = total - (now.idle - last.idle)
+        _CPU["value"] = round(max(0.0, min(100.0, busy / total * 100)), 1)
+        return _CPU["value"]
+
+
+if psutil is not None:
+    try:
+        _cpu_percent()                                    # the first reading needs one before it
+    except Exception:
+        pass
 
 
 def _copy_result(value: dict) -> dict:
@@ -260,7 +372,7 @@ def begin_model_load() -> None:
         if _MODEL["baseline_used_mb"] is not None:
             return
     sample = _gpu_sample()
-    if not sample:
+    if not sample or sample.get("vram_used_mb") is None:
         return
     with _LOCK:
         if _MODEL["baseline_used_mb"] is None:
@@ -276,7 +388,7 @@ def finish_model_load(model_name: str | None = None) -> None:
         if model_name and _MODEL["name"] == model_name and _MODEL["estimated_mb"] is not None:
             return
     sample = _gpu_sample()
-    if not sample:
+    if not sample or sample.get("vram_used_mb") is None:
         return
     with _LOCK:
         baseline = _MODEL["baseline_used_mb"]
@@ -302,6 +414,9 @@ def _add_vram_breakdown(gpu: dict, active_model: str | None) -> dict:
         if _MODEL["baseline_used_mb"] is None and used is not None:
             _MODEL["baseline_used_mb"] = used
             _MODEL["baseline_total_mb"] = total
+    elif used is None:                                    # memory unreadable this time (NVML gives parts alone)
+        model_mb = None
+        source = "unavailable"
     elif direct is not None and direct >= 64:
         model_mb = min(float(direct), float(used))
         source = "process"
@@ -335,7 +450,7 @@ def _collect() -> dict:
         try:
             memory = psutil.virtual_memory()
             result.update({
-                "cpu_percent": round(float(psutil.cpu_percent(interval=None)), 1),
+                "cpu_percent": _cpu_percent(),
                 "ram_percent": round(float(memory.percent), 1),
                 "ram_used_gb": round((memory.total - memory.available) / (1024 ** 3), 1),
                 "ram_total_gb": round(memory.total / (1024 ** 3), 1),
@@ -345,18 +460,32 @@ def _collect() -> dict:
 
     gpu = _gpu_sample()
     if gpu:
-        gpu["process_vram_mb"] = _parse_model_vram(_run_smi([
+        # Per-process memory from nvidia-smi is N/A under Windows' WDDM; with NVML in use, snapshot() reads
+        # llama-server's from the Windows GPU counters instead of starting nvidia-smi for it.
+        gpu["process_vram_mb"] = None if _NVML is not None and _NVML.ok else _parse_model_vram(_run_smi([
             "--query-compute-apps=process_name,used_gpu_memory",
             "--format=csv,noheader,nounits",
         ]))
-        _LAST_GPU.update(at=time.monotonic(), value=dict(gpu))
-        result["gpu"] = gpu
-    elif _LAST_GPU["value"] and time.monotonic() - _LAST_GPU["at"] < 15:
-        result["gpu"] = dict(_LAST_GPU["value"])      # one bad or missing reading keeps the last good one on screen
+        last = _LAST_GPU["value"] or {}
+        for key in ("vram_used_mb", "vram_percent", "gpu_percent"):     # one part missing keeps its last value
+            if gpu.get(key) is None and last.get(key) is not None and time.monotonic() - _LAST_GPU["at"] < _KEEP_GPU_S:
+                gpu[key] = last[key]
+        if gpu.get("vram_used_mb") is not None and gpu.get("gpu_percent") is not None:
+            _LAST_GPU.update(at=time.monotonic(), value=dict(gpu))
+        result["gpu"], result["gpu_state"] = gpu, "ok"
+    elif _LAST_GPU["value"] and time.monotonic() - _LAST_GPU["at"] < _KEEP_GPU_S:
+        # A bad or missing reading keeps the last good one on screen, with its age. It was dropped after 15 s,
+        # and every GPU row then read "Unavailable" while the GPU worked (3 Nov 2026).
+        result["gpu"] = dict(_LAST_GPU["value"], stale_s=round(time.monotonic() - _LAST_GPU["at"]))
+        result["gpu_state"] = "stale"
+    else:
+        found = (_NVML is not None and _NVML.ok) or bool(_nvidia_smi_path())
+        result["gpu_state"] = "unreadable" if found else "none"
     return result
 
 
 _LAST_GPU = {"at": 0.0, "value": None}
+_KEEP_GPU_S = 60
 
 
 _BG = {"on": False}

@@ -206,9 +206,9 @@ def start_chat(req: shared.ChatRequest, request: Request = None):
     long-polls GET /api/turn/{id}; a reloaded page finds it in /api/state."""
     if not req.message.strip():
         return {"status": "error", "message": "Empty message."}
-    if not tasks.turns.running():
-        # From your phone, screen/mouse/keyboard control stays off unless Phone access allows it (schemas.origin_off).
-        shared.app_state["turn_origin"] = "phone" if request is not None and remote_access.is_remote(request.scope) else "pc"
+    # From your phone, screen/mouse/keyboard control stays off unless Phone access allows it (schemas.origin_off). Set
+    # only once this turn is accepted (turns.start's on_start), so a refused send can't change the running turn's.
+    origin = "phone" if request is not None and remote_access.is_remote(request.scope) else "pc"
     open_temp = sessions.temporary_chat()
     if chat_guard.is_locked(shared.app_state.get("active_chat")):
         # Closed for pushing past the chat limits (chat_guard.py): readable, but nothing more is sent to it.
@@ -237,7 +237,8 @@ def start_chat(req: shared.ChatRequest, request: Request = None):
                                               "Stop the run in Labs, wait for it to finish, or switch to a cloud model."}
     turn = tasks.turns.start(req, {"message": req.message[:500], "with_vision": bool(req.with_vision),
                              "command": req.command, "event_seq": shared.app_state.get("event_seq", 0),
-                             "temp": open_temp["id"] if open_temp else None})
+                             "temp": open_temp["id"] if open_temp else None},
+                             on_start=lambda: shared.app_state.__setitem__("turn_origin", origin))
     if turn is None:
         return {"status": "error", "message": "Busy - a task is already running. Stop it or wait for it to finish."}
     return {"status": "accepted", "turn": turn}
@@ -889,12 +890,14 @@ def _channel_turn(chat_id, message: str, origin: str, on_approval):
             sessions.new_chat()
     finally:
         shared.state_lock.release()
-    shared.app_state["turn_origin"] = origin
     req = shared.ChatRequest(message=message, mode=shared.app_state.get("mode") or config.MODE_LOCAL,
                              local_model=shared.app_state.get("local_model") or "")
     req.command = None
+    # The origin only once the turn is accepted (1.4.6): set before, a refused one left a running PC turn marked
+    # as the channel's, with fewer tools.
     turn = tasks.turns.start(req, {"message": message[:500], "with_vision": False, "command": None,
-                                   "event_seq": shared.app_state.get("event_seq", 0), "temp": None, "origin": origin})
+                                   "event_seq": shared.app_state.get("event_seq", 0), "temp": None, "origin": origin},
+                             on_start=lambda: shared.app_state.__setitem__("turn_origin", origin))
     if turn is None:
         return chat_id, {"status": "error", "message": "Busy - another task is running on the PC."}
     asked = None

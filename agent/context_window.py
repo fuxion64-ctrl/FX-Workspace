@@ -38,7 +38,7 @@ import events as event_log
 import tools.schemas as schemas
 
 THRESHOLDS = ("off", "80", "90", "95", "97")
-DEFAULT_THRESHOLD = "97"
+DEFAULT_THRESHOLD = "90"           # 1.4.6: 97% left a long reply too little room on a small context (audit)
 LIVE_BLOCK_TOKENS = 900            # the live machine-state block (agent/models._fit_for_local uses the same)
 _tool_cache: dict = {}
 

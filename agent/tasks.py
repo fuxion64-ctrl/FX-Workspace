@@ -1076,7 +1076,7 @@ def _screen(req, raw: bool) -> dict | None:
         shared.app_state["turn_instructions"] = (note + "\n\n" if note else "") + chat_guard.CARE_NOTE
         return None
     chat = sessions.ensure_chat(req)
-    guard = chat_guard.record_refusal(chat, verdict["category"])
+    guard = chat_guard.record_refusal(chat, verdict["category"], verdict.get("via") or "model")
     category = verdict["category"]
     state = "the chat is now closed" if guard.get("locked") else f"strike {guard['strikes'].get(category, 0)} for {category}"
     event_log.log_action(f"Chat limits: refused a message ({category}, by {verdict['via']}); {state}.")

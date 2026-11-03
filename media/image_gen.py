@@ -1246,11 +1246,23 @@ def expand(iid: str, sides=None, amount: float = 0.5, prompt: str = "", quality:
         out = match_colors(out, placed, plan)
         out = Image.composite(placed, out, alpha)
         b = io.BytesIO(); out.save(b, "PNG"); return b.getvalue()
-    text = ", ".join(p for p in (str(prompt or "").strip(), meta.get("prompt") or "") if p) or "the same scene, continued"
+    text = ", ".join(p for p in (str(prompt or "").strip(), meta.get("prompt") or "") if p) if str(prompt or "").strip() \
+        else surroundings_prompt(meta.get("prompt") or "")
     quality = quality if quality in MODELS else meta.get("quality") if meta.get("quality") in MODELS else None
     extra = {"expanded_from": iid, "expand": {"sides": plan["sides"], "amount": amount}}
     return generate(text, quality, f"{plan['w']}x{plan['h']}", None, meta.get("negative", ""), init_image=start,
                     strength=strength, mask_image=mask, after=put_back, extra_meta=extra, **kw)
+
+
+def surroundings_prompt(original: str) -> str:
+    """What the new area of an expanded picture shows when you didn't say (1.4.6): the picture's setting and style
+    without its subject. The whole original prompt drew the subject again in the new strip - a second cabin beside
+    the cabin (1.4.5's known issue). Prompts name the subject first ("a red sports car, on a desert road, golden
+    hour"), so the first part goes; the rest is the place, the light and the style. A one-part prompt ("a red
+    wall") is the scene itself and stays."""
+    parts = [p.strip() for p in re.split(r"[,;]", str(original or "")) if p.strip()]
+    rest = ", ".join(parts[1:] if len(parts) > 1 else parts)
+    return f"{rest}, more of the surroundings, background, seamless" if rest else "more of the same surroundings, background, seamless"
 
 
 def edit(iid: str, prompt: str, **kw) -> dict:

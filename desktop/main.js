@@ -34,7 +34,8 @@ let win = null;
 let tray = null;
 let server = null;                           // the launcher, when this app started it
 let quitting = false;
-let mini = null;                             // the mini window (mini_window.py): always on top, the ?hud=1 page
+let serverUp = false;                        // the server answered; the splash has nothing left to wait for
+let mini = null;                            // the mini window (mini_window.py): always on top, the ?hud=1 page
 let shellState = { close_to_tray: true, mini: { open: false } };   // GET /api/shell, read about once a second
 const MINI_SIZE = { width: 360, height: 460 };
 const START_HIDDEN = process.argv.includes('--hidden');   // the sign-in start (setLoginItemSettings below)
@@ -169,6 +170,15 @@ function createWindow() {
   });
   win.webContents.on('will-navigate', (e, url) => {
     if (!isApp(url) && !url.startsWith('file:')) { e.preventDefault(); if (/^https?:/.test(url)) shell.openExternal(url); }
+  });
+  // The mouse's Back button (1.4.6): the window's history began at splash.html, so Back went there and the app sat
+  // on "Starting…" until it was restarted. The history is forgotten once the app loads (the page turns Back into
+  // "close what's on top"), and a splash reached any other way while the server runs goes straight to the app.
+  win.webContents.on('did-navigate', (e, url) => {
+    if (isApp(url)) {
+      const h = win.webContents.navigationHistory;
+      try { if (h && typeof h.clear === 'function') h.clear(); else win.webContents.clearHistory(); } catch (err) { /* nothing to forget */ }
+    } else if (url.startsWith('file:') && serverUp) win.loadURL(APP_URL);
   });
   // The shortcuts a browser had: reload, zoom, full screen, developer tools.
   win.webContents.on('before-input-event', (e, input) => {
@@ -395,6 +405,7 @@ if (!app.requestSingleInstanceLock()) {
       app.quit();
       return;
     }
+    serverUp = true;
     if (win) win.loadURL(APP_URL);
     if (START_HIDDEN) postJSON('/api/shell/window', { visible: false });
     await pollShell();

@@ -92,6 +92,16 @@ class TurnManagerTests(unittest.TestCase):
         self.assertEqual(done["result"]["message"], "one")
         self.assertIsNotNone(tm.start("three"))          # free again
 
+    def test_on_start_runs_only_for_an_accepted_turn(self):
+        # 1.4.6: the phone/PC origin is set in on_start - a refused second send must not change the running turn's.
+        gate, origin = threading.Event(), {}
+        tm = TurnManager(runner=lambda req: (gate.wait(2), {"status": "success"})[1])
+        first = tm.start("pc", on_start=lambda: origin.update(v="pc"))
+        self.assertIsNone(tm.start("phone", on_start=lambda: origin.update(v="phone")))
+        self.assertEqual(origin["v"], "pc")
+        gate.set()
+        tm.wait(first["id"], 2)
+
     def test_runner_exception_becomes_error_result(self):
         tm = TurnManager(runner=lambda req: 1 / 0)
         t = tm.start("x")

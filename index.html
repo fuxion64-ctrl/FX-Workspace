@@ -1619,6 +1619,10 @@ html.fx-desktop .sb-quit:hover { background: var(--hover); color: var(--danger-t
 :root[data-motion="off"] *, :root[data-motion="off"] *::before, :root[data-motion="off"] *::after {
   animation: none !important; transition: none !important; scroll-behavior: auto !important;
 }
+/* One moving signal (1.4.6): a mark another one in the same reply speaks for holds still (oneMover), and inside a
+   reply the step list's and the page list's spinners are a still ring - the reply's thinking mark already moves. */
+.think[data-still], .think[data-still] *, .think[data-still] *::before, .think[data-still] *::after,
+.msg-assistant :is(.steps, .web-body) .spinner { animation: none !important; }
 /* ---- Icon hover animations (2026-10-14, v2): each icon moves its own parts - the trash lid lifts, the gear turns and
    settles, the download arrow falls into the tray, the notes hop in turn, the eye blinks. Symbols carry ip-* classes on
    their parts; a part plays var(--ip-<part>), which only the hovered button sets, so idle icons are untouched. Full motion
@@ -3108,6 +3112,7 @@ span.tier.input { padding: 0; border: 0; width: 8px; height: 8px; min-height: 0;
 .kv dd { margin: 0; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sub-head { margin-top: 14px; font-weight: 500; font-size: 12.5px; display: flex; align-items: center; gap: 7px; }
 .usage-row { display: grid; grid-template-columns: 1fr auto; gap: 3px 8px; margin-top: 7px; font-size: 12.5px; }
+.usage-note { margin: 10px 0 0; font-size: 12.5px; }
 .usage-row .bar { grid-column: 1 / -1; }
 .bar { height: 4px; border-radius: 4px; background: var(--surface-3); overflow: hidden; }
 .bar > i { display: block; height: 100%; width: 0; background: var(--text-2); border-radius: inherit; transition: width .4s ease, background-color .2s; opacity: .5; }
@@ -3445,6 +3450,10 @@ span.tier.input { padding: 0; border: 0; width: 8px; height: 8px; min-height: 0;
 .conn-foot { display: flex; align-items: center; gap: 6px; margin-top: auto; }
 .conn-foot .grow, .cfg-actions .grow { flex: 1; }
 .ro-name { display: flex; gap: 6px; align-items: center; }
+/* Renaming a chat in place (1.4.6): the box takes the title's place - in a sidebar row or the top bar. */
+.rename-box { flex: 1; min-width: 0; height: 28px; padding: 0 8px; font-size: 13px; }
+.sb-row > .rename-box { margin: 2px 0; }
+.topbar .rename-box { max-width: 420px; font-size: 14px; }
 .ro-name .input { height: 28px; width: 220px; flex: none; font-size: 12.5px; }
 .prep-text { width: 100%; height: auto; min-height: 96px; margin-top: 10px; resize: vertical; flex: none; font-family: var(--mono); font-size: 12.5px; line-height: 1.5; padding: 8px 10px; }
 .mem-text { width: 100%; height: auto; resize: vertical; min-height: 44px; font: inherit; line-height: 1.45; padding: 7px 9px; margin-bottom: 4px; }
@@ -11790,6 +11799,7 @@ const Thinking = (() => {
     const ind = el.querySelector('.think'), act = S.run === 'paused' || S.live.waiting ? 'wait' : stage ? 'read' : 'think';
     setThinkAct(ind, act);
     paintAct(turn, phase === 'live');
+    oneMover(turn);
   }
   function tick() {
     timer = 0;
@@ -12156,10 +12166,10 @@ var Orbs = (() => {
         if (el._orb && el._orb.seen) { const p = el._orb; p.seen = false; handoff = { act: p.act, from: p.from, t0: p.t0, depth: p.depth, at: now }; }
         continue;
       }
-      const o = el._orb || prepare(el);
+      const o = el._orb || prepare(el), hold = still || el.dataset.still === '1';   // oneMover: another mark moves
       o.seen = true;
-      paint(el, o, t, now, still);
-      live = live || !still || !!o.from;
+      paint(el, o, hold ? .4 : t, now, hold);
+      live = live || !hold || !!o.from;
     }
     if (live) raf = requestAnimationFrame(frame); else last = 0;
   }
@@ -12986,6 +12996,17 @@ function paintResearch(el, r) {
     ${r.question && live ? `<div class="rp-q">${esc(r.question)}</div>` : ''}`;
   setHtmlIfChanged(el, html);
 }
+// One moving signal at a time (1.4.6): a Research turn moved the same mark in the Thinking row, the search row and
+// Research's bar at once (3 Nov 2026). Of a turn's marks on screen only the newest - the lowest - moves; the others
+// hold their formation still (data-still: the CSS marks stop, Orbs draws them once).
+function oneMover(turn = S.turn) {
+  if (!turn || !turn.wrap) return;
+  const marks = [...turn.wrap.querySelectorAll('.think')].filter(el => el.getClientRects().length > 0);
+  marks.forEach((el, i) => {
+    const still = i < marks.length - 1;
+    if ((el.dataset.still === '1') !== still) { if (still) el.dataset.still = '1'; else delete el.dataset.still; }
+  });
+}
 function sortedEvents(map) { return [...map.values()].sort((a, b) => (a.id ?? a.seq) - (b.id ?? b.seq)); }
 function updateTurn(events) {
   const turn = S.turn; if (!turn) return;
@@ -13014,6 +13035,7 @@ function updateTurn(events) {
     }
     paintWeb(turn.webEl, webModelOf(web), true);
   }
+  oneMover(turn);
   // The approval card says it is waiting; the live steps don't repeat it (D48).
   const list = visibleSteps(sortedEvents(turn.events)).filter(e => e.kind !== 'approval');
   if (!list.length || (!turn.stepsEl && !hasMeaningfulSteps(list))) return;
@@ -13022,6 +13044,7 @@ function updateTurn(events) {
   if (!turn.stepsEl) { turn.stepsEl = buildSteps(list, true); (turn.webEl || turn.researchEl || turn.modelEl).after(turn.stepsEl); }
   turn.stepsEl.querySelector('.steps-body').innerHTML = list.map(stepRow).join('');
   turn.stepsEl.querySelector('.steps-summary').innerHTML = stepsSummary(list, true);
+  oneMover(turn);
   scrollToBottom();
 }
 async function finishTurn() {
@@ -14067,12 +14090,17 @@ function renderMetrics(m, st) {
   S.tele.push({ cpu, vram, state: S.live.state }); if (S.tele.length > 120) S.tele.shift();
   drawTelemetry();
   const est = g.model_vram_source === 'load_delta' ? '~' : '';
-  const row = (label, p, detail) => `<div class="usage-row"><span>${label}</span><span class="muted mono">${p === null ? 'Unavailable' : detail}</span><div class="bar"><i class="${barClass(p)}" style="width:${p ?? 0}%"></i></div></div>`;
+  // A part with no reading yet shows a dash (1.4.6); the whole GPU block says why when there's none - it used to
+  // read "Unavailable" four times while the GPU worked (3 Nov 2026). An older reading says how old.
+  const row = (label, p, detail) => `<div class="usage-row"><span>${label}</span><span class="muted mono">${p === null ? '—' : detail}</span><div class="bar"><i class="${barClass(p)}" style="width:${p ?? 0}%"></i></div></div>`;
   const mv = pct(g.model_vram_percent), sv = pct(g.system_vram_percent);
+  const old = g.stale_s >= 5 ? ` · ${g.stale_s} s ago` : '';
+  const gpuNote = d.gpu ? '' : { none: 'No NVIDIA GPU found - models run on the CPU.', unreadable: 'The GPU didn\'t answer just now - the next reading tries again.' }[d.gpu_state] || 'Reading the GPU…';
   setHtmlIfChanged($('system-body'),
     row('CPU', cpu, `${(cpu ?? 0).toFixed(1)}%`) + row('Memory', ram, `${Number(d.ram_used_gb).toFixed(1)} / ${Number(d.ram_total_gb).toFixed(1)} GB`) +
-    row('GPU load', gpu, `${(gpu ?? 0).toFixed(0)}%`) + row('GPU memory', vram, `${gb(g.vram_used_mb)} / ${gb(g.vram_total_mb)} GB`) +
-    row('Model VRAM', mv, `${est}${gb(g.model_vram_mb)} GB`) + row('Other VRAM', sv, `${est}${gb(g.system_vram_mb)} GB`) +
+    (gpuNote ? `<p class="usage-note muted">${esc(gpuNote)}</p>` :
+    row('GPU load', gpu, `${(gpu ?? 0).toFixed(0)}%${old}`) + row('GPU memory', vram, `${gb(g.vram_used_mb)} / ${gb(g.vram_total_mb)} GB`) +
+    row('Model VRAM', mv, `${est}${gb(g.model_vram_mb)} GB`) + row('Other VRAM', sv, `${est}${gb(g.system_vram_mb)} GB`)) +
     `<dl class="kv" style="margin-top:12px"><dt>Engine</dt><dd>${esc(st.mode || '')} · ${esc(shortModel(st.model))}</dd><dt>llama-server</dt><dd>${st.local_up ? 'running' : 'not reachable'}</dd><dt>Context</dt><dd>${st.local_ctx ? Number(st.local_ctx).toLocaleString() + ' tokens' : '—'}</dd><dt>UI control</dt><dd>${st.pywinauto_available ? 'UI Automation' : 'screenshots only'}</dd></dl>`);
 }
 
@@ -14288,9 +14316,10 @@ function renderLockState(locked) {
   const severe = S.locked === 'minors';
   const why = severe ? 'it asked for sexual content involving minors, which is never allowed here.'
     : S.locked === 'abuse' ? 'it stayed abusive.' : "it kept asking for things outside this app's limits.";
-  // Hidden on purpose: double-clicking the lock icon reopens the chat (a small model can refuse by mistake). A chat
-  // closed for minors has no way back.
-  el.innerHTML = `<span class="lb-key"${severe ? '' : ' ondblclick="reopenChat()"'} aria-hidden="true">${icon('i-lock', 'sm')}</span><div class="lb-text"><b>This chat was closed</b> - ${esc(why)} You can still read it.</div>
+  // Reopen is a button you can see (1.4.6) - it was a hidden double-click on the lock, so a chat a small model
+  // closed by mistake looked lost for good. A chat closed for minors has no way back.
+  el.innerHTML = `<span class="lb-key" aria-hidden="true">${icon('i-lock', 'sm')}</span><div class="lb-text"><b>This chat was closed</b> - ${esc(why)} You can still read it.</div>
+    ${severe ? '' : `<button class="btn sm ghost" onclick="reopenChat()" title="If it was closed by mistake: read back through it, then reopen">${icon('i-retry', 'xs')}Review and reopen</button>`}
     <button class="btn sm" onclick="newChat()">${icon('i-plus', 'xs')}New chat</button>`;
   $('thread').appendChild(el);
 }
@@ -14569,12 +14598,25 @@ document.addEventListener('keydown', e => {
 // Esc stops the running task - only when Esc has nothing else to close. Capture phase: it has
 // to look before the handlers that close menus, cards and editors run.
 document.addEventListener('keydown', e => {
-  if (e.key !== 'Escape' || !S.busy || S.run === 'stopping' || popEl || !$('settings').classList.contains('hidden')) return;
+  if (e.key !== 'Escape' || e.fxBack || !S.busy || S.run === 'stopping' || popEl || !$('settings').classList.contains('hidden')) return;
   if (document.querySelector('.palette-back:not([hidden]), .approval-card[data-open="1"], .msg-edit, .find-bar:not([hidden]), .cite-card:not([hidden])')) return;
   if (!$('project-editor').classList.contains('hidden') || !$('routine-editor').classList.contains('hidden') || !$('help').classList.contains('hidden')) return;
   if ($('app').classList.contains('sidebar-open')) return;              // Esc closes the drawer first
   e.preventDefault(); stopRun();
 }, true);
+
+// The mouse's Back button (1.4.6) closes what's on top, the way Esc does - but never stops a reply (e.fxBack, above)
+// and never leaves the page: going back used to land on the desktop app's splash, stuck on "Starting…". Forward
+// does nothing. mousedown and mouseup both, so the browser's own back/forward never starts.
+for (const ev of ['mousedown', 'mouseup']) document.addEventListener(ev, e => {
+  if (e.button !== 3 && e.button !== 4) return;
+  e.preventDefault();
+  if (ev === 'mouseup' && e.button === 3) {
+    const esc = new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true, cancelable: true });
+    esc.fxBack = true;
+    (document.activeElement || document.body).dispatchEvent(esc);
+  }
+});
 
 /* ---- The sidebar's width: drag its edge (arrow keys on it), double-click to reset ---- */
 (() => {
@@ -15840,7 +15882,7 @@ function renderAgent() {
         ${rowHtml('Prompt Prep', `What it adds before it starts - now ${PREP_NAMES[s.prompt_prep || 'clarify']}. Set beside the message box, Effort tab.`, '')}
         ${rowHtml('Raise effort for complex tasks', 'Clearly multi-step requests at Balanced run as Thorough.', sw(s.effort_auto_escalate !== false, `saveSettings({effort_auto_escalate:${s.effort_auto_escalate === false}}).then(renderAgent)`))}
         ${rowHtml('Revisions after review', 'How often it may fix its own result. Auto follows the effort.', seg([['auto', 'Auto'], ['0', '0'], ['1', '1'], ['2', '2']], mr, "(v=>saveSettings({max_revisions:v==='auto'?'auto':Number(v)}).then(renderAgent))"))}
-        ${rowHtml('Compress a long chat at', 'Older requests become a summary instead of being dropped.', seg([['off', 'Off'], ['80', '80%'], ['90', '90%'], ['95', '95%'], ['97', '97%']], String(s.context_auto_compress ?? '97'), "(v=>saveSettings({context_auto_compress:v}).then(renderAgent))"))}
+        ${rowHtml('Compress a long chat at', 'Older requests become a summary instead of being dropped.', seg([['off', 'Off'], ['80', '80%'], ['90', '90%'], ['95', '95%'], ['97', '97%']], String(s.context_auto_compress ?? '90'), "(v=>saveSettings({context_auto_compress:v}).then(renderAgent))"))}
         ${rowHtml('Load tools as needed', 'Sends only the tools a request needs - about half the context on a local model.', sw(s.skills_on !== false, `saveSettings({skills_on:${s.skills_on === false}}).then(renderAgent)`))}
         ${rowHtml('Show planning in the chat', 'Planning and review rows under each reply. They are always in Activity.', sw(s.show_activity === true, `saveSettings({show_activity:${s.show_activity !== true}}).then(renderAgent)`))}
         ${rowHtml('Switch models by itself', 'Hand a task to a better-suited model. Your chosen model is otherwise never switched.', sw(!!s.auto_model_routing, `saveSettings({auto_model_routing:${!s.auto_model_routing}}).then(renderAgent)`))}
@@ -19698,6 +19740,7 @@ function sbDrop(e, pid) {
 }
 function renderSidebar() {
   const list = $('sb-list'); if (!list) return;
+  if (S.renaming && list.contains(S.renaming.input)) { S.sb.pendingRender = true; return; }   // renameChat redraws after
   const chip = $('sb-proj');
   if (S.project) {
     chip.classList.remove('hidden');
@@ -19852,9 +19895,39 @@ async function openChat(id) {
     loadSidebar();
   } catch (e) { toast(e.message); }
 }
-async function renameChat(id, title) {
-  const t = prompt('Rename chat', title); if (t === null || !t.trim()) return;
-  try { const r = await api(`/api/chats/${encodeURIComponent(id)}`, { title: t }); if (!r.ok) toast(r.message); else if (id === S.chatId) adoptChat(r.chat); loadSidebar(); } catch (e) { toast(e.message); }
+// Rename in place (1.4.6): this used prompt(), which the desktop app doesn't have - Rename did nothing there. The
+// title becomes a text box where it's shown: the sidebar row, or the top bar when the row isn't on screen. Enter or
+// clicking away saves, Esc cancels. The sidebar doesn't redraw under it (renderSidebar waits for S.renaming).
+function renameChat(id, title) {
+  if (S.renaming) { S.renaming.input.focus(); return; }
+  const row = [...document.querySelectorAll('.sb-row[data-chat]')].find(r => r.dataset.chat === id && r.offsetParent);
+  const host = row ? row.querySelector('.sb-row-main') : id === S.chatId ? $('chat-title') : null;
+  if (!host) return;
+  const input = Object.assign(document.createElement('input'), { className: 'input rename-box', value: title || '', maxLength: 70, spellcheck: false });
+  input.setAttribute('aria-label', 'Chat name');
+  if (row) row.draggable = false;                  // a draggable row won't let the mouse select text in the box
+  host.hidden = true; host.after(input);
+  S.renaming = { id, input };
+  input.focus(); input.select();
+  const finish = async save => {
+    if (!S.renaming || S.renaming.input !== input) return;
+    S.renaming = null;
+    const t = input.value.trim();
+    input.remove(); host.hidden = false; if (row) row.draggable = true;
+    if (S.sb.pendingRender) { S.sb.pendingRender = false; renderSidebar(); }
+    if (!save || !t || t === (title || '').trim()) return;
+    try {
+      const r = await api(`/api/chats/${encodeURIComponent(id)}`, { title: t });
+      if (!r.ok) toast(r.message); else if (id === S.chatId) adoptChat(r.chat);
+      loadSidebar();
+    } catch (e) { toast(e.message); }
+  };
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+  input.addEventListener('click', e => e.stopPropagation());
 }
 async function deleteChat(id, title) {
   if (!confirm(`Delete "${title}"? It is moved to data\\chats\\trash, not destroyed.`)) return;

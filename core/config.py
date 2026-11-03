@@ -164,7 +164,7 @@ DEFAULT_SETTINGS = {
     **skills.DEFAULT_SETTINGS,          # action tools in skills, loaded as needed (skills.py)
     "presets": [],                      # the composer's saved presets: [{id, name, system, tools, model: {mode, id}, effort}]
     "ambient_idle": "10",               # minutes without input before the idle screen: off | 5 | 10 | 30
-    "context_auto_compress": "97",      # % of the context limit that triggers compression: off | 80 | 90 | 95 | 97
+    "context_auto_compress": "90",      # % of the context limit that triggers compression: off | 80 | 90 | 95 | 97 (1.4.6: was 97)
     **awareness.DEFAULT_SETTINGS,
     # Permission mode/category-defaults/per-tool overrides - see
     # permissions.py, the single source of truth for their shape and for
@@ -255,7 +255,7 @@ def clean_agent_settings(s: dict) -> dict:
     out["effort_overrides"] = effort.clean_overrides(s.get("effort_overrides"))
     out["ambient_idle"] = str(s.get("ambient_idle")) if str(s.get("ambient_idle")) in AMBIENT_IDLE else "10"
     out["context_auto_compress"] = (str(s.get("context_auto_compress")) if str(s.get("context_auto_compress"))
-                                    in CONTEXT_COMPRESS_AT else "97")
+                                    in CONTEXT_COMPRESS_AT else "90")
     out["web_search_provider"] = (s.get("web_search_provider") if s.get("web_search_provider") in WEB_SEARCH_PROVIDERS
                                  else "duckduckgo")
     url = str(s.get("searxng_url") or "").strip()

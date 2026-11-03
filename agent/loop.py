@@ -92,6 +92,10 @@ def _append_tool_result(tc, tool_name, res):
             _report_embedded_instructions(tool_name, found)
         url_guard.note_read(message)            # from here on, only addresses seen so far open by themselves
         message = untrusted.frame(tool_name, message, found)
+    held = shared.app_state.pop("held_back_calls", None)
+    if held:
+        message += (f"\n\n[NOT RUN YET - you asked for these in the same step, before this result was known: "
+                    f"{'; '.join(held)}. Call again any you still need now that you have this result.]")
     shared.app_state["conversation"].append({
         "role": "tool", "tool_call_id": tc.id, "name": tool_name,
         "content": message,
@@ -558,11 +562,14 @@ def run_agent_loop():
         # is one tool called for many items at once (ten roblox_create_instance
         # calls): those don't build on each other, and kept together they are one
         # step and one approval card instead of ten.
-        dropped = 0
+        # The model is told which ones were held back (1.4.6): they vanished without a word, and it carried on as
+        # if they had run (audit, 31 Oct 2026). The note rides on the kept call's result (_append_tool_result).
+        shared.app_state["held_back_calls"] = None
         if local and len(parsed) > 1 and not _same_tool_batch(parsed):
-            dropped = len(parsed) - 1
+            held = [f"{n} ({event_log.describe_tool(n, a)})" for _tc, n, a in parsed[1:]]
             parsed = parsed[:1]
-            event_log.log_action(f"Local mode: kept the first tool call, deferred {dropped} more until its result is known.")
+            shared.app_state["held_back_calls"] = held
+            event_log.log_action(f"Local mode: kept the first tool call, deferred {len(held)} more until its result is known.")
 
         # Real tools this message may not use end the run. A name that isn't a
         # tool at all is answered below with the real list instead: ending the

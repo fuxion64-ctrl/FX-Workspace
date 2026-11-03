@@ -18,19 +18,20 @@ Each category has its own count and its own limit (`limits`, default 3). Strikes
 stay held against the chat forever, the way Claude only ends a conversation that keeps going.
 
 Two layers ("rules + model check"):
-  1. Rules: the image filter's own patterns (image_gen) flag a possible `minors` case. Greetings and very short
-     messages ("ok", "go on") skip the model check entirely.
+  1. Rules: the chat's own narrow phrases (_CHAT_SEXUAL next to _CHAT_MINOR) flag a possible `minors` case.
+     Greetings and very short messages ("ok", "go on") skip the model check entirely.
   2. Model check: the message (with the previous one, for follow-ups) gets one short classification question to
      the model in use - about a second. Only its verdict refuses. If the check can't run, the message is allowed,
-     except a `minors` rule hit, which is refused (fail closed for that one category).
+     except a `minors` rule hit, which is refused (fail closed for that one category) - that message only: the
+     chat is closed for good only when the model confirms it (1.4.6).
 
 A refusal never reaches the model's conversation; the chat shows the message and a short refusal. Each counts as a
 strike on that chat; `strike_limit` strikes (default 3) - or one `minors` refusal - lock it: it can still be read,
 but nothing more can be sent, edited, retried or branched from it. A new chat starts clean.
 
 Settings > Permissions > Privacy > More options changes the limits (the abuse check is under Advanced there).
-A closed chat reopens with a hidden gesture - double-click the lock icon on its banner - except one closed for
-`minors`: nothing reopens that.
+A closed chat reopens with "Review and reopen" on its banner (1.4.6; it was a hidden double-click on the lock) -
+except one closed for `minors`: nothing reopens that.
 """
 from __future__ import annotations
 
@@ -170,20 +171,42 @@ def update_limits(categories: list | None = None, strike_limit: int | None = Non
 
 
 # ---- screening a message ----------------------------------------------------------------------------------
+# The chat's own phrases (1.4.6). They used to be the image filter's, made for picture prompts, where "explicit",
+# "stripping" and "breasts" count as sexual and "minor", "child" or "baby" as a minor - so "make the error in the
+# child process explicit" or "a minor bug, explicit return" closed a chat for good (audit, 31 Oct 2026). Here the
+# words are the unambiguous ones, and they must stand close together in the text.
+_CHAT_SEXUAL = re.compile(
+    r"\b(?:nude|nudes|naked|nsfw|porn\w*|sex|sexy|sexual\w*|erotic\w*|hentai|lingerie|topless|undress\w*|"
+    r"genital\w*|orgasm\w*|xxx|lewd)\b|עירום|עירומה|ערום|ערומה|סקס|פורנו|ארוטי|голая|голый|порн\w*|секс\w*|эрот\w*", re.I)
+_CHAT_MINOR = re.compile(
+    r"\b(?:child|children|kid|kids|underage|under-age|preteen|pre-teen|teen|teens|teenage\w*|schoolgirl|schoolboy|"
+    r"loli|lolita|shota|toddler|infant|young (?:girl|boy)|little (?:girl|boy)|(?:1[0-7]|[1-9])[- ]?(?:yo|y/o|years?[- ]old))\b"
+    r"|ילד|ילדה|ילדים|קטין|קטינה|נערה|תינוק|ребён\w*|ребен\w*|девочк\w*|мальчик\w*|несовершеннолет\w*", re.I)
+_NEAR = 60                                              # characters between the two words, at most
+
+
 def _rule_minors(text: str) -> bool:
-    import image_gen                                    # the image filter's patterns: one definition for both
-    return bool(image_gen._SEXUAL.search(text) and image_gen._MINOR.search(text))
+    sexual = [m.start() for m in _CHAT_SEXUAL.finditer(text)]
+    if not sexual:
+        return False
+    return any(abs(m.start() - s) <= _NEAR for m in _CHAT_MINOR.finditer(text) for s in sexual)
+
+
+_ANSWERS = {"ALLOW", *(c.upper() for c in CATEGORIES)}
 
 
 def parse_verdict(text: str) -> str | None:
-    """The model's one-word answer -> a category id, "allow", or None when it said something else."""
-    words = re.findall(r"[A-Z_]{4,}", str(text or "").upper())
-    for w in words:
-        if w == "ALLOW":
-            return "allow"
-        if w.lower() in CATEGORIES:
-            return w.lower()
-    return None
+    """The model's answer -> a category id, "allow", or None when it said something else. It used to take the first
+    category word anywhere, so "Is this MALWARE? No - ALLOW" read as malware (audit, 31 Oct 2026). Now: the answer's
+    own first word when it is one (the format asked for), else a labelled "Verdict: X", else the last one named.
+    Reasoning a model shows (<think>...</think>) is never read."""
+    t = re.sub(r"<think>.*?(?:</think>|$)", " ", str(text or ""), flags=re.S | re.I)
+    first = re.match(r"\W*([A-Za-z_]{4,})", t)
+    if first and first.group(1).upper() in _ANSWERS:
+        return first.group(1).lower()
+    labelled = [w.upper() for w in re.findall(r"(?:verdict|answer|decision|category|final)\W{1,4}([A-Za-z_]{4,})", t, re.I)]
+    named = [w for w in labelled if w in _ANSWERS] or [w for w in re.findall(r"[A-Z_]{4,}", t.upper()) if w in _ANSWERS]
+    return named[-1].lower() if named else None
 
 
 def screen(message: str, previous: str = "", ask_model=None) -> dict:
@@ -193,7 +216,7 @@ def screen(message: str, previous: str = "", ask_model=None) -> dict:
     cfg = load()
     enabled = set(cfg["categories"])
     allow = {"action": "allow", "category": None, "via": None}
-    rule_hit = _rule_minors(text) or bool(previous and _rule_minors(f"{previous}\n{text}"))
+    rule_hit = _rule_minors(text) or bool(previous and _rule_minors(f"{previous[-_NEAR:]}\n{text}"))
     # Very short messages ("ok", "thanks", "go on") skip the check - unless abuse is watched and it's two words or
     # more ("f*** you" is short too).
     if len(text) < MIN_CHECK_CHARS and not rule_hit and ("abuse" not in enabled or len(text.split()) < 2 or set(re.findall(r"[a-z]+", text.lower())) <= _ACK_WORDS):
@@ -236,16 +259,19 @@ def strike_total(g: dict) -> int:
     return sum(_counts(g or {}).values())
 
 
-def record_refusal(chat: dict, category: str) -> dict:
+def record_refusal(chat: dict, category: str, via: str = "model") -> dict:
     """Count a refusal in its own category; lock the chat at that category's limit (at once - and for good - for
-    `minors`). Returns the chat's guard state."""
+    `minors` the model confirmed). A `minors` refusal on the phrases alone (no model check could run) refuses that
+    message but doesn't close the chat: a phrase is never proof (1.4.6). Returns the chat's guard state."""
     cfg = load()
     g = dict(chat.get("guard") or {})
     counts = _counts(g)
     counts[category] = counts.get(category, 0) + 1
     g.update(strikes=counts, clean=0)
-    g["log"] = (list(g.get("log") or []) + [{"c": category, "at": time.time()}])[-20:]
-    if category == "minors":
+    g["log"] = (list(g.get("log") or []) + [{"c": category, "at": time.time(), **({"via": via} if via != "model" else {})}])[-20:]
+    if category == "minors" and via != "model":
+        counts.pop(category, None)                      # not a strike either: nothing confirmed it
+    elif category == "minors":
         g.update(locked=True, reason="minors", permanent=True, locked_at=time.time())
     elif counts[category] >= cfg["limits"].get(category, cfg["strike_limit"]):
         g.update(locked=True, reason=category, locked_at=time.time())

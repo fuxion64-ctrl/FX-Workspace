@@ -37,11 +37,15 @@ class TurnManager:
         self._keep = keep
         self._current: str | None = None
 
-    def start(self, request, meta: dict | None = None) -> dict | None:
-        """Start a turn. Returns its public record, or None if one is running."""
+    def start(self, request, meta: dict | None = None, on_start=None) -> dict | None:
+        """Start a turn. Returns its public record, or None if one is running. on_start() runs under the lock once
+        the turn is accepted - for state that belongs to this turn only, so a refused second start can't change it
+        (the phone/PC origin was set before the check: two sends at once could swap it - 1.4.6)."""
         with self._lock:
             if self._current and self._turns[self._current]["status"] == "running":
                 return None
+            if on_start is not None:
+                on_start()
             turn_id = uuid.uuid4().hex[:12]
             turn = {"id": turn_id, "status": "running", "started": time.time(), "ended": None,
                     "result": None, **(meta or {})}

@@ -224,6 +224,35 @@ class SystemPanelTests(unittest.TestCase):
             second = system_metrics._collect()
         self.assertEqual(second["gpu"]["vram_used_mb"], 3790.0)
 
+    def test_cpu_reads_from_a_new_thread_each_time(self):
+        # 1.4.6: psutil 7 keeps cpu_percent's baseline per thread, and each refresh runs on a new thread - it read 0.0.
+        import threading
+        import psutil
+        Times = type(psutil.cpu_times())
+        fields = Times._fields
+        mk = lambda busy, idle: Times(*[busy if f == "user" else idle if f == "idle" else 0.0 for f in fields])
+        seq = iter([mk(10.0, 90.0), mk(13.0, 97.0)])     # 3 s busy of 10 s since the last reading: 30%
+        out = []
+        with patch.dict(system_metrics._CPU, times=None, value=None), patch.object(psutil, "cpu_times", lambda: next(seq)):
+            for _ in range(2):
+                t = threading.Thread(target=lambda: out.append(system_metrics._cpu_percent()))
+                t.start(); t.join()
+        self.assertEqual(out, [None, 30.0])
+
+    def test_one_missing_part_keeps_its_last_value(self):
+        good = {"name": "GPU", "vram_used_mb": 3790.0, "vram_total_mb": 8192.0, "vram_percent": 46.3, "gpu_percent": 20.0}
+        part = {"name": "GPU", "vram_used_mb": None, "vram_total_mb": 8192.0, "vram_percent": None, "gpu_percent": 55.0}
+        with patch.object(system_metrics, "_gpu_sample", side_effect=[dict(good), dict(part)]), \
+                patch.object(system_metrics, "_run_smi", return_value=""):
+            system_metrics._collect()
+            second = system_metrics._collect()
+        self.assertEqual((second["gpu"]["vram_used_mb"], second["gpu"]["gpu_percent"], second["gpu_state"]), (3790.0, 55.0, "ok"))
+
+    def test_no_reading_says_why(self):
+        with patch.object(system_metrics, "_gpu_sample", return_value={}), patch.dict(system_metrics._LAST_GPU, at=0.0, value=None), \
+                patch.object(system_metrics, "_NVML", None), patch.object(system_metrics, "_nvidia_smi_path", return_value=None):
+            self.assertEqual(system_metrics._collect()["gpu_state"], "none")
+
     def test_engine_row_names_the_local_model_in_local_mode(self):
         import api.server as server
         import core.state as shared

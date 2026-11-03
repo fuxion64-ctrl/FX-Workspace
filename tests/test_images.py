@@ -41,6 +41,16 @@ class FilterTests(unittest.TestCase):
         self.assertIsNotNone(image_gen.check_prompt("a rape scene"))           # on unless turned off
 
 
+class ExpandPromptTests(unittest.TestCase):
+    def test_the_new_area_gets_the_setting_not_the_subject(self):
+        # 1.4.6: the whole prompt drew the subject again in the new strip (a second cabin beside the cabin).
+        p = image_gen.surroundings_prompt("a wooden cabin, in a snowy pine forest, golden hour, oil painting")
+        self.assertNotIn("cabin", p)
+        self.assertIn("snowy pine forest", p)
+        self.assertIn("a red wall", image_gen.surroundings_prompt("a red wall"))     # one part: the scene itself
+        self.assertIn("surroundings", image_gen.surroundings_prompt(""))
+
+
 class SettingsTests(unittest.TestCase):
     def test_clean(self):
         out = image_gen.clean_settings({"image_root": "..\\evil", "image_quality": "ultra", "image_size": "huge",

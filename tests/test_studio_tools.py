@@ -304,6 +304,18 @@ class ApprovalTests(unittest.TestCase):
         self.assertFalse(loop._same_tool_batch([(object(), "update_plan", {})] * 2))
         self.assertFalse(loop._same_tool_batch(calls * 4))                              # over MAX_SAME_TOOL_BATCH
 
+    def test_held_back_calls_are_named_in_the_kept_calls_result(self):
+        # 1.4.6 (audit 2.1): a local model's extra calls vanished without a word; it then acted as if they had run.
+        import core.state as shared
+        from types import SimpleNamespace as NS
+        with patch.dict(shared.app_state, conversation=[], held_back_calls=["write_file (Write notes.txt)"]):
+            loop._append_tool_result(NS(id="1"), "update_plan", {"ok": True, "message": "Plan saved."})
+            loop._append_tool_result(NS(id="2"), "update_plan", {"ok": True, "message": "Again."})
+            first, second = shared.app_state["conversation"]
+        self.assertIn("NOT RUN YET", first["content"])
+        self.assertIn("write_file", first["content"])
+        self.assertNotIn("NOT RUN YET", second["content"])                             # said once, on that result
+
     def test_what_allow_all_may_cover(self):
         s = dict(permissions.DEFAULT_PERMISSION_SETTINGS)
         self.assertTrue(permissions.request_grantable("roblox_create_instance", s))
