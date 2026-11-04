@@ -63,13 +63,22 @@ class Feedback4Nov(unittest.TestCase):
 class Dictation(unittest.TestCase):
     def test_empty_send_dictates_in_the_chatgpt_look(self):
         i = HTML.index("const Dictate = (() => {")
-        body = HTML[i:i + 4000]
+        body = HTML[i:i + 9000]
         self.assertIn("dataset.skin === 'mono'", body)                      # the ChatGPT look only
         self.assertIn("'/api/voice/transcribe'", body)                      # transcribed on this PC
         self.assertIn("promptEl.value = ", body)                            # into the box, not sent
         self.assertIn("else if (Dictate.wanted()) Dictate.toggle();", HTML)
         self.assertIn('<symbol id="i-dictate"', HTML)
-        self.assertIn("redock: applyDock, wav16k,", HTML)
+        self.assertIn("redock: applyDock, wav16k, pcm16k,", HTML)
+
+    def test_live_words_and_a_level_meter(self):
+        i = HTML.index("const Dictate = (() => {")
+        body = HTML[i:i + 9000]
+        self.assertIn("/api/voice/live?sid=", body)          # the words as you speak
+        self.assertIn("function fullPreview()", body)         # ...or, without the live recognizer, every ~1.5 s
+        self.assertIn("dict-meter", body)                     # the level meter and timer
+        self.assertIn("['en', 'auto'].includes(lang)", body)
+        self.assertIn(".dict-meter i {", HTML)
 
 
 class Feedback4NovLate(unittest.TestCase):

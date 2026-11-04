@@ -5554,6 +5554,13 @@ html.voice-on .idle-screen { display: none !important; }
 :root[data-ui][data-skin="mono"] .send-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--gpt-voice, #3566f0) 88%, #000); }
 :root[data-ui][data-skin="mono"] .send-btn:disabled { background: var(--gpt-voice, #3566f0); color: #fff; opacity: .5; }
 :root[data-ui][data-skin="mono"] .send-btn.stop { background: var(--gpt-voice, #3566f0); color: #fff; }
+/* While it listens: a level meter that follows your voice and a timer, beside the button (Dictate). */
+.dict-meter { display: inline-flex; align-items: center; gap: 3px; height: 36px; padding: 0 8px; flex: none; order: 1; }
+.dict-meter i { width: 3px; height: 18px; border-radius: 2px; background: var(--gpt-voice, var(--accent)); transform-origin: center; transform: scaleY(.18); transition: transform .08s linear; }
+.dict-meter b { margin-left: 6px; font: 500 12px/1 var(--mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; color: var(--muted); }
+.dict-meter::before { content: ""; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: #e5484d; animation: dict-rec 1.2s ease-in-out infinite; }
+@keyframes dict-rec { 50% { opacity: .35; } }
+:root:is([data-motion="off"], [data-motion="reduced"]) .dict-meter::before { animation: none; }
 /* While it listens the composer says so. */
 :root[data-ui][data-skin="mono"] .send-btn.dictate { opacity: 1; filter: none; }
 :root[data-ui][data-skin="mono"] .composer[data-dictate="listening"] { box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 35%, transparent); }
@@ -9788,51 +9795,123 @@ function sendOrStop() { if (S.busy) stopRun(); else if (Dictate.wanted()) Dictat
    it's transcribed on this PC (the same recognizer as Voice mode) and lands in the box for you to read and send.
    Not Voice mode (the mic beside it), which answers out loud. Click again (or Enter) to finish, Esc to drop it. */
 const Dictate = (() => {
-  let state = 'off', stream = null, ctx = null, proc = null, chunks = [];
+  // 4 Nov: while it listens, a level meter that follows your voice and a timer sit in the bar, and the words show in
+  // the box as you speak (the live recognizer Voice mode's captions use, ~4 times a second). When you finish, the
+  // full recognizer writes the final text over that preview. The live words need the English live recognizer; in
+  // another language (or without it) the meter and timer still show and the text comes when you finish.
+  let state = 'off', stream = null, ctx = null, proc = null, chunks = [], unsent = [], sid = null, busy = false;
+  let base = '', heard = '', level = 0, t0 = 0, raf = 0, meter = null, lastFull = 0;
   const look = () => document.documentElement.dataset.skin === 'mono' && !document.documentElement.dataset.aiClassic;
   function wanted() { return state !== 'off' || (look() && !promptEl.value.trim()); }
   function paint() { renderRunControls(); const box = $('composer'); if (box) box.dataset.dictate = state === 'off' ? '' : state; }
+  const join = t => (base && t ? base + ' ' : base) + t;
+  function show(t) { heard = t; promptEl.value = join(t); autoGrow(); promptEl.scrollTop = promptEl.scrollHeight; }
+  function addMeter() {
+    meter = document.createElement('span');
+    meter.className = 'dict-meter'; meter.setAttribute('aria-hidden', 'true');
+    meter.innerHTML = '<i></i><i></i><i></i><i></i><i></i><i></i><i></i><b>0:00</b>';
+    const send = $('send-btn'); send.parentElement.insertBefore(meter, send);
+    const bars = [...meter.querySelectorAll('i')], hist = new Array(bars.length).fill(0), clock = meter.querySelector('b');
+    let last = 0;
+    const tick = now => {
+      if (!meter) return;
+      raf = requestAnimationFrame(tick);
+      if (now - last < 60) return; last = now;
+      hist.shift(); hist.push(Math.min(1, level * 9));            // the newest level enters on the right
+      bars.forEach((b, i) => { b.style.transform = `scaleY(${(0.18 + 0.82 * hist[i]).toFixed(3)})`; });
+      const s = Math.floor((now - t0) / 1000); clock.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    };
+    raf = requestAnimationFrame(tick);
+  }
   async function start() {
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
     } catch (_) { toast('The microphone is off or in use - allow it in Windows › Privacy › Microphone.'); return; }
     ctx = new (window.AudioContext || window.webkitAudioContext)();
     const src = ctx.createMediaStreamSource(stream), sink = ctx.createGain(); sink.gain.value = 0;
-    proc = ctx.createScriptProcessor(2048, 1, 1); chunks = [];
-    proc.onaudioprocess = e => { if (state === 'listening') chunks.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
+    proc = ctx.createScriptProcessor(2048, 1, 1); chunks = []; unsent = []; heard = ''; level = 0;
+    proc.onaudioprocess = e => {
+      if (state !== 'listening') return;
+      const d = new Float32Array(e.inputBuffer.getChannelData(0));
+      chunks.push(d); unsent.push(d);
+      let s = 0; for (let i = 0; i < d.length; i++) s += d[i] * d[i];
+      level = level * .6 + Math.sqrt(s / d.length) * .4;
+      liveSend();
+    };
     src.connect(proc); proc.connect(sink); sink.connect(ctx.destination);
-    state = 'listening'; promptEl.dataset.ph = promptEl.placeholder; promptEl.placeholder = 'Listening… click ✓ when you’re done';
-    paint();
+    // The live recognizer is English; with "auto" it previews too (the final pass writes the real words over it).
+    const lang = ((S.settings || {}).voice_lang || 'en');
+    sid = ['en', 'auto'].includes(lang) ? Math.random().toString(36).slice(2, 12) : null; lastFull = 0;
+    base = promptEl.value.trim(); t0 = performance.now();
+    state = 'listening';
+    promptEl.dataset.ph = promptEl.placeholder; promptEl.placeholder = 'Listening…'; promptEl.readOnly = true;
+    addMeter(); paint();
+  }
+  // What's been said so far goes to the live recognizer about four times a second; its words show in the box.
+  async function liveSend() {
+    if (!sid) return fullPreview();
+    if (busy || !unsent.length || !ctx) return;
+    const ms = unsent.reduce((n, c) => n + c.length, 0) / ctx.sampleRate * 1000;
+    if (ms < 250) return;
+    const body = Voice.pcm16k(unsent, ctx.sampleRate), my = sid; unsent = []; busy = true;
+    try {
+      const res = await fetch(`/api/voice/live?sid=${my}`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body });
+      const d = await res.json();
+      if (state === 'listening' && sid === my) {
+        if (d.ok && d.partial) show(d.partial.trim());
+        if (d.off || !d.ok) sid = null;                          // no live recognizer here: the text comes at the end
+      }
+    } catch (_) { sid = null; }
+    busy = false;
+  }
+  // No live recognizer (not installed, another language): what's been said so far goes to the full one every
+  // ~1.5 s instead (the last 30 s at most), so the words still show while you talk - a little behind.
+  async function fullPreview() {
+    if (busy || !ctx || state !== 'listening' || performance.now() - lastFull < 1500) return;
+    const rate = ctx.sampleRate, keep = [];
+    for (let i = chunks.length - 1, n = 0; i >= 0 && n < rate * 30; i--) { keep.unshift(chunks[i]); n += chunks[i].length; }
+    if (keep.reduce((n, c) => n + c.length, 0) < rate * 0.6) return;
+    busy = true; lastFull = performance.now();
+    try {
+      const res = await fetch('/api/voice/transcribe?preview=1', { method: 'POST', headers: { 'Content-Type': 'audio/wav' }, body: Voice.wav16k(keep, rate) });
+      const d = await res.json();
+      if (state === 'listening' && d.ok && (d.text || '').trim()) show(d.text.trim());
+    } catch (_) { /* the final pass still runs */ }
+    busy = false;
   }
   function release() {
+    cancelAnimationFrame(raf); raf = 0;
+    if (meter) { meter.remove(); meter = null; }
+    if (sid) fetch(`/api/voice/live?sid=${sid}&end=1`, { method: 'POST' }).catch(() => {});
+    sid = null;
     try { proc && proc.disconnect(); } catch (_) {}
     if (stream) stream.getTracks().forEach(t => t.stop());
     if (ctx) ctx.close().catch(() => {});
     stream = ctx = proc = null;
+    promptEl.readOnly = false;
     if (promptEl.dataset.ph != null) { promptEl.placeholder = promptEl.dataset.ph; delete promptEl.dataset.ph; }
   }
   async function finish() {
-    const rate = ctx ? ctx.sampleRate : 48000, got = chunks; chunks = [];
+    const rate = ctx ? ctx.sampleRate : 48000, got = chunks; chunks = []; unsent = [];
     release(); state = 'transcribing'; paint();
     try {
       if (got.reduce((n, c) => n + c.length, 0) < rate * 0.3) throw new Error('Nothing was heard.');
       const res = await fetch('/api/voice/transcribe', { method: 'POST', headers: { 'Content-Type': 'audio/wav' }, body: Voice.wav16k(got, rate) });
       const d = await res.json();
       if (!d.ok) throw new Error(d.message || 'The recognizer failed - Settings › Voice sets it up.');
-      const text = (d.text || '').trim();
-      if (text) { promptEl.value = (promptEl.value ? promptEl.value.trimEnd() + ' ' : '') + text; autoGrow(); }
-      else toast('Nothing was heard.');
-    } catch (e) { toast(e.message); }
+      const text = (d.text || '').trim() || heard;                  // the full recognizer's words; else the live ones
+      if (text) show(text); else { show(''); toast('Nothing was heard.'); }
+    } catch (e) { if (!heard) show(''); toast(e.message); }   // a failed final pass keeps the live words, if any
     state = 'off'; paint(); promptEl.focus();
   }
-  function cancel() { if (state !== 'listening') return; chunks = []; release(); state = 'off'; paint(); }
+  function cancel() { if (state !== 'listening') return; chunks = []; unsent = []; release(); state = 'off'; promptEl.value = base; autoGrow(); paint(); }
   function toggle() { if (state === 'off') start(); else if (state === 'listening') finish(); }
   document.addEventListener('keydown', e => {
     if (state !== 'listening') return;
     if (e.key === 'Escape') { e.preventDefault(); cancel(); }
     else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.stopPropagation(); finish(); }
   }, true);
-  return { wanted, toggle, cancel, get state() { return state; } };
+  return { wanted, toggle, cancel, get state() { return state; }, _test: { show, get meter() { return meter; } } };
 })();
 async function stopRun() {
   if (!S.busy || S.run === 'stopping') return;
@@ -19221,7 +19300,7 @@ const Voice = (() => {
       if (english()) enqueue('I need your go-ahead in the chat.');
     } else if (!on && (state === 'thinking' || (state === 'listening' && !turnDone))) setState('thinking');
   }
-  return { open, close, feed, finish, beginTurn, waiting, approval, setup: setupNow, tap, redock: applyDock, wav16k, get active() { return !!stage && !stage.hidden; }, get state() { return state; },
+  return { open, close, feed, finish, beginTurn, waiting, approval, setup: setupNow, tap, redock: applyDock, wav16k, pcm16k, get active() { return !!stage && !stage.hidden; }, get state() { return state; },
     // What a reply would be split into (tests and debugging): no audio is made.
     _test: { speechText, wav16k, command, get timings() { return voiceTiming; }, heard: (text, barged = false) => ask && heardAnswer(text, barged), drainOf(text, final = true) {
       const save = [feedText, spoken, spokenChars, skipRest, queue];
