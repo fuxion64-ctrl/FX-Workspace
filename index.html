@@ -311,7 +311,7 @@ html.temp-chat #chat-title { color: var(--incog); }
    The banner ends the thread and the message box is disabled. The owner's
    unlock is deliberately quiet: a double-click on the banner's lock icon. */
 /* Music (MusicView): library | studio */
-.mz { display: flex; flex-direction: column; gap: 14px; max-width: 1240px; margin: 0 auto; padding: 0 20px 40px; }
+.mz { display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 1040px; margin: 0 auto; padding: 18px 28px 48px; }   /* the other places' column (1.4.6) */
 .mz-body { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 18px; align-items: start; }
 .mz-lib { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 150px);
   border: 1px solid var(--border); border-radius: calc(var(--radius) + 4px); background: var(--surface); padding: 10px; }
@@ -337,7 +337,8 @@ html.temp-chat #chat-title { color: var(--incog); }
 .mz-tabs { align-self: flex-start; }
 .mz-tab-sub { margin-left: 6px; color: var(--muted); font-weight: 400; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mz-card { border: 1px solid var(--border); border-radius: calc(var(--radius) + 4px); background: var(--surface); padding: 18px; display: flex; flex-direction: column; gap: 14px; }
-.mz-h { display: flex; align-items: center; gap: 6px; margin: 4px 0 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.mz-h { display: flex; align-items: center; gap: 6px; margin: 4px 0 0; font-size: 13px; font-weight: 500; color: var(--text-2); }
+#mu-title { font-family: var(--sans); }
 /* New song */
 .mz-new .field { margin: 0; }
 .mz-new .field label small { color: var(--muted); font-weight: 400; margin-left: 4px; }
@@ -970,7 +971,7 @@ html.fx-desktop .sb-quit:hover { background: var(--hover); color: var(--danger-t
 /* ---- A lighter sidebar: slim one-line chats, a quiet New chat, one slim line each for the model and you ---- */
 .sb-plus { width: 20px; height: 20px; background: var(--accent-soft); color: var(--accent-text); }
 .sb-new:hover .sb-plus { background: var(--accent); color: var(--accent-ink); }
-.sb-group { padding: 12px 8px 3px; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); }
+.sb-group { padding: 12px 8px 3px; font-size: 12px; font-weight: 500; color: var(--muted); }   /* sentence case (1.4.6 unslop) */
 .sb-list .sb-row { border-radius: 7px; }
 .sb-list .sb-row-main { padding: 5px 8px; }
 .sb-list .sb-row-title { font-size: 13px; color: var(--text-2); }
@@ -1184,7 +1185,9 @@ html.fx-desktop .sb-quit:hover { background: var(--hover); color: var(--danger-t
 .pc-main small { display: block; font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pc-main small .st-ok { color: var(--ok-text); } .pc-main small .st-bad { color: var(--danger-text); }
 .pc-acts { display: flex; align-items: center; gap: 4px; padding-top: 6px; flex-shrink: 0; }
-.place-empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 42px 20px; border: 1px dashed var(--border-strong); border-radius: var(--radius); color: var(--muted); }
+.place-empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 42px 20px; border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius); color: var(--muted); }
+/* One primary action: while the empty card offers it, the header doesn't repeat it (1.4.6 unslop). */
+.place-wrap:has(.place-empty .btn.primary) .place-head .place-acts .btn.primary { display: none; }
 .place-empty > .icon { width: 28px; height: 28px; color: var(--faint); }
 .place-empty b { color: var(--text); font-size: 15px; font-weight: 500; }
 .place-empty p { margin: 0 0 6px; max-width: 52ch; font-size: 13.5px; line-height: 1.55; }
@@ -1309,7 +1312,7 @@ html.fx-desktop .sb-quit:hover { background: var(--hover); color: var(--danger-t
 .ml-form-acts { display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
 .mc-body { height: 46vh; min-height: 200px; padding: 12px; resize: vertical; font: 14.5px/1.6 var(--sans); }
 .cp-form { display: flex; flex-direction: column; gap: 10px; }
-.cp-in { height: 84px; padding: 10px 12px; resize: vertical; font: 14.5px/1.5 var(--sans); }
+.cp-in { height: 84px; padding: 10px 12px; resize: none; font: 14.5px/1.5 var(--sans); }
 .cp-pick { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .cp-pick select { flex: 1 1 200px; }
 .cp-blind { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
@@ -1367,8 +1370,8 @@ html.fx-desktop .sb-quit:hover { background: var(--hover); color: var(--danger-t
 .iv-engine .btn.sm { height: 24px; border-radius: 999px; }
 .iv-gen { background: var(--surface); border: 1px solid var(--border-strong); border-radius: 18px; box-shadow: var(--shadow); padding: 14px 14px 12px 16px; display: flex; flex-direction: column; gap: 10px; }
 .iv-gen:focus-within { border-color: color-mix(in srgb, var(--text) 28%, var(--border-strong)); }
-#iv-prompt { width: 100%; border: 0; outline: 0; resize: vertical; min-height: 48px; max-height: 240px; background: transparent; font-size: 15.5px; line-height: 1.5; }
-#iv-prompt::placeholder { color: var(--muted); }
+#iv-prompt, #vv-prompt { width: 100%; border: 0; outline: 0; resize: vertical; min-height: 48px; max-height: 240px; background: transparent; box-shadow: none; font-size: 15.5px; line-height: 1.5; color: var(--text); }
+#iv-prompt::placeholder, #vv-prompt::placeholder { color: var(--muted); }   /* Videos' box drawn like Images' (1.4.6) */
 .iv-styles { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .iv-styles .pill { height: 26px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--border); font-size: 12.5px; margin: 0; background: transparent; color: var(--text-2); }
 .iv-styles .pill:hover { color: var(--text); border-color: var(--border-strong); }
@@ -1472,7 +1475,10 @@ html.fx-desktop .sb-quit:hover { background: var(--hover); color: var(--danger-t
 .ov-b.fav { color: #f2c14e; }
 .iv-fav { position: absolute; left: 7px; top: 7px; color: #f2c14e; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
 .iv-fav .icon { fill: currentColor; }
-.iv-tag { position: absolute; left: 6px; bottom: 6px; font: 10.5px var(--mono); color: #f5f4ee; background: rgba(20, 20, 19, .66); padding: 2px 6px; border-radius: 5px; pointer-events: none; }
+.iv-tag { position: absolute; left: 6px; bottom: 6px; font: 10.5px var(--mono); color: #f5f4ee; background: rgba(20, 20, 19, .66); padding: 2px 6px; border-radius: 5px; pointer-events: none; opacity: 0; transition: opacity .15s; }
+:hover > .iv-tag, :focus-visible > .iv-tag { opacity: 1; }            /* the size tag on hover only (1.4.6 unslop) */
+.iv-neg .af-link { text-decoration: none; color: var(--muted); }
+.iv-neg .af-link:hover { color: var(--text); }
 .iv-skel { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .iv-skel i { aspect-ratio: 1 / 1; border-radius: var(--radius); }
 .iv-insp-empty { margin: auto; text-align: center; color: var(--muted); font-size: 13px; line-height: 1.5; padding: 20px; }
@@ -2807,7 +2813,7 @@ body.resizing .sidebar { transition: none; }
 .leak-row.unk > .icon { color: var(--muted); }
 .leak-row b { min-width: 104px; color: var(--text); }
 .leak-list { margin-top: 4px; }
-.sm-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
+.sm-cards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }   /* the five modes in one row (1.4.6) */
 .sm-card { text-align: left; gap: 6px; }
 /* Settings sliders and checkboxes wear the theme's accent, not the browser's blue (D49). */
 #settings :is(input[type="range"], input[type="checkbox"]) { accent-color: var(--accent); }
@@ -3378,7 +3384,7 @@ span.tier.input { padding: 0; border: 0; width: 8px; height: 8px; min-height: 0;
 .img-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
 .img-thumb img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
 .img-thumb:hover img { border-color: var(--accent); }
-.theme-cards.families { grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); margin-bottom: 8px; }
+.theme-cards.families { grid-template-columns: repeat(5, minmax(0, 1fr)); margin-bottom: 8px; }   /* the five looks in one row (1.4.6) */
 .th { height: 78px; border-radius: 8px; margin-bottom: 10px; position: relative; overflow: hidden; border: 1px solid var(--border); padding: 10px; display: flex; flex-direction: column; justify-content: flex-end; gap: 5px; }
 .th i { display: block; height: 9px; border-radius: 5px; position: relative; }
 .th .a { width: 50%; align-self: flex-end; } .th .b { width: 82%; } .th .c { width: 60%; }
@@ -5310,7 +5316,7 @@ html.voice-on .idle-screen { display: none !important; }
 :root[data-ui="new"] .modal-nav .nav-item.open:not(.active) { color: var(--text); }
 :root[data-ui="new"] .modal-content > h3, :root[data-ui="new"] #settings-body > h3 { font-family: var(--serif); font-weight: 400; font-size: 27px; letter-spacing: -0.01em; }
 :root[data-ui="new"] .modal-content { padding-inline: clamp(24px, 4vw, 56px); }
-:root[data-ui="new"] .set-group { border-radius: 14px; }
+:root[data-ui="new"] .set-group { border-radius: 0; }   /* only a top line is drawn: a radius made each line end in arcs (1.4.6 unslop) */
 
 /* ===========================================================================
    The AI-inspired appearances, matched to the apps (1.4.3). Values measured on the apps' own public pages
@@ -6779,7 +6785,7 @@ function showPlace(name) {
   $('welcome').classList.add('hidden'); $('scroll').classList.add('hidden'); $('composer-dock').classList.add('hidden');
   $('place').classList.remove('hidden');
   $('place').dataset.place = name;
-  $('chat-title').textContent = PLACES[name];
+  $('chat-title').textContent = '';                   // the page's own heading names it - once (1.4.6 unslop)
   document.querySelectorAll('.chat-only').forEach(b => { b.hidden = true; });
   markPlace(name);
   syncAppMode();
@@ -6987,6 +6993,7 @@ const ImagesView = (() => {
       : !s.engine ? `<span class="iv-engine err">${icon('i-alert', 'xs')}Not set up</span>`
       : j.stage ? `<span class="iv-engine busy"><span class="spinner"></span>${esc(j.model || 'Drawing')}</span>`
       : s.running ? `<span class="iv-engine on"><span class="dot on"></span>${esc(s.loaded)} ready<button type="button" class="btn sm ghost" onclick="ImagesView.unload()" title="Free its RAM and VRAM now">Unload</button></span>`
+      : s.warm ? ''                                // one status at a time: the "Getting ready" bar says it (1.4.6)
       : `<span class="iv-engine"><span class="dot"></span>Engine idle</span>`;
     setHtmlIfChanged(el, `<div><h1 class="place-title">Images</h1><p class="place-lead">Made on this PC by stable-diffusion.cpp - nothing is sent anywhere.</p></div>
       <div class="place-acts">${pill}<button type="button" class="icon-btn" onclick="openSettings('images')" aria-label="Image settings" title="Settings › Images">${icon('i-gear')}</button></div>`);
@@ -14729,8 +14736,8 @@ const SETTINGS_PAGES = [
   ['models', [['models', 'Chat models'], ['images', 'Pictures'], ['voice', 'Voice']]],
   ['agent', [['agent', 'How it answers'], ['systemmessage', 'System message'], ['skills', 'Skills'], ['proactive', 'Proactive help'], ['permissions', 'Permissions']]],
   ['memory', [['memory', 'Memory and profile'], ['knowledge', 'Your files']]],
-  ['webnet', [['webnet', 'Web search and network'], ['privacy', 'Privacy']]],
-  ['connections', [['connections', 'Connectors and channels'], ['remote', 'Phone access']]],
+  ['webnet', [['webnet', 'Search and network'], ['privacy', 'Privacy']]],
+  ['connections', [['connections', 'Connectors'], ['remote', 'Phone access']]],
   ['data', [['data', 'Data and files']]],
   ['diagnostics', [['diagnostics', 'Diagnostics']]],
   ['about', [['about', 'About']]],
@@ -14738,7 +14745,8 @@ const SETTINGS_PAGES = [
 const pageOf = tab => (SETTINGS_PAGES.find(([, parts]) => parts.some(([id]) => id === tab)) || SETTINGS_PAGES[0]);
 // The parts made of sections: each section is drawn by its own renderer into <section id="sec-<name>"> (setBody),
 // and the old names open the part at their section (TAB_ALIAS, settingsTabNow).
-const SETTINGS_STACKS = { connections: ['connectors', 'mcp', 'channels'], webnet: ['websearch', 'network'] };
+// Network first on its page (1.4.6): "Tor and your IP address" sat under the search providers and keys, where it was missed.
+const SETTINGS_STACKS = { connections: ['connectors', 'mcp', 'channels'], webnet: ['network', 'websearch'] };
 const STACK_OF = Object.fromEntries(Object.entries(SETTINGS_STACKS).flatMap(([part, secs]) => secs.map(s => [s, part])));
 // Where a section draws: its own <section> inside a stacked part, else the whole page.
 const setBody = name => document.getElementById('sec-' + name) || $('settings-body');
@@ -14913,12 +14921,15 @@ const wordmark = (cls = '') => `<span class="fx-wordmark ${cls}"><svg aria-hidde
 const CONTRIBUTORS = [
   { name: '123timsolotech', url: 'https://github.com/123timsolotech', for: 'Pull request #1: getting the test suite to run off Windows, pointing out the tests that had gone stale, and making the open-folder button fail cleanly. Then the ideas behind 1.4.2\'s Update now, the tidier updates and setup, and Stop keeping the half-written reply.' },
 ];
+// A file of this app's own, from its data folder on (data\memory.json): the full C:\Users\... path wrapped over two
+// lines (1.4.6 unslop). The whole path stays in the tooltip.
+const dataPath = p => { const s = String(p || ''), i = s.search(/[\\/]data[\\/]/i); return `<span class="mono" title="${esc(s)}">${esc(i >= 0 ? s.slice(i + 1) : s)}</span>`; };
 function renderAbout() {
   $('settings-body').innerHTML = `<h3>About</h3>
     <div class="set-group about-card">${wordmark('lg')}
       <p class="lead">A private, local-first AI assistant for Windows. Version <span id="about-version">${esc(APP_VERSION || '…')}</span>.</p>
       ${rowHtml('Check for updates by itself', 'Looks on GitHub for a newer version after the app starts and twice a day, and offers it on Home. Nothing installs without your click.', sw(S.settings.update_check !== false, `saveSettings({update_check:${S.settings.update_check === false}}).then(()=>{renderAbout();UpdateBanner.refresh()})`))}
-      ${rowHtml('Updates', 'Look now.', '<button type="button" class="btn sm" onclick="checkUpdates(this).then(()=>UpdateBanner.refresh())">Check for updates</button>')}
+      ${rowHtml('Check now', 'Asks GitHub right away.', '<button type="button" class="btn sm" onclick="checkUpdates(this).then(()=>UpdateBanner.refresh())">Check for updates</button>')}
       <div id="about-update"></div>
       ${rowHtml('Created by', '<span class="fx-sign">Fuxion</span>', '<a class="btn sm" href="mailto:fuxion64@gmail.com">fuxion64@gmail.com</a>')}
       <p class="set-note">If you want to support the project or have suggestions, email me.</p>
@@ -15256,7 +15267,7 @@ function renderModelsCached() {
   const byId = new Map();
   S.localModels.forEach(m => byId.set(m.id, { id: m.id, vision: m.vision, favorite: m.favorite, cfg: null }));
   S.modelConfigs.forEach((c, i) => { const r = byId.get(c.name) || { id: c.name, vision: c.vision, favorite: false }; r.cfg = c; r.cfgIndex = i; byId.set(c.name, r); });
-  const rows = [...byId.values()].map(m => {
+  const items = [...byId.values()].map(m => {
     const k = jsArg(m.id), c = m.cfg, i = m.cfgIndex;
     const favKey = m.vision ? 'favorite_local_vision_models' : 'favorite_local_text_models';
     m.favorite = (s[favKey] || []).includes(m.id);       // from the settings, not the model list fetched before the last toggle
@@ -15271,18 +15282,23 @@ function renderModelsCached() {
     const missing = c && c.file_found === false;          // models.ini points at a file that isn't on disk
     const loadTitle = missing ? `title="The model file isn't on disk: ${esc(c.model_path)}"` : S.bench.running ? 'title="A benchmark is running"' : '';
     const va = visionLine(m.id);
-    return `<details class="model-item" data-id="${esc(m.id)}"${wasOpen.has(m.id) ? ' open' : ''}><summary class="list-row"><div class="grow"><span class="mono">${esc(m.id)}</span>${m.vision ? '<span class="pill vision">vision</span>' : ''}${S.engaged === m.id ? '<span class="pill loaded">loaded</span>' : ''}${missing ? '<span class="pill missing">file missing</span>' : ''}<span class="bench-pill">${benchPill(m.id)}</span><small>${missing ? `Not found: ${esc(c.model_path)}` : c ? `GPU layers ${eff(c.ngl, d.ngl)} · context ${eff(c.ctx_size, d.ctx_size)}` : 'Default load settings'}</small>${va}</div>
+    return { missing, html: `<details class="model-item" data-id="${esc(m.id)}"${wasOpen.has(m.id) ? ' open' : ''}><summary class="list-row"><div class="grow"><span class="mono">${esc(m.id)}</span>${m.vision ? '<span class="pill vision">vision</span>' : ''}${S.engaged === m.id ? '<span class="pill loaded">loaded</span>' : ''}${missing ? '<span class="pill missing">file missing</span>' : ''}<span class="bench-pill">${benchPill(m.id)}</span><small>${missing ? `Not found: ${esc(c.model_path)}` : c ? `GPU layers ${eff(c.ngl, d.ngl)} · context ${eff(c.ctx_size, d.ctx_size)}` : 'Default load settings'}</small>${va}</div>
       <label class="fav" onclick="event.stopPropagation()" title="Auto only picks favorites when any are starred"><input type="checkbox" ${m.favorite ? 'checked' : ''} onchange="toggleFav('${favKey}','${k}')">Favorite</label>
       <button class="btn sm" ${S.loading[m.id] || S.bench.running || missing ? 'disabled' : ''} ${loadTitle} onclick="event.preventDefault();forceLoad('${k}')">${S.loading[m.id] ? '<span class="spinner"></span>Loading' : S.engaged === m.id ? 'Reload' : 'Load now'}</button>
-      ${icon('i-chev', 'sm chev')}</summary>${cfgHtml}${benchHtml(m.id)}</details>`;
-  }).join('');
+      ${icon('i-chev', 'sm chev')}</summary>${cfgHtml}${benchHtml(m.id)}</details>` };
+  });
+  // Models whose file is gone fold together at the end, not between the ones you can load (1.4.6 unslop).
+  const rows = items.filter(x => !x.missing).map(x => x.html).join('');
+  const gone = items.filter(x => x.missing);
+  const goneHtml = gone.length ? `<details class="set-more"><summary>Not on this PC <small>· ${gone.length} listed in models.ini whose file is gone</small></summary><div class="list-box">${gone.map(x => x.html).join('')}</div></details>` : '';
   const cloudRows = (list, key) => list.map(m => `<div class="list-row"><div class="grow mono">${esc(shortModel(m))}</div><label class="fav"><input type="checkbox" ${(s[key] || []).includes(m) ? 'checked' : ''} onchange="toggleFav('${key}','${jsArg(m)}')">Favorite</label></div>`).join('');
   $('settings-body').innerHTML = `<h3>Models</h3><p class="lead">One local model at a time - a vision model loads only when a screenshot needs it. Local, Auto or Cloud is picked under the message box.</p>
     <div class="set-group"><div class="gt">Local models <small>· open one for its load settings</small></div>
       ${S.engaged ? `<p class="lead" style="margin-bottom:10px">Loaded now: <span class="mono">${esc(S.engaged)}</span>${S.engagedIsVision ? ' - a vision model, so it stays loaded for text too' : ''}</p>` : ''}
       <div class="sr-only" aria-live="polite" id="bench-live"></div>
       ${S.bench.loadError ? `<p class="lead" role="alert">Couldn't load benchmark results: ${esc(S.bench.loadError)}</p>` : ''}
-      <div class="list-box">${rows || (S.localModelsError ? `<div class="list-row" role="alert">Couldn't load the model list: ${esc(S.localModelsError)} <button class="af-link" onclick="renderModelsTab()">Retry</button></div>` : '<div class="list-row muted">llama-server reported no models and models.ini lists none. Check that run.bat started it.</div>')}</div>
+      <div class="list-box">${rows || (gone.length ? '' : S.localModelsError ? `<div class="list-row" role="alert">Couldn't load the model list: ${esc(S.localModelsError)} <button class="af-link" onclick="renderModelsTab()">Retry</button></div>` : '<div class="list-row muted">llama-server reported no models and models.ini lists none. Check that run.bat started it.</div>')}</div>
+      ${goneHtml}
       <p class="set-note" style="margin:10px 0 0">More GPU layers is faster but needs more video memory. If a model won't load, lower GPU layers or context.</p></div>
     <div class="set-group">
       ${rowHtml('Get models ready while I type', 'Starts loading the chat model (and the picture model, when you ask for a picture) as soon as you type, so replies start sooner. Off: nothing loads until you send.', sw(s.chat_warmup !== false, `saveSettings({chat_warmup:${s.chat_warmup === false}, image_warmup:${s.chat_warmup === false}}).then(renderModelsCached)`))}
@@ -16420,9 +16436,9 @@ async function renderDataFiles() {
   const row = k => `<div class="row df-row"><div class="row-text"><b>${esc(k.label)}</b><small>${esc(k.what)} · <span class="mono">${k.files ? `${fmtBytes(k.bytes)} · ${k.files.toLocaleString()} file${k.files === 1 ? '' : 's'}` : 'empty'}</span></small></div>
     <div class="df-acts"><button class="btn sm" onclick="dataOpen('${k.id}')" title="Open in File Explorer">${icon('i-folder', 'xs')}Open</button>
     ${k.id === 'chats' ? `<label class="df-perm"><input type="checkbox" id="df-keep-pinned" checked> Keep pinned</label>` : ''}
-    ${k.clearable ? `<button class="btn sm danger" ${k.files ? '' : 'disabled'} onclick="dataClear('${k.id}', this)">${icon('i-trash', 'xs')}Clear…</button>` : ''}</div></div>`;
+    ${k.clearable ? `<button class="btn sm" ${k.files ? '' : 'disabled'} onclick="dataClear('${k.id}', this)">${icon('i-trash', 'xs')}Clear…</button>` : ''}</div></div>`;
   S.dataKinds = Object.fromEntries(d.kinds.map(k => [k.id, k]));
-  body.innerHTML = `<h3>Data and files</h3><p class="lead">Everything this app keeps on this PC - ${fmtBytes(d.bytes)} in all, in <span class="mono">${esc(d.data_dir)}</span>. Open a folder to look, back it up or change files by hand; clear what you don't need.</p>
+  body.innerHTML = `<h3>Data and files</h3><p class="lead">Everything this app keeps on this PC - ${fmtBytes(d.bytes)} in all, in the app's <span class="mono" title="${esc(d.data_dir)}">data</span> folder. Open a folder to look, back it up or change files by hand; clear what you don't need.</p>
     <div class="set-group"><div class="gt">Where it lives</div>
       ${rowHtml('The data folder', 'Chats, memory, settings, images and the rest - one folder.', `<button class="btn" onclick="dataOpen()">${icon('i-folder', 'xs')}Open data folder</button>`)}
       ${rowHtml('When clearing', 'Cleared files go to the Recycle Bin, where Windows can put them back.', `<label class="df-perm"><input type="checkbox" id="df-permanent"${S.dataPermanent ? ' checked' : ''} onchange="S.dataPermanent=this.checked"> Skip the Recycle Bin</label>`)}
@@ -19115,7 +19131,8 @@ async function renderDiagnostics(data, running) {
     ${g.total_mb ? `<div class="set-group"><div class="gt">GPU memory <small>· ${esc(g.name || '')}</small></div>
       <div class="dg-gpu">${bar(now.free || 0, `Other apps use ${gb(now.other)}; ${gb(now.free || 0)} is free for a model`, false, now)}<div class="dg-legend"><span><i class="dg-other"></i>other apps ${gb(now.other)}</span><span><i class="dg-need"></i>free for a model now ${gb(now.free || 0)}</span><span><i class="dg-over"></i>would spill into RAM</span><span><i class="dg-cpu"></i>on the CPU by plan</span></div>
       ${g.model_mb ? `<small>The loaded model uses ${gb(g.model_mb)} of VRAM${g.spilled_mb > 256 ? ` and <b class="dg-bad">${gb(g.spilled_mb)} of system RAM</b> (spilled - slow)` : ''}.</small>` : ''}</div></div>` : ''}
-    <div class="set-group"><div class="gt">Models <small>· what each needs at its context size${g.total_mb ? `, planned for other apps using up to ${gb(plan.other)}` : ''}</small></div>${(data.models || []).map(modelRow).join('') || '<p class="lead">No models in models.ini.</p>'}</div>
+    <div class="set-group"><div class="gt">Models <small>· what each needs at its context size${g.total_mb ? `, planned for other apps using up to ${gb(plan.other)}` : ''}</small></div>${(data.models || []).filter(m => m.status !== 'missing').map(modelRow).join('') || ((data.models || []).length ? '' : '<p class="lead">No models in models.ini.</p>')}
+      ${(() => { const gone = (data.models || []).filter(m => m.status === 'missing'); return gone.length ? `<details class="set-more"><summary>Not on this PC <small>· ${gone.length} in models.ini whose file is gone - remove each one there</small></summary>${gone.map(modelRow).join('')}</details>` : ''; })()}</div>
     ${groups.slice(1).join('')}<div class="set-group" id="mm-set"></div><div class="set-group" id="storage-group"><div class="gt">Storage <small>· what this app keeps on disk</small></div>${SKELETON_TEXT}</div></div>`;
   loadStorage();
   renderModelMonitor();
@@ -19302,7 +19319,7 @@ async function renderMemory() {
       ${rowHtml('Use sensitive memories', 'Health, beliefs, politics, money and similar. Off: they are kept and shown, but not sent, and profile updates leave them out.', sw(sens, `saveSettings({memory_sensitive:${!sens}}).then(renderMemory)`))}</div>
     <div class="set-group" id="soul"><div class="gt">Soul <small>· who the assistant is - its name, its voice, what it's for</small></div>
       <textarea class="input prof-text mono" id="soul-text" rows="7" maxlength="4000" placeholder="Empty: the app's default. Write who the assistant is, in its own words (&quot;My name is…&quot;)." aria-label="Soul">${esc(idn.soul || '')}</textarea>
-      <div class="cfg-actions"><small class="muted grow">Sent with a header that says this file is about the assistant itself, not you · <span class="mono">${esc(idn.path)}</span></small>
+      <div class="cfg-actions"><small class="muted grow">Sent with a header that says this file is about the assistant itself, not you · ${dataPath(idn.path)}</small>
         ${idn.soul ? '' : `<button class="btn sm" onclick="$('soul-text').value=${esc(JSON.stringify(idn.starter))}">Start from an example</button>`}
         <button class="btn sm primary" onclick="api('/api/identity',{soul:$('soul-text').value}).then(()=>{toast('Saved - the next message uses it.');renderMemory();}).catch(e=>toast(e.message))">Save</button></div></div>
     ${profile}
@@ -19316,7 +19333,7 @@ async function renderMemory() {
       ${groups.length ? groups.map(([t, xs]) => `<div class="mem-topic-h">${esc(t)} <span class="muted">${xs.length}</span></div><div class="list-box">${xs.map(row).join('')}</div>`).join('')
         : '<div class="list-box"><div class="list-row muted">Nothing saved yet. Add something below, ask the assistant to remember something, or import what another assistant remembers (paste its list into a .txt file, one per line).</div></div>'}
       <form class="folder-add" onsubmit="event.preventDefault();memAdd(this.elements.text)"><input class="input" name="text" maxlength="${d.max_text}" placeholder="e.g. My main Roblox place is Obby World" aria-label="New memory" autocomplete="off"><button class="btn" type="submit">Add</button></form>
-      <p class="set-note" style="margin-top:12px">Memory never grants a permission or skips an approval. Kept in <span class="mono">${esc(d.path)}</span>; in Cloud mode the entries a request uses go with it.</p>
+      <p class="set-note" style="margin-top:12px">Memory never grants a permission or skips an approval. Kept in ${dataPath(d.path)}; in Cloud mode the entries a request uses go with it.</p>
     </div>`;
 }
 // The memory graph (memory_graph.graph): topics on an inner ring, the names they share on an outer one.
@@ -19392,7 +19409,7 @@ async function renderSkills() {
       ${rowHtml('Offer to save skills after tasks', 'Shows Save as skill under replies that took several actions.', sw(d.offer !== false, `saveSettings({skills_offer:${d.offer === false}}).then(renderSkills)`))}</div>
     <div class="set-group"><div class="gt">Your skills <small>· ${d.skills.length}</small></div>
       <div class="list-box">${d.skills.map(row).join('') || '<div class="list-row muted">None yet.</div>'}</div>
-      <p class="set-note">A skill is advice only: every action it describes still asks as usual, and FX never runs a skill's files by itself. Imported skills start off - read them first. Folder: <span class="mono">${esc(d.folder)}</span></p></div>`;
+      <p class="set-note">A skill is advice only: every action it describes still asks as usual, and FX never runs a skill's files by itself. Imported skills start off - read them first. Folder: ${dataPath(d.folder)}</p></div>`;
 }
 async function skillOpen(slug) {
   const r = await api(`/api/skills/${slug}`).catch(e => ({ ok: false, message: e.message }));
@@ -20684,7 +20701,7 @@ const NotesView = (() => {
         <button type="button" class="icon-btn" title="Delete" aria-label="Delete task" onclick="NotesView.delTask('${t.id}')">${icon('i-trash', 'sm')}</button></span></li>`;
     const note = d.notes.find(n => n.id === st.sel);
     const noteCard = n => `<button type="button" class="nt-note${n.id === st.sel ? ' on' : ''}" onclick="NotesView.open('${n.id}')"><b>${n.pinned ? icon('i-pin', 'xs') : ''}${esc(n.title)}</b><small>${esc((n.body || '').replace(/^#.*\n?/, '').slice(0, 140))}</small><span class="muted">${esc(fmtAgo(n.updated))}</span></button>`;
-    $('place').innerHTML = `<div class="place-wrap nt-wrap">${placeHead('Notes', 'Your to-dos and notes. The assistant can read and add to them too ("add a task to call Dana on Friday"); a task with a time gets a notification while the app runs.')}
+    $('place').innerHTML = `<div class="place-wrap nt-wrap">${placeHead('Notes', 'Your to-dos and notes. The assistant can read and add to them, and a task with a time reminds you while the app runs.')}
       <div class="nt-cols">
         <section class="nt-tasks" aria-labelledby="nt-t"><div class="nt-sec-head"><h2 id="nt-t">Tasks</h2>${doneN ? `<button type="button" class="af-link" onclick="NotesView.toggleDone()">${st.showDone ? 'Hide' : 'Show'} ${doneN} done</button>` : ''}</div>
           <form class="nt-add" onsubmit="event.preventDefault();NotesView.addTask()"><input class="input" id="nt-new" placeholder="Add a task" aria-label="New task" autocomplete="off">
@@ -20761,7 +20778,7 @@ const DocsView = (() => {
   }
   function paintList() {
     const card = d => `<article class="place-card dc-card"><button type="button" class="pc-main" onclick="DocsView.open('${d.id}')">${icon('i-file')}<span><b>${esc(d.title)}</b><small>${d.words.toLocaleString()} words · ${esc(fmtAgo(d.updated))}</small></span></button></article>`;
-    $('place').innerHTML = `<div class="place-wrap">${placeHead('Docs', 'Write in Markdown with the model as your editor: select text and say what to change, proofread, or let it continue. Every change it suggests waits for your OK, and older versions are kept.',
+    $('place').innerHTML = `<div class="place-wrap">${placeHead('Docs', 'Write in Markdown with the model as your editor: select text and say what to change. Each change waits for your OK, and older versions are kept.',
       `<label class="btn">${icon('i-arrow-up', 'xs')}Import<input type="file" accept=".md,.markdown,.txt,.html,.htm" hidden onchange="DocsView.importFile(this)"></label><button class="btn primary" onclick="DocsView.create()">${icon('i-plus', 'xs')}New document</button>`)}
       ${st.list.length ? `<div class="place-grid">${st.list.map(card).join('')}</div>` : `<div class="place-empty">${icon('i-file')}<b>No documents yet</b><p>Start one, or import a .md or .txt file. The assistant can write documents here too ("write a cover letter in Docs").</p><button class="btn primary" onclick="DocsView.create()">${icon('i-plus', 'xs')}New document</button></div>`}</div>`;
   }
