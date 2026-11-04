@@ -35,5 +35,30 @@ class DrawCard(unittest.TestCase):
         self.assertIsNone(re.search(r"live \? ' open'", HTML[i:i + 400]))
 
 
+class Feedback4Nov(unittest.TestCase):
+    def test_crowded_one_line_box_takes_two_rows(self):
+        self.assertIn("function composerCrowded(box)", HTML)
+        self.assertIn("|| composerCrowded(box);", HTML)
+
+    def test_no_char_rate_while_thinking(self):
+        i = HTML.index("const writing = !!splitThink(c.content).answer.trim();")
+        self.assertIn(": 'thinking';", HTML[i:i + 300])
+
+    def test_one_mark_per_reply(self):
+        self.assertIn(".msg-assistant .think[data-still] { display: none !important; }", HTML)
+        i = HTML.index("function oneMover(")
+        self.assertIn("closest('.research-progress')", HTML[i:i + 700])
+
+    def test_dot_field_fills_the_frame(self):
+        i = HTML.index("  mono(c, p, e, t) {")
+        body = HTML[i:i + 2600]
+        self.assertIn("x = q * sx + sx / 2, y = r * sy + sy / 2", body)
+        self.assertNotIn("20 + q * sx", body)
+
+    def test_claude_shimmer_is_a_mask_not_clipped_text(self):
+        self.assertIn("content: attr(data-t)", HTML)
+        self.assertIn("function setTp(el, text)", HTML)
+
+
 if __name__ == "__main__":
     unittest.main()

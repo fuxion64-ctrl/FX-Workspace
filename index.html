@@ -1649,6 +1649,8 @@ html.fx-desktop .sb-quit:hover { background: var(--hover); color: var(--danger-t
    reply the step list's and the page list's spinners are a still ring - the reply's thinking mark already moves. */
 .think[data-still], .think[data-still] *, .think[data-still] *::before, .think[data-still] *::after,
 .msg-assistant :is(.steps, .web-body) .spinner { animation: none !important; }
+/* 4 Nov: one mark per reply - the others aren't shown at all (a still copy still read as a second animation). */
+.msg-assistant .think[data-still] { display: none !important; }
 /* ---- Icon hover animations (2026-10-14, v2): each icon moves its own parts - the trash lid lifts, the gear turns and
    settles, the download arrow falls into the tray, the notes hop in turn, the eye blinks. Symbols carry ip-* classes on
    their parts; a part plays var(--ip-<part>), which only the hovered button sets, so idle icons are untouched. Full motion
@@ -5652,6 +5654,18 @@ html.voice-on .idle-screen { display: none !important; }
 :root[data-ui][data-skin="clay"] .thinking-label > .tp { background-image: linear-gradient(120deg, var(--muted) 37.5%, color-mix(in srgb, var(--muted) 30%, #fff) 45%, color-mix(in srgb, var(--muted) 30%, #fff) 55%, var(--muted) 62.5%);
   background-size: 400% 100%; animation: clay-shimmer 3s linear infinite; }
 :root[data-ui][data-skin="clay"][data-tone="light"] .thinking-label > .tp { background-image: linear-gradient(120deg, var(--muted) 37.5%, color-mix(in srgb, var(--text) 20%, #fff) 45%, color-mix(in srgb, var(--text) 20%, #fff) 55%, var(--muted) 62.5%); }
+/* 4 Nov: on the GPU, an animated gradient clipped to text sometimes painted as a solid grey bar over the label
+   (Chromium; seen on the search row). The same sweep is now a mask over plain text, which paints reliably: the
+   words in the muted colour, the passing band in the brighter one. */
+:root[data-ui][data-skin="clay"] .thinking-label > .tp { background: none !important; -webkit-background-clip: border-box; background-clip: border-box;
+  color: var(--muted); animation: none; position: relative; }
+:root[data-ui][data-skin="clay"] .thinking-label > .tp::after { content: attr(data-t); position: absolute; inset: 0; white-space: nowrap; pointer-events: none;
+  color: #fff; -webkit-mask-image: linear-gradient(120deg, transparent 37.5%, #000 45%, #000 55%, transparent 62.5%); mask-image: linear-gradient(120deg, transparent 37.5%, #000 45%, #000 55%, transparent 62.5%);
+  -webkit-mask-size: 400% 100%; mask-size: 400% 100%; animation: clay-mask 3s linear infinite; opacity: .75; }
+:root[data-ui][data-skin="clay"][data-tone="light"] .thinking-label > .tp::after { color: color-mix(in srgb, var(--text) 20%, #fff); opacity: 1; }
+:root[data-ui][data-skin="clay"]:is([data-motion="off"], [data-motion="reduced"]) .thinking-label > .tp::after,
+:root[data-ui][data-skin="clay"] .think-block[data-phase="done"] .thinking-label > .tp::after { content: none; }
+@keyframes clay-mask { 0%, 15% { -webkit-mask-position: 83.333% 0; mask-position: 83.333% 0; animation-timing-function: cubic-bezier(.714, .121, .211, .888); } 85%, 100% { -webkit-mask-position: 16.667% 0; mask-position: 16.667% 0; } }
 /* 1.4.4: the message box shows keyboard focus in the Claude, ChatGPT and Gemini looks too - a quiet one-pixel ring
    inside its edge (Claude's own box darkens its border the same way); before, focusing it changed nothing. */
 :root[data-ui]:is([data-skin="clay"], [data-skin="mono"], [data-skin="prism"]) .composer:focus-within {
@@ -9664,10 +9678,31 @@ function autoGrow() {
   const box = $('composer'), lh = parseFloat(getComputedStyle(promptEl).lineHeight) || 22;
   if (!box) return;
   const open = box.classList.contains('multiline');
-  const multi = promptEl.value.includes('\n') || promptEl.scrollHeight > (open ? lh * 1.5 : lh * 1.8) + 16;
+  const multi = promptEl.value.includes('\n') || promptEl.scrollHeight > (open ? lh * 1.5 : lh * 1.8) + 16 || composerCrowded(box);
   if (open !== multi) { box.classList.toggle('multiline', multi); fitPrompt(); }
 }
-function updateSend() { renderRunControls(); }
+// 1.4.6: a one-line box with many controls (context ring, model, effort, style, Pause and Stop while it works) used
+// to wrap its last button onto a line of its own. When they can't all sit beside a usable message field, the box
+// takes its proper two-row form instead. Measured from the controls' own widths, so it doesn't depend on the layout
+// it is in (no flip-flop).
+function composerCrowded(box) {
+  const row = box.querySelector('.composer-row');
+  if (!row || getComputedStyle(row).display !== 'contents') return false;    // only the one-line looks
+  let need = 180;                                                             // the message field's least width
+  for (const el of row.children) {
+    if (el === promptEl || el.classList.contains('grow-space') || !el.getClientRects().length) continue;
+    need += el.offsetWidth + 4;
+  }
+  const cs = getComputedStyle(box);
+  return need > box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+}
+function updateSend() { renderRunControls(); requestAnimationFrame(autoGrow); }
+if (typeof ResizeObserver === 'function') {
+  // The box, and the controls whose width changes (a model name loading, Stop replacing Send).
+  const ro = new ResizeObserver(() => requestAnimationFrame(autoGrow));
+  const watch = () => { const b = $('composer'); if (!b) return; ro.observe(b); b.querySelectorAll('.composer-row > *').forEach(el => ro.observe(el)); };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watch); else watch();
+}
 
 /* ---- Run controls --------------------------------------------------------
    While a request runs, Send turns into Stop and Pause appears beside it.
@@ -11649,6 +11684,8 @@ function webSavedOf(events) {
   const last = m.searches[m.searches.length - 1];
   return { q, pages, searches: m.searches.length, reads: pages.length, ...(last && last.mode ? { via: { mode: last.mode, route: last.route, providers: last.providers } } : {}) };
 }
+// A thinking-row phrase: its text, and a copy in data-t for the Claude look's shimmer band (drawn by ::after).
+function setTp(el, text) { el.textContent = text; el.dataset.t = text; }
 function webBlock() {
   const el = document.createElement('div');
   el.className = 'think-block web-block';
@@ -11700,7 +11737,7 @@ function paintWeb(el, model, live) {
   const ind = el.querySelector('.think'), act = !model.searches.some(s => s.running) && model.reads.some(r => r.running) ? 'read' : 'search';
   setThinkAct(ind, act);
   const text = webLabel(model, live), tp = el.querySelector('.tp');
-  if (tp.textContent !== text) tp.textContent = text;
+  if (tp.textContent !== text) setTp(tp, text);
   el.querySelector('.web-head').setAttribute('aria-label', text);
   const pages = model.reads.flatMap(r => r.pages);
   syncFaces(el.querySelector('.fav-stack'), [...pages.filter(p => p.ok !== false && p.state !== 'failed').map(p => p.domain),
@@ -11982,8 +12019,8 @@ const Thinking = (() => {
   function label(el, text, animate) {
     const lab = el.querySelector('.thinking-label'), cur = lab.querySelector('.tp.on'), next = lab.querySelector('.tp:not(.on)');
     if (cur.textContent === text) return;
-    if (!animate || still()) { cur.textContent = text; next.textContent = ''; return; }
-    next.textContent = text;
+    if (!animate || still()) { setTp(cur, text); setTp(next, ''); return; }
+    setTp(next, text);
     next.classList.add('enter'); void next.offsetWidth; next.classList.remove('enter');
     next.classList.add('on'); cur.classList.remove('on');
   }
@@ -12330,13 +12367,14 @@ const fx = {
   },
   // Terminal: unchanged - block characters fill row by row.
   terminal(c, p) {
-    const blocks = ' ░▒▓█', cols = 44, rows = 8;
+    // Rows fill the whole frame, in any shape (1.4.6); the bar sits on the last line.
+    const blocks = ' ░▒▓█', cols = Math.max(8, Math.floor((CW - 20) / 7.8)), rows = Math.max(3, Math.floor((CH - 44) / 17));
     c.font = '13px ui-monospace, Consolas, monospace'; c.fillStyle = '#7fd4a0';
     for (let i = 0; i < rows; i++) {
-      const fill = Math.max(0, Math.min(cols, Math.round((p * rows - i) * cols))), sh = i < 3 ? 2 : i < 6 ? 3 : 4;
-      c.fillText(blocks[sh].repeat(fill) + '·'.repeat(cols - fill), 16, 52 + i * 17);
+      const fill = Math.max(0, Math.min(cols, Math.round((p * rows - i) * cols))), sh = i < rows * .38 ? 2 : i < rows * .75 ? 3 : 4;
+      c.fillText(blocks[sh].repeat(fill) + '·'.repeat(cols - fill), 10, 22 + i * 17);
     }
-    const n = Math.round(p * 12); c.fillText('[' + '#'.repeat(n) + '-'.repeat(12 - n) + ']', 16, CH - 46);
+    const n = Math.round(p * 12); c.fillText('[' + '#'.repeat(n) + '-'.repeat(12 - n) + ']', 10, CH - 12);
   },
   // Eclipse: the picture behind a moon that slides away; corona flares travel the rim.
   eclipse(c, p, e, t) {
@@ -12383,9 +12421,12 @@ const fx = {
   },
   // ChatGPT: the dot field, each dot the picture's own colour, arriving in soft clusters.
   mono(c, p, e, t) {
-    const P = this.pic('mono'), cols = 46, rows = 17, sx = (CW - 40) / cols, sy = (CH - 70) / rows;
-    if (!this.dotTurn) {                     // each dot's turn: cluster order, spread evenly over 0-90 % by rank
-      const raw = []; for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) raw.push(Math.min(Math.hypot((q - 12) / 14, (r - 4) / 6), Math.hypot((q - 30) / 15, (r - 12) / 6)) + (Math.sin(q * 1.7 + r * 2.3) + 1) * .08);
+    // 1.4.6: the field fills the whole frame, edge to edge, in any shape - square cells (round, even spacing) at
+    // about the approved density, so a tall picture's frame isn't stripes in a band.
+    const P = this.pic('mono'), cell = Math.max(6, Math.sqrt(CW * CH / 760));
+    const cols = Math.max(8, Math.round(CW / cell)), rows = Math.max(6, Math.round(CH / cell)), sx = CW / cols, sy = CH / rows;
+    if (!this.dotTurn || this.dotTurn.length !== cols * rows) {   // each dot's turn: cluster order, spread evenly over 0-90 % by rank
+      const raw = []; for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) { const u = q / cols, v = r / rows; raw.push(Math.min(Math.hypot((u - .26) / .3, (v - .24) / .35), Math.hypot((u - .65) / .33, (v - .7) / .35)) + (Math.sin(q * 1.7 + r * 2.3) + 1) * .08); }
       const rank = raw.map((v, i) => [v, i]).sort((a, b) => a[0] - b[0]); this.dotTurn = new Array(raw.length);
       rank.forEach(([, i], n) => { this.dotTurn[i] = n / raw.length * .82; });
     }
@@ -12395,7 +12436,7 @@ const fx = {
     if (fin > 0) { c.save(); c.beginPath(); c.arc(CW / 2, CH / 2, Math.max(0, rr - 12), 0, TAU); c.clip(); c.drawImage(P.cv, 0, 0); c.restore(); }
     for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) {
       const th = this.dotTurn[r * cols + q];
-      const on = Math.max(0, Math.min(1, (p - th) * 8)), x = 20 + q * sx + sx / 2, y = 40 + r * sy + sy / 2;
+      const on = Math.max(0, Math.min(1, (p - th) * 8)), x = q * sx + sx / 2, y = r * sy + sy / 2;
       const d = Math.hypot(x - CW / 2, y - CH / 2), edge = fin > 0 ? Math.max(0, 1 - Math.abs(d - rr) / 24) : 0;
       if (fin > 0 && d < rr - 24) continue;                       // the ripple has passed: the picture shows here
       const i = (Math.min(P.h - 1, Math.round(y)) * P.w + Math.min(P.w - 1, Math.round(x))) * 4, size = on > 0 ? 1.4 + 1.3 * on + .3 * Math.sin(t * 2 + q + r) * on : 1.2;
@@ -13233,7 +13274,9 @@ function modelActivity(turn) {
   else if (c && c.n && !c.ended) {
     const secs = (now - (c.tFirst || now)) / 1000;
     rate = secs > .6 ? c.n / secs : 0;
-    what = `${splitThink(c.content).answer.trim() ? 'writing' : 'thinking'}${rate ? ` · ${rate < 10 ? rate.toFixed(1) : Math.round(rate)} char/s` : ''}`;
+    // The speed only while it writes the answer: during thinking it counted hidden reasoning (1.4.6 feedback).
+    const writing = !!splitThink(c.content).answer.trim();
+    what = writing ? `writing${rate ? ` · ${rate < 10 ? rate.toFixed(1) : Math.round(rate)} char/s` : ''}` : 'thinking';
   } else if (ev) what = S.mode === 'cloud' || !c ? 'working' : 'starting';
   else { what = 'done'; busy = false; }
   if (S.run === 'paused') { what = 'paused'; busy = false; }
@@ -14002,11 +14045,15 @@ function paintResearch(el, r) {
 // One moving signal at a time (1.4.6): a Research turn moved the same mark in the Thinking row, the search row and
 // Research's bar at once (3 Nov 2026). Of a turn's marks on screen only the newest - the lowest - moves; the others
 // hold their formation still (data-still: the CSS marks stop, Orbs draws them once).
+// 4 Nov feedback: a still copy next to a moving one still read as two animations, so the others now step aside
+// (hidden, their row's text moves up to the edge) and Research's card, when there is one, keeps the mark.
 function oneMover(turn = S.turn) {
   if (!turn || !turn.wrap) return;
-  const marks = [...turn.wrap.querySelectorAll('.think')].filter(el => el.getClientRects().length > 0);
-  marks.forEach((el, i) => {
-    const still = i < marks.length - 1;
+  // Judged by the mark's row: a hidden mark has no box of its own, and must be able to come back.
+  const marks = [...turn.wrap.querySelectorAll('.think')].filter(el => el.parentElement && el.parentElement.getClientRects().length > 0);
+  const mover = marks.find(el => el.closest('.research-progress')) || marks[marks.length - 1];
+  marks.forEach(el => {
+    const still = el !== mover;
     if ((el.dataset.still === '1') !== still) { if (still) el.dataset.still = '1'; else delete el.dataset.still; }
   });
 }

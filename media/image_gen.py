@@ -1613,10 +1613,61 @@ def wants_image(message: str) -> bool:
     return bool(_WANTS.search(str(message or "")))
 
 
+def _norm(s: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", str(s or "").lower())
+
+
+def installed_models() -> list:
+    """[{"key", "name", "about"}] of the picture models on this PC, yours included - what a chat can ask for."""
+    return [{"key": k, "name": m["name"], "about": m.get("about", "")} for k, m in MODELS.items() if installed(k)]
+
+
+def resolve_model(name: str) -> str | None:
+    """A model named in a chat ("DreamShaper", "z image", "my juggernaut", "fast") -> its key, among the models on
+    this PC. Exact key/name first, then the longest name contained in what was said (or the other way round); None
+    when nothing fits, so the caller lists what there is instead of guessing (1.4.6)."""
+    said = _norm(name)
+    if not said:
+        return None
+    rows = installed_models()
+    for r in rows:
+        if said in (_norm(r["key"]), _norm(r["name"])):
+            return r["key"]
+    best, score = None, 0
+    for r in rows:
+        for cand in (r["name"], r["key"]):
+            c = _norm(cand)
+            if len(c) >= 3 and (c in said or said in c):
+                s = min(len(c), len(said))
+                if s > score:
+                    best, score = r["key"], s
+    if score >= 3:
+        return best
+    # Words said in another order or with others between ("pony anime clean" for "Pony V6 · Anime clean"): the
+    # model whose name holds the most of the words said - at least two, or all of them.
+    words = [w for w in re.findall(r"[a-z0-9]+", str(name).lower()) if len(w) >= 2]
+    best, score = None, 0
+    for r in rows:
+        have = set(re.findall(r"[a-z0-9]+", f"{r['name']} {r['key']}".lower()))
+        s = sum(w in have for w in words)
+        if s > score:
+            best, score = r["key"], s
+    return best if score >= 2 or (words and score == len(words)) else None
+
+
 def generate_image_tool(args: dict, ref_image: bytes | None = None, should_cancel=None, progress=None) -> dict:
     """The model's generate_image tool."""
+    quality = args.get("quality")
+    if args.get("model"):                     # a model the user named: matched to one on this PC, never guessed
+        key = resolve_model(args["model"])
+        if not key:
+            have = "; ".join(f"{r['name']} ({r['key']})" for r in installed_models()) or "none"
+            return {"ok": False, "status": "permanent_failure", "code": "unknown_model",
+                    "message": f"No picture model called '{args['model']}' is on this PC. Installed: {have}. "
+                               "Ask the user which of these to use, or call again with one of them."}
+        quality = key
     try:
-        img = generate(args.get("prompt") or "", args.get("quality"), args.get("size"), args.get("seed"),
+        img = generate(args.get("prompt") or "", quality, args.get("size"), args.get("seed"),
                        args.get("negative") or "", ref_image if args.get("edit") else None, should_cancel, progress,
                        count=args.get("count") or 1)
     except ImageError as e:

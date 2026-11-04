@@ -90,7 +90,10 @@ class ContextAndApiTests(unittest.TestCase):
                 patch.object(llm, 'system_prompt', return_value='system'), \
                 patch.object(llm, '_turn_tokens', return_value=0), \
                 patch.object(llm, '_local_reply_tokens', return_value=1000), \
+                patch.object(cw, '_tools_tokens', return_value=2000), \
                 patch.object(llm, 'trim_conversation') as trim:
+            # _tools_tokens pinned (4 Nov): the tool list's size depended on which tools earlier tests left on, which
+            # made this fail in some full runs (69,936) - the point here is the 80K window, not the tools.
             llm._fit_for_local()
             budget = trim.call_args.kwargs['budget_tokens']
             self.assertGreater(budget, 70000)
