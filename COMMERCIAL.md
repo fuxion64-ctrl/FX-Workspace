@@ -1,6 +1,7 @@
 # Commercial license
 
-FX Workspace is dual-licensed. You can use it under **either**:
+FX Workspace is dual-licensed - every version, the earlier ones included (from 4 November 2026; see
+[`NOTICE`](NOTICE) for copies of 1.3.0-1.4.5 received before then). You can use it under **either**:
 
 1. **The GNU AGPL-3.0** ([`LICENSE`](LICENSE)), free. Use it, change it, share it. If you share a changed
    version, or let other people use one over a network, you must publish your changes under the AGPL too.

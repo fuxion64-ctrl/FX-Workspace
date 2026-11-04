@@ -12,7 +12,7 @@ Parts marked **Beta** work, but are still being finished.
 - **Faster:** "write me a function" answers in the chat; quick PC questions about 3× faster on Auto; downloads over several connections; Tune speed pauses for your chats.
 - **Settings in nine pages**, Hide my IP up front and a Tor tag in the top bar; updates offered on Home.
 - **The looks redrawn:** Claude, ChatGPT, Grok and Gemini from their design write-ups, Eclipse with its own night, and each look's own thinking mark. Extras brings the old ones back.
-- **License:** AGPL-3.0 or a commercial license (1.4.5 and older stay Apache-2.0).
+- **License:** AGPL-3.0 or a commercial license, for every version from 4 Nov 2026, the earlier ones too (copies already received under Apache-2.0 keep it).
 
 ## 1.4.5 - 2026-10-29
 

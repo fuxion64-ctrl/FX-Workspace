@@ -135,7 +135,8 @@ FX Workspace is **dual-licensed**:
 - **A commercial license** for companies and commercial use that don't want the AGPL's terms. See
   [`COMMERCIAL.md`](COMMERCIAL.md).
 
-Versions up to 1.4.5 were released under the Apache License 2.0 and stay under it. See [`NOTICE`](NOTICE).
+This covers every version, the earlier ones too: from 4 November 2026, 1.3.0-1.4.5 are offered under the same two
+licenses. Copies of those already received under the Apache License 2.0 keep the rights it gave; see [`NOTICE`](NOTICE).
 The engines and models it downloads have their own licenses, listed in [`THIRD_PARTY.md`](THIRD_PARTY.md). Some
 of them (for example the MMAudio weights) are for non-commercial use only.
 

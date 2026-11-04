@@ -64,7 +64,7 @@ class Dictation(unittest.TestCase):
     def test_empty_send_dictates_in_the_chatgpt_look(self):
         i = HTML.index("const Dictate = (() => {")
         body = HTML[i:i + 9000]
-        self.assertIn("dataset.skin === 'mono'", body)                      # the ChatGPT look only
+        self.assertIn("['mono', 'void'].includes(document.documentElement.dataset.skin)", body)   # ChatGPT and Grok only
         self.assertIn("'/api/voice/transcribe'", body)                      # transcribed on this PC
         self.assertIn("promptEl.value = ", body)                            # into the box, not sent
         self.assertIn("else if (Dictate.wanted()) Dictate.toggle();", HTML)

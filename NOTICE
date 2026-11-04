@@ -1,7 +1,9 @@
 FX Workspace
 Copyright 2026 Fuxion (fuxion64@gmail.com)
 
-From version 1.4.6 on, FX Workspace is dual-licensed:
+From 4 November 2026, every version of FX Workspace - 1.4.6 and the earlier
+ones (1.3.0 to 1.4.5) - is offered only under these two licenses, whichever
+you choose:
 
   1. GNU Affero General Public License, version 3 only (AGPL-3.0-only) - see
      LICENSE. Free for everyone. If you change it and share it, or run a
@@ -11,8 +13,11 @@ From version 1.4.6 on, FX Workspace is dual-licensed:
   2. A commercial license from Fuxion - for companies, or anyone using it to
      make money, who don't want the AGPL's terms. See COMMERCIAL.md.
 
-Versions up to and including 1.4.5 were released under the Apache License 2.0,
-and those copies stay under it.
+Versions 1.3.0 to 1.4.5 first came out under the Apache License 2.0. Anyone
+who got one of those copies before 4 November 2026 keeps the rights Apache 2.0
+gave them for that copy - an open license can't be taken back for copies
+already given out. Every copy of any version obtained from then on, from this
+repository or its Releases, is under the two licenses above.
 
 If you redistribute FX Workspace or a modified version, keep this NOTICE file
 with it.

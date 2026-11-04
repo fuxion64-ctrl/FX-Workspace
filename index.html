@@ -4434,7 +4434,8 @@ select.input { padding-right: 6px; height: 30px; font-size: 12.5px; flex: 0 0 au
   --user-bubble: #1a1c20; --radius: 8px; --shadow: none;
 }
 :root[data-skin="void"]:not([data-tone="light"]):not([data-ai-classic]) :is(.btn, .chip, .icon-btn) { border-radius: 999px; }
-:root[data-skin="void"]:not([data-tone="light"]):not([data-ai-classic]) .composer { background: var(--surface-2); border-color: var(--border); border-radius: 8px; box-shadow: none; }
+/* 4 Nov: Grok's box is a soft rounded card (about 26 px corners), a step lighter than the page, a quiet hairline. */
+:root[data-skin="void"]:not([data-tone="light"]):not([data-ai-classic]) .composer { background: #1e1e1e; border-color: #2a2a2a; border-radius: 26px; box-shadow: none; }
 :root[data-skin="void"]:not([data-tone="light"]):not([data-ai-classic]) .sb-group { font-family: var(--mono); font-size: 11px; font-weight: 400; letter-spacing: .1em; text-transform: uppercase; }
 :root[data-skin="prism"][data-tone="light"]:not([data-ai-classic]) {
   --bg: #f0f4f8; --bg-sidebar: #f0f4f8; --surface: #ffffff; --surface-2: #f8fafd; --border: #e1e3e1; --border-strong: #c4c7c5;
@@ -5498,6 +5499,12 @@ html.voice-on .idle-screen { display: none !important; }
 :root[data-ui][data-skin="void"] .engine-btn { border-radius: 999px; height: 36px; color: var(--muted); font-weight: 500; }
 :root[data-ui][data-skin="void"] .send-btn { width: 40px; height: 40px; border-radius: 50%; background: var(--grok-blue); color: #fff; }
 :root[data-ui][data-skin="void"] .send-btn:disabled { background: color-mix(in srgb, var(--grok-blue) 40%, var(--surface)); color: color-mix(in srgb, #fff 70%, var(--surface)); opacity: 1; }
+/* 4 Nov, as Grok shows it: Send is a solid circle in the text colour; with the box empty it's a dark circle with
+   Grok's blue sound bars (Dictate); Stop matches Send. */
+:root[data-ui][data-skin="void"]:not([data-ai-classic]) .send-btn { background: var(--text); color: var(--bg); }
+:root[data-ui][data-skin="void"]:not([data-ai-classic]) .send-btn.dictate { background: #0b0b0b; color: var(--grok-blue, #3b9eff); }
+:root[data-ui][data-skin="void"][data-tone="light"]:not([data-ai-classic]) .send-btn.dictate { background: #f1f1f1; }
+:root[data-ui][data-skin="void"]:not([data-ai-classic]) .send-btn.stop { background: var(--text); color: var(--bg); }
 :root[data-ui][data-skin="void"] .msg-user { border-radius: 20px 20px 6px 20px; border: 1px solid var(--border); background: var(--user-bubble); }
 :root[data-ui][data-skin="void"] .sidebar { border-right: 1px solid var(--border); }
 :root[data-ui][data-skin="void"] .sb-item { border-radius: 999px; font-size: 14px; }
@@ -5556,7 +5563,7 @@ html.voice-on .idle-screen { display: none !important; }
 :root[data-ui][data-skin="mono"] .send-btn.stop { background: var(--gpt-voice, #3566f0); color: #fff; }
 /* While it listens: a level meter that follows your voice and a timer, beside the button (Dictate). */
 .dict-meter { display: inline-flex; align-items: center; gap: 3px; height: 36px; padding: 0 8px; flex: none; order: 1; }
-.dict-meter i { width: 3px; height: 18px; border-radius: 2px; background: var(--gpt-voice, var(--accent)); transform-origin: center; transform: scaleY(.18); transition: transform .08s linear; }
+.dict-meter i { width: 3px; height: 18px; border-radius: 2px; background: var(--gpt-voice, var(--grok-blue, var(--accent))); transform-origin: center; transform: scaleY(.18); transition: transform .08s linear; }
 .dict-meter b { margin-left: 6px; font: 500 12px/1 var(--mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; color: var(--muted); }
 .dict-meter::before { content: ""; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: #e5484d; animation: dict-rec 1.2s ease-in-out infinite; }
 @keyframes dict-rec { 50% { opacity: .35; } }
@@ -9801,7 +9808,8 @@ const Dictate = (() => {
   // another language (or without it) the meter and timer still show and the text comes when you finish.
   let state = 'off', stream = null, ctx = null, proc = null, chunks = [], unsent = [], sid = null, busy = false;
   let base = '', heard = '', level = 0, t0 = 0, raf = 0, meter = null, lastFull = 0;
-  const look = () => document.documentElement.dataset.skin === 'mono' && !document.documentElement.dataset.aiClassic;
+  // The looks whose app has it on the round button: ChatGPT and Grok (4 Nov).
+  const look = () => ['mono', 'void'].includes(document.documentElement.dataset.skin) && !document.documentElement.dataset.aiClassic;
   function wanted() { return state !== 'off' || (look() && !promptEl.value.trim()); }
   function paint() { renderRunControls(); const box = $('composer'); if (box) box.dataset.dictate = state === 'off' ? '' : state; }
   const join = t => (base && t ? base + ' ' : base) + t;
@@ -16106,7 +16114,7 @@ function renderAbout() {
       ${CONTRIBUTORS.map(c => rowHtml(esc(c.name), esc(c.for), `<a class="btn sm" href="${esc(c.url)}" target="_blank" rel="noopener">GitHub</a>`)).join('')}
       <p class="set-note">Want to help? Pull requests are welcome on <a href="https://github.com/fuxion64-ctrl/FX-Workspace" target="_blank" rel="noopener">GitHub</a>.</p></div>
     <div class="set-group"><div class="gt">Licenses</div>
-      ${rowHtml('This app', 'GNU AGPL-3.0, free for everyone - see LICENSE and NOTICE in the app folder.', '')}
+      ${rowHtml('This app', 'GNU AGPL-3.0, free for everyone - every version, the earlier ones too. See LICENSE and NOTICE in the app folder.', '')}
       ${rowHtml('Using it commercially', 'Companies and commercial use can get a commercial license instead of the AGPL - see COMMERCIAL.md.', '<a class="btn sm" href="mailto:fuxion64@gmail.com?subject=FX%20Workspace%20commercial%20license">Ask</a>')}
       ${rowHtml('Engines and models', 'llama.cpp, whisper.cpp, stable-diffusion.cpp, Kokoro, Parakeet, the image, video and sound models: each has its own license, listed in THIRD_PARTY.md. Some model weights are for non-commercial use only.', '')}</div>`;
 }
