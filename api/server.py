@@ -425,6 +425,8 @@ class SettingsUpdate(BaseModel):
     model_replies_only: bool | None = None   # Settings > This PC: no automatic model use outside replies (model_monitor)
     close_to_tray: bool | None = None        # closing the window keeps the app in the tray (desktop/main.js)
     chat_warmup: bool | None = None          # load the local chat model while a message is typed
+    update_check: bool | None = None         # look for a newer version by itself (app_version.start_auto)
+    claude_mark: str | None = None           # the Claude look's thinking mark: "regular" or "liquid"
     mini_place: str | None = None            # the mini window's place (mini_window.py)
     start_with_windows: bool | None = None   # the desktop app starts at sign-in...
     start_hidden: bool | None = None         # ...in the tray
@@ -1546,6 +1548,8 @@ def _start_background_services():
     threading.Timer(4, lambda: __import__("channels").start_all()).start()
     # The installer Update now downloaded has done its job once this version runs (app_version.py).
     threading.Timer(20, app_version.clean_downloads).start()
+    # ...and newer versions are looked for by itself, for Home's update banner (Settings > About can turn it off).
+    app_version.start_auto(lambda: (shared.app_state.get("settings") or {}).get("update_check") is not False)
     # A crash leaves temporary chats' folders behind: nothing of them survives a restart (privacy.py).
     swept = privacy.sweep()
     if swept:
@@ -2014,9 +2018,15 @@ def app_version_notes():
     return app_version.notes()
 
 
+@app.get("/api/version/latest")
+def app_version_latest():
+    """What the last update check found (by itself or pressed) - never asks GitHub. Home's update banner."""
+    return app_version.known()
+
+
 @app.post("/api/version/check")
 def app_version_check():
-    """Settings > About > Check for updates (only when pressed): the newest GitHub release and its installer."""
+    """Settings > About > Check for updates: the newest GitHub release and its installer."""
     return app_version.check(force=True)
 
 
@@ -3075,6 +3085,7 @@ def get_state(focused: int = None, since: int = 0, log_since: int = 0):
         "metrics": system_metrics.snapshot_nonblocking(active_model=shared.app_state.get("local_engaged")),
         "placement": _model_placement(shared.app_state.get("local_engaged")),
         "diagnostics": _diagnostics_counts(),
+        "settings_at": shared.app_state.get("settings_at"),     # a tool changed settings (app_look): the page reloads them
         "net": {"blocked": netlayer.blocked_state(), "session_direct": netlayer.session_direct(),   # the kill-switch banner
                 "tor": (tor := netlayer.tor_use()),                                            # ...and the Tor tag
                 "tor_state": tor_service.status().get("state") if tor and netlayer.uses_builtin_tor() else None},

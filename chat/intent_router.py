@@ -511,6 +511,10 @@ def classify_turn(message: str, with_vision: bool = False, previous: dict | None
     # "Show / hide the mini window" changes the app's own window (the mini_window tool) - not a read, not chat.
     if not explicit_action and not question:
         explicit_action = bool(re.match(r"^(?:please\s+)?(?:show|hide|bring\s+(?:up|back)|pop\s+out)\b.*\bmini[\s-]?window\b", work))
+    # "Switch to dark mode", "make it light", "change the theme to Aurora": the app's own look (app_appearance).
+    if not explicit_action and not question:
+        explicit_action = bool(re.match(r"^(?:please\s+)?(?:switch|change|make|turn|set|put|go|use)\b.*\b(?:dark|light)(?:\s+(?:mode|theme))?\b", work)
+                               or re.match(r"^(?:please\s+)?(?:switch|change|set)\b.*\b(?:theme|appearance)\b", work))
     if explicit_action:
         return {"mode": "action", "allow_mutation": True, "reason": "explicit current-turn action"}
 

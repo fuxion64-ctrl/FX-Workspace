@@ -1107,6 +1107,14 @@ html.fx-desktop .sb-quit:hover { background: var(--hover); color: var(--danger-t
 .welcome > .greeting { margin-top: auto; }   /* with the credit's auto margin: the spare height splits above and below, so the box sits mid-screen */
 .update-card { margin-top: 10px; padding: 12px 14px; border: 1px solid var(--accent); border-radius: var(--radius); background: var(--accent-soft); font-size: 13.5px; }
 .update-card .cfg-actions { justify-content: flex-start; margin-top: 8px; }
+/* 1.4.6: Home's update offer - one line above the greeting, from the update check that runs by itself. */
+.update-banner { width: 100%; margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px 10px 14px; }
+.update-banner[hidden] { display: none; }
+.update-banner .ub-text { flex: 1; min-width: 200px; }
+.update-banner .ub-text small { display: block; color: var(--text-2); font-size: 12.5px; margin-top: 2px; }
+.update-banner .update-progress { flex: 1 1 100%; }
+.update-banner .update-progress:empty { display: none; }
+.update-banner .update-progress .set-note { margin: 0; }
 .ctx-help { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 6px 0 2px; }
 .ctx-help small { flex: 1 1 100%; color: var(--muted); font-size: 12px; line-height: 1.4; }
 .greeting { display: flex; align-items: center; gap: 14px; font-family: var(--serif); font-size: clamp(30px, 4.2vw, 40px); font-weight: 400; letter-spacing: -.015em; color: var(--text); text-align: center; margin: 0; text-wrap: balance; }
@@ -4496,6 +4504,10 @@ html.sfx-still .ops-radar i { animation: none !important; }
 :root[data-skin="terminal"][data-tone="mossad"] :is(.send-btn, .btn.primary) { background: linear-gradient(180deg, #7eaaff, var(--accent)); color: var(--accent-ink); border-color: transparent; box-shadow: 0 6px 18px -8px var(--glow); }
 :root[data-skin="terminal"][data-tone="mossad"] .btn.primary:hover { background: linear-gradient(180deg, #98bbff, #6aa0ff); color: var(--accent-ink); }
 :root[data-skin="terminal"][data-tone="mossad"] :is(.icon-btn, .tool-btn):hover { box-shadow: 0 0 0 1px var(--border-strong), 0 0 14px -5px var(--glow); }
+/* 1.4.6: the same underglow in Aurora and Eclipse (their own glow colour) - and it stays on the temporary-chat button
+   while a temporary chat is open. */
+:root:is([data-skin="aurora"], [data-skin="eclipse"]) :is(.icon-btn, .tool-btn):hover,
+:root:is([data-skin="aurora"], [data-skin="eclipse"], [data-skin="terminal"][data-tone="mossad"]) .sb-temp[aria-pressed="true"] { box-shadow: 0 0 0 1px var(--border-strong), 0 0 14px -5px var(--glow); }
 :root[data-skin="terminal"][data-tone="mossad"] .msg-user { padding: 8px 12px; border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent); border-radius: 8px;
   background: rgba(91, 149, 255, .06); box-shadow: 0 10px 24px -18px var(--glow); }
 :root[data-skin="terminal"][data-tone="mossad"] .assistant-body { border-left: 2px solid color-mix(in srgb, var(--accent) 40%, transparent); }
@@ -5735,6 +5747,7 @@ html.voice-on .idle-screen { display: none !important; }
     <div class="net-banner" id="net-banner" role="alert" hidden></div>
 
     <div class="welcome" id="welcome">
+      <div class="update-card update-banner" id="update-banner" role="status" hidden></div>
       <h1 class="greeting"><svg><use href="#mark"/></svg><span id="greeting-text">Good evening</span></h1>
       <div class="composer-wrap" id="composer-home"></div>
       <button class="voice-home" id="voice-home" hidden onclick="Voice.open()" aria-label="Talk to the assistant - voice mode (Ctrl+Alt+V)" title="Voice mode (Ctrl+Alt+V)"><span class="vh-orb" aria-hidden="true"><i></i><i></i><i></i></span><span class="vh-label">Talk</span></button>
@@ -14212,6 +14225,10 @@ async function poll() {
     renderMetrics(d.metrics, d);
     S.placement = d.placement || null; syncDiagnostics(d.diagnostics);
     if (d.net) { NetIndicator.banner(d.net.blocked); torTag(d.net); }
+    // The assistant changed a setting (app_appearance: light, dark, the appearance) - take it on now.
+    const at = d.settings_at || null;
+    if ('settingsAt' in S && at !== S.settingsAt) loadSettings();
+    S.settingsAt = at;
     // The mini window's chat strip reads these (Overlay.paint): the turn, Stop, a waiting approval, the model to send with.
     S.turnInfo = d.turn || null; S.runInfo = d.run || 'idle'; S.approvalWaiting = !!d.pending_approval;
     S.pinnedLocal = d.local_pinned || ''; if (d.mode) S.serverMode = d.mode;
@@ -14822,7 +14839,7 @@ SETTINGS_WORDS.connections = ['connectors', 'mcp', 'channels'].map(id => `${id} 
 SETTINGS_WORDS.webnet = ['websearch', 'network'].map(id => SETTINGS_WORDS[id]).join(' ');
 let APP_VERSION = '';                        // the VERSION file, from /api/version (shared with the installer)
 api('/api/version').then(d => { APP_VERSION = d.version || ''; const el = $('about-version'); if (el) el.textContent = APP_VERSION; }).catch(() => {});
-// Settings > About > Check for updates: asks GitHub only when pressed. Updating = run the new installer over this
+// Settings > About > Check for updates: asks GitHub now (it also checks by itself - UpdateBanner). Updating = run the new installer over this
 // one - it keeps chats, settings, keys and models (installer/FXWorkspace.iss).
 async function checkUpdates(btn) {
   const out = $('about-update');
@@ -14856,6 +14873,29 @@ async function installUpdate(btn) {
     try { p = await api('/api/version/install'); } catch (_) { return say('Installing - FX Workspace closes in a moment and opens again when the update is done.'); }
   }
 }
+// Home's update banner (1.4.6): what the update check found by itself (GET /api/version/latest, which never asks
+// GitHub). Not now hides it until a still newer version comes out.
+const UpdateBanner = (() => {
+  async function refresh() {
+    const el = $('update-banner'); if (!el) return;
+    const d = await api('/api/version/latest').catch(() => null);
+    const skip = store.get('updateSkip', '');
+    if (!d || !d.newer || !d.latest || d.latest === skip || S.settings.update_check === false) { el.hidden = true; return; }
+    if (el.dataset.v === d.latest && !el.hidden) return;              // already showing (and maybe installing)
+    el.dataset.v = d.latest;
+    el.innerHTML = `${icon('i-download', 'sm')}<span class="ub-text"><b>FX Workspace ${esc(d.latest)} is out</b><small>You have ${esc(d.current)}. Your chats, settings and models stay as they are.</small></span>
+      ${d.can_install ? `<button type="button" class="btn sm primary" onclick="installUpdate(this)">Update now</button>`
+        : d.installer ? `<a class="btn sm primary" href="${esc(d.installer)}" target="_blank" rel="noopener">Download</a>` : ''}
+      <a class="btn sm" href="${esc(d.url)}" target="_blank" rel="noopener">What's new</a>
+      <button type="button" class="btn sm ghost" onclick="UpdateBanner.later()">Not now</button>
+      <div class="update-progress" aria-live="polite"></div>`;
+    el.hidden = false;
+  }
+  function later() { const el = $('update-banner'); store.set('updateSkip', el.dataset.v || ''); el.hidden = true; }
+  setTimeout(refresh, 2000);
+  setInterval(() => { if (!document.hidden) refresh(); }, 15 * 60 * 1000);   // the server checks every 12 h
+  return { refresh, later };
+})();
 // The wordmark: the gold Fx mark, then "workspace" (also the welcome card's title and the About page's).
 const wordmark = (cls = '') => `<span class="fx-wordmark ${cls}"><svg aria-hidden="true"><use href="#mark"/></svg><span>workspace</span></span>`;
 // Settings > About: who made it, how to reach them, and the licenses (NOTICE, THIRD_PARTY.md).
@@ -14867,7 +14907,8 @@ function renderAbout() {
   $('settings-body').innerHTML = `<h3>About</h3>
     <div class="set-group about-card">${wordmark('lg')}
       <p class="lead">A private, local-first AI assistant for Windows. Version <span id="about-version">${esc(APP_VERSION || '…')}</span>.</p>
-      ${rowHtml('Updates', 'Checks GitHub for a newer version - only when you press the button.', '<button type="button" class="btn sm" onclick="checkUpdates(this)">Check for updates</button>')}
+      ${rowHtml('Check for updates by itself', 'Looks on GitHub for a newer version after the app starts and twice a day, and offers it on Home. Nothing installs without your click.', sw(S.settings.update_check !== false, `saveSettings({update_check:${S.settings.update_check === false}}).then(()=>{renderAbout();UpdateBanner.refresh()})`))}
+      ${rowHtml('Updates', 'Look now.', '<button type="button" class="btn sm" onclick="checkUpdates(this).then(()=>UpdateBanner.refresh())">Check for updates</button>')}
       <div id="about-update"></div>
       ${rowHtml('Created by', '<span class="fx-sign">Fuxion</span>', '<a class="btn sm" href="mailto:fuxion64@gmail.com">fuxion64@gmail.com</a>')}
       <p class="set-note">If you want to support the project or have suggestions, email me.</p>

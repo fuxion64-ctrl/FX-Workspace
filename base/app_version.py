@@ -6,7 +6,8 @@ and the update check: Settings > About > Check for updates asks GitHub for the n
 newer, links its installer. Updating = run the new installer over this one: it keeps chats, settings, keys,
 models and the Python environment, and replaces only the app's own files (installer/FXWorkspace.iss).
 
-Nothing is checked unless the user presses the button; it goes through netlayer like every other request.
+Checked by itself (1.4.6, "Check for updates by itself", on by default): 90 s after start and every 12 hours, so Home
+can offer the update; or when the user presses the button. It goes through netlayer like every other request.
 
 Update now (1.4.2): the app downloads that installer itself into data\\updates - only from this repo's own
 release downloads, and only when it matches the SHA-256 GitHub publishes for it - then starts it silently
@@ -92,6 +93,37 @@ def check(force: bool = False) -> dict:
     result["can_install"] = bool(result["newer"] and result["sha256"] and _ours(result["installer"]) and os.name == "nt")
     _cache.update(at=time.time(), result=result)
     return {**result, "current": mine}
+
+
+def known() -> dict:
+    """The last check's answer without asking GitHub again - what Home's update banner reads."""
+    return {**(_cache["result"] or {}), "current": current(), "checked": _cache["at"] or None}
+
+
+AUTO_FIRST_S, AUTO_EVERY_S = 90, 12 * 3600
+
+
+def auto_round(enabled) -> bool:
+    """One round of the check by itself: asks GitHub only while enabled() is true. True when it asked."""
+    try:
+        if enabled():
+            check(force=True)
+            return True
+    except Exception:
+        pass                                            # offline or blocked: the next round tries again
+    return False
+
+
+def start_auto(enabled) -> threading.Thread:
+    """Checks by itself while enabled() is true: first AUTO_FIRST_S after start, then every AUTO_EVERY_S."""
+    def loop():
+        time.sleep(AUTO_FIRST_S)
+        while True:
+            auto_round(enabled)
+            time.sleep(AUTO_EVERY_S)
+    t = threading.Thread(target=loop, name="update-check", daemon=True)
+    t.start()
+    return t
 
 
 def _ours(url) -> bool:

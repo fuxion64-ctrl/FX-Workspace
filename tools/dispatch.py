@@ -768,6 +768,10 @@ def execute_tool(tool_name: str, args: dict) -> dict:
             return productivity_tools.send_notification(args["title"], args["message"],
                                                          args.get("duration_seconds", 8))
 
+        elif tool_name == "app_appearance":
+            import app_look                             # this app's own look only: nothing outside the app changes
+            return app_look.apply(args.get("mode"), args.get("appearance"))
+
         elif tool_name == "mini_window":
             import mini_window                          # this app's own window only: nothing outside the app changes
             return mini_window.apply(args.get("action", "toggle"), args.get("opacity"), args.get("click_through"),

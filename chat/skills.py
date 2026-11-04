@@ -41,7 +41,7 @@ SKILLS: dict[str, tuple[str, tuple[str, ...]]] = {
     "desktop": ("open, focus, close and tile apps and windows; click named controls, read the screen, type and press keys",
                 ("open_app_and_list", "open_application", "find_apps", "get_active_window", "wait_for_window", "list_windows",
                  "close_window", "snap_windows", "click_by_name", "list_elements", "act_element", "inspect_screen",
-                 "click_at", "drag_at", "scroll_at", "keyboard_action", "type_text", "screenshot_to_file", "mini_window")),
+                 "click_at", "drag_at", "scroll_at", "keyboard_action", "type_text", "screenshot_to_file", "mini_window", "app_appearance")),
     "files": ("read, write, edit, copy, move, rename, delete, zip, find and open files and folders; disk space",
               ("write_file", "read_file", "apply_patch", "edit_file", "open_file_in_os", "list_dir", "copy_path", "move_path",
                "rename_path", "delete_path", "make_dir", "zip_paths", "unzip_file", "search_files", "file_info",
@@ -86,7 +86,8 @@ _RULES = {
     "desktop": _W + r"(?:open|launch|start|run|close|quit|exit|focus|switch to|minimi[sz]e|maximi[sz]e|window|app|click|press|"
                r"type|button|menu|tab|scroll|drag|select|screen|screenshot|notepad|chrome|edge|discord|spotify|steam|vs ?code|"
                r"settings|explorer|tile|side by side|snap|mini ?window|always on top|overlay|corner|see-?through|"
-               r"transparent|"
+               r"transparent|dark mode|light mode|dark theme|light theme|theme|appearance|"
+               r"(?:make|turn|switch|go) (?:it |the app |this app |everything )?(?:dark|light)|"
                r"פתח|תפתח|סגור|תסגור|הפעל|לחץ|תלחץ|הקלד|חלון|אפליקציה|מסך|"
                r"открой|открыть|закрой|запусти|нажми|напечатай|окно|приложение|экран)",
     "files": _W + r"(?:files?|folders?|director(?:y|ies)|documents?|downloads|desktop|txt|csv|json|pdf|docx?|xlsx?|zip|unzip|"
