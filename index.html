@@ -5549,10 +5549,13 @@ html.voice-on .idle-screen { display: none !important; }
 :root[data-ui][data-skin="mono"] #tools-btn > span:not(.tools-count) { display: none; }
 :root[data-ui][data-skin="mono"] .composer-row .tool-btn:hover, :root[data-ui][data-skin="mono"] .engine-btn:hover { background: var(--hover); }
 :root[data-ui][data-skin="mono"] .engine-btn { border-radius: 999px; height: 36px; color: var(--muted); }
-:root[data-ui][data-skin="mono"] .send-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--text); color: var(--bg); }
-:root[data-ui][data-skin="mono"] .send-btn:disabled { background: var(--gpt-voice); color: #fff; opacity: 1; }
-/* Dictate (empty box): the solid round button, as ChatGPT shows it; while it listens the composer says so. */
-:root[data-ui][data-skin="mono"] .send-btn.dictate { background: var(--text); color: var(--bg); opacity: 1; filter: none; }
+/* ChatGPT's round button is its blue in every state - Send, Dictate (empty box), Stop (4 Nov, from the app itself). */
+:root[data-ui][data-skin="mono"] .send-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--gpt-voice, #3566f0); color: #fff; }
+:root[data-ui][data-skin="mono"] .send-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--gpt-voice, #3566f0) 88%, #000); }
+:root[data-ui][data-skin="mono"] .send-btn:disabled { background: var(--gpt-voice, #3566f0); color: #fff; opacity: .5; }
+:root[data-ui][data-skin="mono"] .send-btn.stop { background: var(--gpt-voice, #3566f0); color: #fff; }
+/* While it listens the composer says so. */
+:root[data-ui][data-skin="mono"] .send-btn.dictate { opacity: 1; filter: none; }
 :root[data-ui][data-skin="mono"] .composer[data-dictate="listening"] { box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 35%, transparent); }
 :root[data-ui][data-skin="mono"] .composer[data-dictate="listening"] #prompt::placeholder { color: var(--text); }
 :root[data-ui][data-skin="mono"] .msg-user { border-radius: 18px; background: var(--user-bubble); border: 0; padding: 10px 16px; }
