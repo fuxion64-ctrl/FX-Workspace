@@ -3129,6 +3129,45 @@ def _tree_size(path: str) -> tuple[int, int]:
     return total, files
 
 
+@app.get("/api/gpu/apps")
+def gpu_apps_view():
+    """Which apps hold the GPU's memory now, with what to do about each (shown after a model ran out of VRAM)."""
+    import gpu_apps
+    try:
+        return gpu_apps.snapshot()
+    except Exception as e:
+        return {"ok": False, "message": f"Couldn't read the GPU: {str(e)[:200]}"}
+
+
+class RamSplitRequest(BaseModel):
+    model: str | None = None
+
+
+@app.post("/api/local-models/ram-split")
+def ram_split(body: RamSplitRequest):
+    """A model that doesn't fit in VRAM: run what fits on the GPU and the rest from system RAM (llama.cpp's fit -
+    GPU layers "auto" with a margin left free). Slower than all on the GPU, but it answers. Settings > Models undoes it."""
+    import diagnostics
+    model = (body.model or shared.app_state.get("local_engaged") or shared.app_state.get("local_model") or "").strip()
+    try:
+        known = {c["name"] for c in llama_local.list_model_configs()}
+    except Exception:
+        known = set()
+    if not model or model not in known:
+        return {"ok": False, "message": "Pick the model first - it isn't in models.ini."}
+    if tasks.turns.running() or _model_loading():
+        return {"ok": False, "message": "Busy - wait for the current task to finish."}
+    err = llama_local.set_model_options({model: {"ngl": "auto", "fit": None, "fit-target": diagnostics.MARGIN_MB}})
+    if err:
+        return {"ok": False, "message": err}
+    try:
+        llama_local.unload_all()              # the next message loads it with the new split
+    except Exception:
+        pass
+    event_log.log_action(f"{model}: set to run partly from RAM (GPU layers auto, {diagnostics.MARGIN_MB} MB left free).")
+    return {"ok": True, "model": model, "message": f"{model} now runs what fits on the GPU and the rest from RAM - slower, but it answers."}
+
+
 @app.get("/api/storage/map")
 def storage_map_view(force: bool = False):
     """Settings › Storage (1.4.6): each drive, how full it is, and what of this app's is on it. Read-only."""

@@ -100,7 +100,8 @@ DEFAULT_SETTINGS = {
     "layout": "comfortable",
     "accent": "",                  # "" = the default gold (follows light/dark); a hex = a chosen accent
     "chat_font": "serif",         # serif | sans  (assistant replies)
-    "think_mark": "auto",         # auto | orbs | legacy  (the thinking mark; auto = orbs, the AI-inspired looks keep theirs)
+    "think_mark": "auto",         # auto | orbs | legacy  (the thinking mark; auto = each look's own mark since 1.4.6)
+    "marks_146": False,           # the one-time move from a saved "Orbs" to the 1.4.6 marks has run (load_settings)
     "user_name": "",
     # Privacy: cloud models never see screenshots unless this is on.
     "cloud_allow_screenshots": False,
@@ -402,6 +403,12 @@ def load_settings() -> dict:
         data["chat_font"] = "serif"
     if data.get("think_mark") not in ("auto", "orbs", "legacy"):
         data["think_mark"] = "auto"
+    # 1.4.6, once: "Orbs" chosen back when Auto meant the orbs becomes the new per-look marks (Auto). Orbs stays one
+    # click away in Settings > Appearance > Extras, and a choice made after this is kept.
+    if not data.get("marks_146"):
+        if data.get("think_mark") == "orbs":
+            data["think_mark"] = "auto"
+        data["marks_146"] = True
     data["look"] = clean_look(data.get("look"))
     data.update(clean_agent_settings(data))
     return data

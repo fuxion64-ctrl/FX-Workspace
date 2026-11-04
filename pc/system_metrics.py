@@ -187,6 +187,47 @@ class _GpuCounters:
         except Exception:
             return None
 
+    def per_pid(self) -> dict:
+        """{pid: dedicated bytes} for every process using the GPU's memory (pc/gpu_apps.py, 1.4.6)."""
+        if not self.ok:
+            return {}
+        ctypes, wintypes = self.ctypes, self.wintypes
+        try:
+            if self.pdh.PdhCollectQueryData(self.query) != 0:
+                return {}
+            handle = self.counters["dedicated"]
+            size, count = wintypes.DWORD(0), wintypes.DWORD(0)
+            status = self.pdh.PdhGetFormattedCounterArrayW(handle, self.PDH_FMT_LARGE, ctypes.byref(size),
+                                                          ctypes.byref(count), None) & 0xFFFFFFFF
+            if status != self.PDH_MORE_DATA or not size.value:
+                return {}
+            buf = (ctypes.c_byte * size.value)()
+            if self.pdh.PdhGetFormattedCounterArrayW(handle, self.PDH_FMT_LARGE, ctypes.byref(size),
+                                                     ctypes.byref(count), buf) != 0:
+                return {}
+            items, out = ctypes.cast(buf, ctypes.POINTER(self.Item)), {}
+            for i in range(count.value):
+                name = items[i].szName or ""
+                if name.startswith("pid_"):
+                    try:
+                        pid = int(name.split("_")[1])
+                    except (IndexError, ValueError):
+                        continue
+                    out[pid] = out.get(pid, 0) + max(0, items[i].FmtValue.largeValue)
+            return out
+        except Exception:
+            return {}
+
+
+def gpu_by_process() -> dict:
+    """{pid: dedicated VRAM bytes} for every process (Windows), {} elsewhere."""
+    global _COUNTERS
+    if os.name != "nt":
+        return {}
+    if _COUNTERS is None:
+        _COUNTERS = _GpuCounters()
+    return _COUNTERS.per_pid()
+
 
 _COUNTERS = None
 _LAST_PROCESS = {"shared_mb": None}

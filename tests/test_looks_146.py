@@ -62,5 +62,89 @@ class UnslopBuiltTests(unittest.TestCase):
         self.assertFalse([c for c in connectors.CATALOG if "official MCP" in c.get("about", "")] if hasattr(connectors, "CATALOG") else [])
 
 
+class HomeChatAndLooksTests(unittest.TestCase):
+    """The first /design rows: Home, a chat, Aurora, Sunrise, Classic dark, ChatGPT's chips (built 4 Nov)."""
+
+    def test_home_and_chat(self):
+        self.assertIn("const html = false ? ", PAGE)                                      # no Continue list
+        self.assertIn("promptEl.placeholder = show && S.transcript.length ? 'Reply…' : askText();", PAGE)
+        self.assertIn("eff === 'Balanced' || (eff === 'Auto' && model === 'Auto') ? '' : eff", PAGE)
+        self.assertIn("(S.mode === 'local' ? 'off' : 'Local models off · cloud first')", PAGE)
+        self.assertIn('.home-credit { display: none !important; }', PAGE)
+        self.assertIn(':root[data-ui="new"] :is(#pins-btn, #mini-btn, #stats-btn) { display: none !important; }', PAGE)
+        self.assertIn("stats: () => SessionStats.open(), mini: () => $('mini-btn').click(),", PAGE)
+
+    def test_looks_under_the_original_switch(self):
+        for sel in (':root[data-skin="aurora"]:not([data-ai-classic])', ':root:is([data-skin="dawn"], [data-skin="dusk"]):not([data-ai-classic]) .halo { opacity: 0; }',
+                    ':root[data-skin="classic"][data-scheme="dark"]:not([data-ai-classic]) .chip .chip-ic', ':root[data-skin="mono"]:not([data-ai-classic]) #composer-chips'):
+            self.assertIn(sel, PAGE)
+
+    def test_creating_image_and_building_cards(self):
+        self.assertIn("const DRAW_FX = (() => {", PAGE)
+        for key in ("classic", "sunrise", "terminal", "eclipse", "aurora", "clay", "mono", "void", "prism"):
+            self.assertIn(f"  {key}(c, p", PAGE)
+        self.assertIn("DRAW_FX.play(turn.drawEl);", PAGE)
+        self.assertIn("if (el.querySelector('canvas.dc-fx')) DRAW_FX.play(el);", PAGE)
+        self.assertIn("const what = L === 'chart' ? 'Building a chart'", PAGE)
+
+    def test_globe_opens_ops_and_relocks(self):
+        self.assertIn("if (mode !== 'ops' && root.dataset.secret === 'mossad' && runId !== autoOpsRun && runId !== opsClosedRun)", PAGE)
+        self.assertIn("function relock(layer) {", PAGE)
+        self.assertIn("data[id] = d; relock(id); schedule();", PAGE)
+
+    def test_saved_orbs_moves_to_the_new_marks_once(self):
+        import json, os, tempfile
+        from unittest.mock import patch
+        path = os.path.join(tempfile.mkdtemp(), "settings.json")
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump({"think_mark": "orbs"}, fh)
+        with patch.object(config, "SETTINGS_PATH", path):
+            s = config.load_settings()
+        self.assertEqual((s["think_mark"], s["marks_146"]), ("auto", True))
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump({"think_mark": "orbs", "marks_146": True}, fh)            # chosen again after 1.4.6: kept
+        with patch.object(config, "SETTINGS_PATH", path):
+            self.assertEqual(config.load_settings()["think_mark"], "orbs")
+
+class GpuMemoryOptionsTests(unittest.TestCase):
+    """Out of GPU memory isn't a dead end (asked 4 Nov): run on RAM too, or see what holds the GPU."""
+
+    def test_the_error_card_offers_both(self):
+        self.assertIn("'Not enough GPU memory for this model',", PAGE)
+        self.assertIn("['ramsplit', 'vram', 'models']],", PAGE)
+        self.assertIn("ramsplit: ['i-layers2', 'Run on RAM too'], vram: ['i-activity', 'What’s using the GPU'],", PAGE)
+        self.assertIn("async function showVram(card, btn) {", PAGE)
+        self.assertIn("<summary>More detail</summary>", PAGE)
+
+    def test_ram_split_endpoint_sets_fit_and_is_phone_blocked(self):
+        from unittest.mock import patch
+        from api import server
+        from connect import remote_access
+        self.assertIn(("POST", "/api/local-models/ram-split"), remote_access.PHONE_BLOCKED)
+        with patch("llama_local.list_model_configs", return_value=[{"name": "M"}]), \
+                patch("llama_local.set_model_options", return_value=None) as setopts, patch("llama_local.unload_all"), \
+                patch.object(server.tasks.turns, "running", return_value=False):
+            r = server.ram_split(server.RamSplitRequest(model="M"))
+        self.assertTrue(r["ok"], r)
+        self.assertEqual(setopts.call_args[0][0]["M"]["ngl"], "auto")
+
+    def test_apps_grouped_by_name_biggest_first(self):
+        from unittest.mock import patch
+        from pc import gpu_apps
+        with patch.object(gpu_apps, "_counters", return_value=[(1, 100), (2, 300), (3, 50)]), \
+                patch("psutil.Process", side_effect=lambda pid: type("P", (), {"name": lambda self: {1: "chrome.exe", 2: "dwm.exe", 3: "chrome.exe"}[pid]})()):
+            r = gpu_apps.snapshot()
+        self.assertEqual([(a["name"], a["bytes"]) for a in r["apps"]], [("dwm", 300), ("chrome", 150)])
+        self.assertIn("graphics acceleration", r["apps"][1]["tip"])
+
+
+class PromptBoxTests(unittest.TestCase):
+    def test_no_scrollbar_until_full_and_refit_on_resize(self):
+        self.assertIn("promptEl.style.overflowY = h > PROMPT_MAX ? 'auto' : 'hidden';", PAGE)
+        self.assertIn("box-sizing: border-box; overflow-y: hidden;", PAGE)
+        self.assertIn("window.addEventListener('resize', () => { if (promptEl.value) autoGrow(); });", PAGE)
+        self.assertIn('.welcome::after { content: ""; margin-top: auto; flex: none; }', PAGE)
+
+
 if __name__ == "__main__":
     unittest.main()

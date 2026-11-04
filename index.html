@@ -1105,7 +1105,8 @@ html.fx-desktop .sb-quit:hover { background: var(--hover); color: var(--danger-t
 .home-pic img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .3s var(--ease-out); }
 .home-pic:hover img { transform: scale(1.04); }
 .home-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); }
-.welcome > .greeting { margin-top: auto; }   /* with the credit's auto margin: the spare height splits above and below, so the box sits mid-screen */
+.welcome > .greeting { margin-top: auto; }
+.welcome::after { content: ""; margin-top: auto; flex: none; }   /* 1.4.6: the lower auto margin the hidden credit held - the box stays mid-screen */   /* with the credit's auto margin: the spare height splits above and below, so the box sits mid-screen */
 .update-card { margin-top: 10px; padding: 12px 14px; border: 1px solid var(--accent); border-radius: var(--radius); background: var(--accent-soft); font-size: 13.5px; }
 .update-card .cfg-actions { justify-content: flex-start; margin-top: 8px; }
 /* 1.4.6: Home's update offer - one line above the greeting, from the update check that runs by itself. */
@@ -1445,6 +1446,7 @@ html.fx-desktop .sb-quit:hover { background: var(--hover); color: var(--danger-t
 .iv-job.quiet { background: transparent; }
 .iv-job > .icon { color: var(--muted); }
 .iv-job-thumb { width: 42px; height: 42px; border-radius: 8px; flex-shrink: 0; }
+.iv-job-thumb:has(.dc-fx) { width: 160px; height: 90px; overflow: hidden; } .iv-job-thumb .dc-fx { width: 100%; height: 100%; display: block; }
 .iv-job .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .iv-job b { font-size: 13.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .iv-job .bar > i { background: var(--accent); opacity: 1; }
@@ -2949,7 +2951,7 @@ span.tier.input { padding: 0; border: 0; width: 8px; height: 8px; min-height: 0;
 .app:not(.panel-closed) .nudge { display: none; }
 .composer { border: 1px solid var(--border-strong); background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); padding: 13px 12px 10px 16px; transition: border-color .15s, box-shadow .15s; }
 .composer:focus-within { border-color: color-mix(in srgb, var(--text) 28%, var(--border-strong)); }
-.composer textarea { width: 100%; border: 0; outline: 0; resize: none; background: transparent; font-size: 15.5px; line-height: 1.5; max-height: 220px; min-height: 26px; padding: 2px 0 8px; display: block; }
+.composer textarea { width: 100%; border: 0; outline: 0; resize: none; background: transparent; font-size: 15.5px; line-height: 1.5; max-height: 220px; min-height: 26px; padding: 2px 0 8px; display: block; box-sizing: border-box; overflow-y: hidden; scrollbar-width: thin; }
 .composer textarea::placeholder { color: var(--muted); }
 .composer-row { display: flex; align-items: center; gap: 6px; }
 .composer-row .grow-space { flex: 1; }
@@ -3392,7 +3394,8 @@ span.tier.input { padding: 0; border: 0; width: 8px; height: 8px; min-height: 0;
 .careful-note .cn-check { flex-shrink: 0; opacity: 1; }
 /* A picture being drawn for the answer in progress (ImagesView paintChatDraw) */
 .draw-card { width: min(100%, 360px); border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); overflow: hidden; margin-top: 8px; }
-.draw-card .dc-pic { height: 108px; display: flex; align-items: center; justify-content: center; color: var(--faint); }
+.draw-card .dc-pic { height: 150px; display: flex; align-items: center; justify-content: center; color: var(--faint); }
+.draw-card .dc-fx { width: 100%; height: 100%; display: block; }
 .draw-card .dc-pic .icon { width: 28px; height: 28px; }
 .draw-card .dc-body { padding: 10px 12px 12px; display: grid; gap: 7px; }
 .draw-card .dc-top { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
@@ -4333,7 +4336,31 @@ select.input { padding-right: 6px; height: 30px; font-size: 12.5px; flex: 0 0 au
 /* Effort sliders - each in its own idiom */
 /* ChatGPT-like: a thin rounded track that fills blue, a round white ball; Max goes indigo, Ultra purple. */
 :root[data-skin="mono"] .lv { --lv-handle: 20px; --mono-fill: #0285ff; }
-/* ---- Eclipse, way 1 (decided 3 Nov, built 1.4.6): its own night, a light wide greeting, the corona dark at rest and
+/* ---- 1.4.6 unslop, Home and a chat (the /design boards "Before and after"): ------------------------------------- */
+/* The top bar keeps Find, More, light/dark and the panel; pinned messages, the mini window and the speed numbers are in More. */
+:root[data-ui="new"] :is(#pins-btn, #mini-btn, #stats-btn) { display: none !important; }
+/* The brand once: the credit lives in About, not under Home. */
+.home-credit { display: none !important; }
+#sb-pc-llm .sb-label { flex: 1 1 auto; } #llm-name { flex-shrink: 0; max-width: none; }   /* "Chat model · off": the name whole, the short state beside it */
+/* Classic dark: the chips' icons on a neutral tile in the text colour (they vanished in dark gold circles); "Auto" readable. */
+:root[data-skin="classic"][data-scheme="dark"]:not([data-ai-classic]) .chip .chip-ic { background: var(--surface-2); color: var(--text-2); }
+:root[data-skin="classic"][data-scheme="dark"]:not([data-ai-classic]) #setup-label .sb-model { color: var(--text); }
+/* Aurora: no frosted glass and no glow - solid raised surfaces with a hairline. The sky stays (its own atmosphere). */
+:root[data-skin="aurora"]:not([data-ai-classic]) :is(.sidebar, .panel, .section, .card, .sugg, .steps, .composer, .popover, .modal, .msg-assistant .assistant-body, .home-card, .design-panel) {
+  -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
+:root[data-skin="aurora"]:not([data-ai-classic]) :is(.composer, .card, .home-card, .sugg, .section, .steps, .popover, .modal) { background: var(--surface); border: 1px solid var(--border); }
+:root[data-skin="aurora"]:not([data-ai-classic]) :is(.sidebar, .panel, .design-panel) { background: var(--bg-sidebar); }
+:root[data-skin="aurora"]:not([data-ai-classic]) .msg-assistant .assistant-body { box-shadow: none; }
+:root[data-skin="aurora"]:not([data-ai-classic]) :is(.send-btn, .btn.primary) { box-shadow: none; }
+:root[data-skin="aurora"]:not([data-ai-classic]) .composer:focus-within { border-color: color-mix(in srgb, var(--glow) 40%, var(--border)); box-shadow: none; }
+/* Sunrise: the ring behind the greeting only when it means something - working, waiting for you (amber), an error (red). */
+:root:is([data-skin="dawn"], [data-skin="dusk"]):not([data-ai-classic]) .halo { opacity: 0; }
+:root:is([data-skin="dawn"], [data-skin="dusk"]):not([data-ai-classic])[data-state="working"] .halo { opacity: .85; }
+:root:is([data-skin="dawn"], [data-skin="dusk"]):not([data-ai-classic])[data-state="waiting"] .halo { opacity: 1; }
+:root:is([data-skin="dawn"], [data-skin="dusk"]):not([data-ai-classic])[data-state="error"] .halo { --glow: var(--danger); --glow-2: var(--danger); opacity: .8; }
+/* ChatGPT's tool chips: in line with the + button, as far from the top edge as from the side, corners inside the box's. */
+:root[data-skin="mono"]:not([data-ai-classic]) #composer-chips { padding: 8px 8px 0; gap: 6px; }
+:root[data-skin="mono"]:not([data-ai-classic]) #composer-chips .tchip { border-radius: 20px; }/* ---- Eclipse, way 1 (decided 3 Nov, built 1.4.6): its own night, a light wide greeting, the corona dark at rest and
    lit only while it works, and quiet outlined chrome - so it no longer reads as Classic dark with a glow.
    Extras > Looks redrawn in 1.4.6: Original brings back the Eclipse from before. */
 :root[data-skin="eclipse"]:not([data-tone="light"]):not([data-ai-classic]) {
@@ -5326,7 +5353,14 @@ html.voice-on .idle-screen { display: none !important; }
 .widget figcaption { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border-top: 1px solid var(--border); font: 11.5px/1.4 var(--sans); color: var(--muted); }
 .widget figcaption span { flex: 1; min-width: 0; }
 .widget .wg-code { margin: 0; max-height: 300px; overflow: auto; padding: 8px 10px; border-top: 1px solid var(--border); font: 12px/1.45 var(--mono); background: var(--surface-2); white-space: pre-wrap; }
+.me-vram { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); display: grid; gap: 6px; }
+.me-vh { font-size: 13px; font-weight: 500; }
+.me-vlist, .me-vtips { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; font-size: 13px; }
+.me-vlist li { display: flex; justify-content: space-between; gap: 16px; } .me-vlist .mono { color: var(--muted); font-variant-numeric: tabular-nums; }
+.me-vtips { padding-left: 16px; list-style: disc; color: var(--text-2); margin-top: 4px; }
+.nt-when:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }   /* the Due field had none */
 .widget-wait { display: flex; align-items: center; gap: 10px; padding: 14px; color: var(--muted); font: 13px var(--sans); }
+.widget-wait.building { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); flex-direction: column; align-items: flex-start; gap: 2px; } .widget-wait.building span { color: var(--text-2); font-weight: 500; } .widget-wait.building small { font-size: 12px; }
 .md-choices { margin: .3em 0 .9em; }
 .md-choices .choice.picked { border-color: var(--accent); color: var(--text); opacity: 1; }
 .table-wrap thead th { cursor: pointer; user-select: none; }
@@ -6446,6 +6480,12 @@ function renderMarkdown(src) {
 }let cbCounter = 0;
 function codeBlock(lang, code) {
   const L = String(lang || '').toLowerCase();
+  // While the reply streams, a chart, a page or a drawing in code shows what it is becoming, not its raw code
+  // (1.4.6, 5.2): the finished reply draws the chart / gives the page its Preview. No spinner: the thinking mark moves.
+  if (MD.live) {
+    const what = L === 'chart' ? 'Building a chart' : L === 'canvas' ? 'Building a canvas page' : { html: 'Building a page', svg: 'Drawing it' }[previewKind(lang, code) || ''];
+    if (what) return `<figure class="widget widget-wait building" role="status"><span>${what}…</span><small>${String(code).split('\n').length} lines so far · it shows when the reply is complete</small></figure>`;
+  }
   if (L === 'chart') { const chart = chartBlock(code); if (chart) return chart; }
   if (L === 'choices') { const c = choicesBlock(code); if (c) return c; }                       // D50
   if (L === 'widget' || L === 'explainer') { const w = widgetBlock(code); if (w) return w; }
@@ -6827,6 +6867,8 @@ function showThread(show) {
   if ($('composer').parentElement !== target) ['nudge', 'composer', 'composer-hint'].forEach(id => target.appendChild($(id)));
   if (S.locked) syncLockedComposer();             // a closed chat's box is off in the chat, on at Home (chat_guard.py)
   $('chat-title').textContent = show ? (S.title || 'New chat') : '';
+  // In a chat the box says Reply…; the greeting's question is for a new one (1.4.6 unslop).
+  if (!isTemp() && !promptEl.disabled && !S.locked) promptEl.placeholder = show && S.transcript.length ? 'Reply…' : askText();
   document.querySelectorAll('.chat-only').forEach(b => { if (b.id !== 'pins-btn') b.hidden = !show; });
   if (typeof renderPins === 'function') renderPins();
   markPlace(show ? null : 'home');
@@ -6996,7 +7038,10 @@ const ImagesView = (() => {
       turn.drawEl = document.createElement('div');
       turn.drawEl.className = 'draw-card rise';
       turn.drawEl.setAttribute('role', 'status');
+      // The look's own "Creating image" (DRAW_FX) plays in the picture area, made once; only the text below changes.
+      turn.drawEl.innerHTML = '<div class="dc-pic"><canvas class="dc-fx" aria-hidden="true"></canvas></div><div class="dc-body"></div>';
       turn.wrap.appendChild(turn.drawEl);
+      DRAW_FX.play(turn.drawEl);
       scrollToBottom();
     }
     const pct = j.stage === 'warming' && j.total ? j.done / j.total : j.progress || 0;
@@ -7005,10 +7050,11 @@ const ImagesView = (() => {
     const detail = j.stage === 'drawing' && j.steps ? `step ${j.step} of ${j.steps}${j.images > 1 ? ` · picture ${j.image} of ${j.images}` : ''}`
       : j.stage === 'warming' && j.total ? `${(j.done / 1073741824).toFixed(1)} of ${(j.total / 1073741824).toFixed(1)} GB` : '';
     const left = j.left != null && j.stage === 'drawing' ? `About ${Math.max(1, Math.round(j.left))} s left · ` : '';
-    setHtmlIfChanged(turn.drawEl, `<div class="dc-pic shimmer" data-stage="${esc(j.stage)}">${icon(j.stage === 'warming' ? 'i-disk' : 'i-image')}</div>
-      <div class="dc-body"><div class="dc-top"><span class="spinner"></span><b>${stage}</b>${detail ? `<span class="mono">${esc(detail)}</span>` : ''}<span class="grow"></span><button type="button" class="btn sm ghost" onclick="ImagesView.stop()">${icon('i-stop', 'xs')}Stop</button></div>
+    // The reveal follows the drawing itself: still before the first step, whole once it is finishing.
+    turn.drawEl._target = j.stage === 'drawing' ? (j.progress || 0) : ['finishing', 'saving'].includes(j.stage) ? 1 : 0;
+    setHtmlIfChanged(turn.drawEl.querySelector('.dc-body'), `<div class="dc-top"><b>${stage}</b>${detail ? `<span class="mono">${esc(detail)}</span>` : ''}<span class="grow"></span><button type="button" class="btn sm ghost" onclick="ImagesView.stop()">${icon('i-stop', 'xs')}Stop</button></div>
       <div class="bar"><i style="width:${Math.round(Math.max(0.03, pct) * 100)}%"></i></div>
-      <div class="dc-sub">${left}${esc(j.model || '')}${j.width ? ` · ${j.width}×${j.height}` : ''}${j.stage === 'warming' ? ' · only the first picture after a restart' : ''}</div></div>`);
+      <div class="dc-sub">${left}${esc(j.model || '')}${j.width ? ` · ${j.width}×${j.height}` : ''}${j.stage === 'warming' ? ' · only the first picture after a restart' : ''}</div>`);
   }
   async function load() {
     const p = new URLSearchParams({ limit: '240' });
@@ -7120,13 +7166,15 @@ const ImagesView = (() => {
     if (j.stage || st.busy) {
       const pct = j.stage === 'warming' && j.total ? j.done / j.total : j.progress || 0;
       const step = j.stage === 'drawing' && j.steps ? `<span class="mono">${j.images > 1 ? `${j.image}/${j.images} · ` : ''}${j.step}/${j.steps}${j.left != null ? ` · ~${Math.round(j.left)} s` : ''}</span>` : '';
-      html = `<div class="iv-job">${j.stage === 'warming' ? icon('i-disk', '') : '<span class="iv-job-thumb shimmer"></span>'}<div class="grow"><b>${esc(j.text || (st.busy ? 'Starting…' : 'Working…'))}</b><div class="bar"><i style="width:${Math.round(Math.max(0.03, pct) * 100)}%"></i></div></div>${step}<button type="button" class="btn sm ghost" onclick="ImagesView.stop()">${icon('i-stop', 'xs')}Stop</button></div>`
+      el._target = j.stage === 'drawing' ? (j.progress || 0) : ['finishing', 'saving'].includes(j.stage) ? 1 : 0;   // DRAW_FX
+      html = `<div class="iv-job">${j.stage === 'warming' ? icon('i-disk', '') : '<span class="iv-job-thumb"><canvas class="dc-fx" aria-hidden="true"></canvas></span>'}<div class="grow"><b>${esc(j.text || (st.busy ? 'Starting…' : 'Working…'))}</b><div class="bar"><i style="width:${Math.round(Math.max(0.03, pct) * 100)}%"></i></div></div>${step}<button type="button" class="btn sm ghost" onclick="ImagesView.stop()">${icon('i-stop', 'xs')}Stop</button></div>`
         + (s.waiting ? `<div class="iv-next">${icon('i-clock', 'xs')}${s.waiting} more waiting for the GPU</div>` : '');
     } else if (w) {
       html = `<div class="iv-job quiet">${icon('i-disk', '')}<div class="grow"><b>Getting ${esc(w.key || '')} ready - reading it from disk</b><div class="bar"><i style="width:${Math.round((w.done / (w.total || 1)) * 100)}%"></i></div></div></div>`;
     }
     if (st.error && !j.stage && !st.busy) html += errorCard(st.error);
     setHtmlIfChanged(el, html);
+    if (el.querySelector('canvas.dc-fx')) DRAW_FX.play(el);            // the look's own Creating image (1.4.6)
   }
   function errorCard(e) {
     const kinds = {
@@ -9464,6 +9512,8 @@ function warmLocalModel() {
   warmAskedAt = Date.now();
   api('/api/local-models/warm', { mode: S.mode, model: S.pinned }).catch(() => {});
 }
+window.addEventListener('resize', () => { if (promptEl.value) autoGrow(); });
+document.addEventListener('appmotionchange', () => { if (promptEl.value) autoGrow(); });   // applyAppearance: a look or text size changed
 promptEl.addEventListener('input', () => { autoGrow(); updateSend(); syncSlashMenu(); if (promptEl.value.trim()) warmLocalModel(); });
 promptEl.addEventListener('keydown', e => {
   if (popEl && popEl.classList.contains('cmd-pop') && !e.isComposing) {      // the command menu has the keys
@@ -9552,15 +9602,24 @@ function pickSlash(cmd) {
   if (c && !c.server && !c.args) { promptEl.value = ''; autoGrow(); updateSend(); c.run(''); return; }   // nothing to type after it
   promptEl.value = `/${cmd} `; promptEl.focus(); autoGrow(); updateSend();
 }
+// The box grows with the message up to 220 px; only past that does it scroll (1.4.6: a rounded scrollHeight left a
+// fraction of a pixel over, and a scrollbar showed on a one-line message). One pixel of slack, measured border-box.
+const PROMPT_MAX = 220;
+function fitPrompt() {
+  promptEl.style.height = 'auto';
+  const h = promptEl.scrollHeight + 1;
+  promptEl.style.height = Math.min(h, PROMPT_MAX) + 'px';
+  promptEl.style.overflowY = h > PROMPT_MAX ? 'auto' : 'hidden';
+}
 function autoGrow() {
-  promptEl.style.height = 'auto'; promptEl.style.height = Math.min(promptEl.scrollHeight, 220) + 'px';
+  fitPrompt();
   // The one-line message boxes (ChatGPT, Gemini) open to two rows once the message wraps or has a line break.
   // It closes again only once the message fits on one line of the wider row, or it would flip back and forth.
   const box = $('composer'), lh = parseFloat(getComputedStyle(promptEl).lineHeight) || 22;
   if (!box) return;
   const open = box.classList.contains('multiline');
   const multi = promptEl.value.includes('\n') || promptEl.scrollHeight > (open ? lh * 1.5 : lh * 1.8) + 16;
-  if (open !== multi) { box.classList.toggle('multiline', multi); promptEl.style.height = 'auto'; promptEl.style.height = Math.min(promptEl.scrollHeight, 220) + 'px'; }
+  if (open !== multi) { box.classList.toggle('multiline', multi); fitPrompt(); }
 }
 function updateSend() { renderRunControls(); }
 
@@ -10650,7 +10709,7 @@ function renderSetupBtn() {
   // Raw (response_modes.py) sends no effort settings or persona: the label says Raw instead.
   // The usual choice (Balanced) goes unsaid (D48): the label names what is different.
   const eff = ($('agent-label') || {}).textContent || '';
-  const effort = isRaw() ? 'Raw' : eff === 'Balanced' ? '' : eff;
+  const effort = isRaw() ? 'Raw' : eff === 'Balanced' || (eff === 'Auto' && model === 'Auto') ? '' : eff;   // "Auto" once, not "Auto · Auto" (1.4.6)
   const pb = $('persona-btn'), persona = !isRaw() && pb && pb.dataset.on === '1' ? ($('persona-label') || {}).textContent || '' : '';
   const parts = [model, effort, persona].filter(Boolean);
   setHtmlIfChanged($('setup-label'), `<span class="sb-model">${esc(model)}</span>`
@@ -11065,6 +11124,8 @@ function openMoreMenu(anchor) {
     ${item('rename', 'i-edit', 'Rename', esc(S.title || 'Untitled'), '', !S.chatId)}
     ${item('find', 'i-search', 'Find in this chat', 'Highlights every match', 'Ctrl+F', !has)}
     ${item('pins', 'i-pin', 'Pinned messages', pins ? `${pins} pinned` : 'Pin a message from its ⋯ menu', '', !pins)}
+    ${item('stats', 'i-activity', 'Speed and models', 'tok/s, waits and models for this chat')}
+    ${item('mini', 'i-dock-right', 'Mini window', 'A small window that stays on top')}
     ${item('branch', 'i-branch', 'Branch from here', 'A new chat that starts with this one', '', !has)}
     <div class="pop-sep" role="separator"></div><div class="pop-head">Export</div>
     ${item('md', 'i-file', 'Markdown', 'Text, code and sources', 'Ctrl+Shift+E', !has)}
@@ -11073,6 +11134,7 @@ function openMoreMenu(anchor) {
   popEl.querySelectorAll('[data-m]').forEach(b => b.onclick = () => {
     const a = b.dataset.m; closePopover();
     ({ rename: () => renameChat(S.chatId, S.title || ''), find: () => Find.open(), pins: () => openPins(anchor), branch: () => branchChat(),
+       stats: () => SessionStats.open(), mini: () => $('mini-btn').click(),
        md: () => exportChat('md'), html: () => exportChat('html'), pdf: () => exportChat('pdf') })[a]?.();
   });
 }
@@ -12151,6 +12213,215 @@ function orbRetarget(o, act, t, now, form) {
 // The Claude look's starburst (our own drawing: twelve tapered rays round a core), also the CSS mark's --clay-burst.
 const CLAY_BURST = 'M13.50 12.00L13.05 1.45A1.05 1.05 0 0 0 10.95 1.45L10.50 12.00ZM13.26 12.81L17.47 5.46A1.05 1.05 0 0 0 15.71 4.32L10.74 11.19ZM12.79 13.28L20.93 7.71A1.05 1.05 0 0 0 19.83 5.93L11.21 10.72ZM12.00 13.50L19.88 13.05A1.05 1.05 0 0 0 19.88 10.95L12.00 10.50ZM11.19 13.26L20.10 18.48A1.05 1.05 0 0 0 21.24 16.72L12.81 10.74ZM10.72 12.79L15.43 19.55A1.05 1.05 0 0 0 17.22 18.45L13.28 11.21ZM10.50 12.00L10.95 21.51A1.05 1.05 0 0 0 13.05 21.51L13.50 12.00ZM10.74 11.19L6.97 17.86A1.05 1.05 0 0 0 8.73 19.00L13.26 12.81ZM11.21 10.72L2.47 16.65A1.05 1.05 0 0 0 3.58 18.44L12.79 13.28ZM12.00 10.50L3.31 10.95A1.05 1.05 0 0 0 3.31 13.05L12.00 13.50ZM12.81 10.74L4.68 6.02A1.05 1.05 0 0 0 3.54 7.79L11.19 13.26ZM13.28 11.21L8.63 4.55A1.05 1.05 0 0 0 6.84 5.65L10.72 12.79Z';
 let clayBurst = null;
+// ---- "Creating image", each look's own (1.4.6, stage 5.3) ---------------------------------------------------------
+// The animations approved on the /design canvas (CreatingImage board), as they are: a small scene in the look's colours
+// revealed the look's own way as the picture is drawn. Played inside the chat's drawing card, driven by the engine's
+// real progress (0 until it starts drawing). It is that moment's one moving part; Motion off shows a still frame.
+const DRAW_FX = (() => {
+let CW = 360, CH = 140;
+const TAU = Math.PI * 2;
+const ease = k => k <= 0 ? 0 : k >= 1 ? 1 : k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+const frac = v => v - Math.floor(v);
+const rgb = h => { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+const rgba = (h, a) => { const [r, g, b] = rgb(h); return `rgba(${r},${g},${b},${Math.max(0, Math.min(1, a))})`; };
+const noise = (x, s = 0) => Math.sin(x * 1.7 + s) * .5 + Math.sin(x * 3.1 + s * 1.3) * .3 + Math.sin(x * 7.3 + s * .7) * .2;
+// The picture every card draws: a sky, a sun and three layers of hills, in the look's own colours.
+const SCENES = {
+  classic: { sky: ['#4a4436', '#857452'], sun: '#ffc24a', hills: ['#6e6650', '#575141', '#3d3a30'], sunAt: [.72, .34] },
+  sunrise: { sky: ['#3b2a3a', '#e8875a'], sun: '#ffd0a0', hills: ['#7b4a3e', '#5a3530', '#3a2420'], sunAt: [.5, .62] },
+  eclipse: { sky: ['#140f22', '#46305c'], sun: '#ffb070', hills: ['#2e2440', '#221a33', '#151022'], sunAt: [.5, .4] },
+  aurora: { sky: ['#03101c', '#0a3a3a'], sun: '#bfffe8', hills: ['#0d2b30', '#0a2026', '#06141a'], sunAt: [.8, .25] },
+  clay: { sky: ['#f3e7dc', '#e9cdb8'], sun: '#d97757', hills: ['#d8a98d', '#c58a6c', '#a86d52'], sunAt: [.3, .35] },
+  mono: { sky: ['#1d2a4a', '#5a7bd1'], sun: '#ffe7a6', hills: ['#2c4f6e', '#22405a', '#162c40'], sunAt: [.66, .32] },
+  void: { sky: ['#161616', '#5c5c5c'], sun: '#f4f4f4', hills: ['#3a3a3a', '#2a2a2a', '#1b1b1b'], sunAt: [.34, .3] },
+  prism: { sky: ['#1b2a4a', '#3a2340'], sun: '#a8c7fa', hills: ['#2c3d66', '#25305a', '#191f3d'], sunAt: [.24, .3] },
+};
+function paintScene(c, w, h, S, seed) {
+  const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, S.sky[0]); g.addColorStop(1, S.sky[1]);
+  c.fillStyle = g; c.fillRect(0, 0, w, h);
+  const [sx, sy] = S.sunAt, gl = c.createRadialGradient(sx * w, sy * h, 0, sx * w, sy * h, h * .45);
+  gl.addColorStop(0, rgba(S.sun, .55)); gl.addColorStop(1, rgba(S.sun, 0)); c.fillStyle = gl; c.fillRect(0, 0, w, h);
+  c.fillStyle = S.sun; c.beginPath(); c.arc(sx * w, sy * h, h * .1, 0, TAU); c.fill();
+  S.hills.forEach((col, i) => {
+    const base = h * (.58 + i * .14), amp = h * (.09 - i * .015);
+    c.fillStyle = col; c.beginPath(); c.moveTo(0, h);
+    for (let x = 0; x <= w; x += 6) c.lineTo(x, base - amp * noise(x / w * 4 + i * 2.1, seed + i));
+    c.lineTo(w, h); c.closePath(); c.fill();
+  });
+}
+const HILL_LINE = (x, w, h, i, seed) => h * (.58 + i * .14) - h * (.09 - i * .015) * noise(x / w * 4 + i * 2.1, seed + i);
+const fx = {
+  pics: {}, p: 0,
+  pic(key) {
+    const id = key + CW + 'x' + CH;
+    if (this.pics[id]) return this.pics[id];
+    const o = document.createElement('canvas'); o.width = Math.round(CW); o.height = Math.round(CH);
+    const c = o.getContext('2d'); paintScene(c, o.width, o.height, SCENES[key], key.length);
+    const px = c.getImageData(0, 0, o.width, o.height).data;
+    return (this.pics[id] = { cv: o, px, w: o.width, h: o.height });
+  },
+  // Classic: an ink front with a ragged edge; gold motes ride it.
+  classic(c, p, e, t) {
+    // Every reveal is spread over the whole 0-100 % (3 Nov: several looked finished at 60-70 %).
+    const P = this.pic('classic'), front = x => p * (CH + 64) - 18 - 14 * (noise(x / CW * 6, t * .4) + 1);
+    c.save(); c.beginPath(); c.moveTo(0, 0);
+    for (let x = 0; x <= CW; x += 8) c.lineTo(x, front(x)); c.lineTo(CW, 0); c.closePath(); c.clip(); c.drawImage(P.cv, 0, 0); c.restore();
+    if (p < 1) for (let k = 0; k < 26; k++) {
+      const fx = frac(k * .137 + t * .03) * CW, fy = front(fx) + 3 * Math.sin(t * 2 + k);
+      const g = c.createRadialGradient(fx, fy, 0, fx, fy, 9); g.addColorStop(0, 'rgba(255,194,74,.85)'); g.addColorStop(1, 'rgba(255,194,74,0)');
+      c.fillStyle = g; c.beginPath(); c.arc(fx, fy, 9, 0, TAU); c.fill();
+    }
+  },
+  // Sunrise: the scene lights up as the sun climbs; warm motes drift up.
+  sunrise(c, p, e, t) {
+    const P = this.pic('sunrise'); c.globalAlpha = .12 + .88 * p; c.drawImage(P.cv, 0, 0); c.globalAlpha = 1;
+    c.fillStyle = `rgba(20,14,12,${.7 * (1 - p)})`; c.fillRect(0, 0, CW, CH);
+    const sy = CH * (.95 - .62 * p), sx = CW * .5, g = c.createRadialGradient(sx, sy, 0, sx, sy, CH * .7);
+    g.addColorStop(0, 'rgba(255,190,130,.55)'); g.addColorStop(1, 'rgba(255,190,130,0)'); c.fillStyle = g; c.fillRect(0, 0, CW, CH);
+    c.fillStyle = '#ffd0a0'; c.beginPath(); c.arc(sx, sy, CH * .1, 0, TAU); c.fill();
+    for (let k = 0; k < 14; k++) { const u = frac(k * .23 + t * .06), mx = CW * (.15 + .7 * frac(k * .61)), my = CH * (1 - u); c.globalAlpha = (1 - u) * .5 * (.3 + e); c.fillStyle = '#ffc79a'; c.beginPath(); c.arc(mx + 8 * Math.sin(t + k), my, 2.4, 0, TAU); c.fill(); }
+    c.globalAlpha = 1;
+  },
+  // Terminal: unchanged - block characters fill row by row.
+  terminal(c, p) {
+    const blocks = ' ░▒▓█', cols = 44, rows = 8;
+    c.font = '13px ui-monospace, Consolas, monospace'; c.fillStyle = '#7fd4a0';
+    for (let i = 0; i < rows; i++) {
+      const fill = Math.max(0, Math.min(cols, Math.round((p * rows - i) * cols))), sh = i < 3 ? 2 : i < 6 ? 3 : 4;
+      c.fillText(blocks[sh].repeat(fill) + '·'.repeat(cols - fill), 16, 52 + i * 17);
+    }
+    const n = Math.round(p * 12); c.fillText('[' + '#'.repeat(n) + '-'.repeat(12 - n) + ']', 16, CH - 46);
+  },
+  // Eclipse: the picture behind a moon that slides away; corona flares travel the rim.
+  eclipse(c, p, e, t) {
+    const P = this.pic('eclipse'), cx = CW / 2, cy = CH * .46, R = CH * .36;
+    c.globalAlpha = .2 + .8 * p; c.drawImage(P.cv, 0, 0); c.globalAlpha = 1;
+    e = p;
+    const mx = cx + p * R * 2.1, ring = c.createRadialGradient(cx, cy, R * .9, cx, cy, R * 1.5);
+    ring.addColorStop(0, `rgba(255,150,80,${.55 * (1 - e * .6)})`); ring.addColorStop(1, 'rgba(255,150,80,0)'); c.fillStyle = ring; c.beginPath(); c.arc(cx, cy, R * 1.5, 0, TAU); c.fill();
+    for (let k = 0; k < 3; k++) { const a = t * .9 + k * TAU / 3; for (let j = 0; j < 14; j++) { c.globalAlpha = (j / 14) * .8 * (1 - e * .7); c.strokeStyle = '#ffd9a0'; c.lineWidth = 1 + j * .14; c.beginPath(); c.arc(cx, cy, R + 1, a - .9 + j * .065, a - .9 + (j + 1) * .065); c.stroke(); } }
+    c.globalAlpha = 1; c.fillStyle = '#07060b'; c.beginPath(); c.arc(mx, cy, R, 0, TAU); c.fill();
+  },
+  // Aurora: a curtain of light across the sky - fine rays under one bright, slowly folding lower edge - grows
+  // across the card and brightens with the progress; the landscape glows in beneath it (3 Nov: ribbons read as
+  // tendrils).
+  aurora(c, p, e, t) {
+    const P = this.pic('aurora'); c.globalAlpha = .08 + .92 * Math.pow(p, 1.3); c.drawImage(P.cv, 0, 0); c.globalAlpha = 1;
+    const N = 90, span = .1 + .9 * p;
+    for (let k = 0; k < N; k++) {
+      const u = k / (N - 1); if (u > span) break;
+      const x = CW * (.04 + .92 * u), edge = CH * (.42 + .1 * Math.sin(u * 7 + t * .45) + .05 * Math.sin(u * 17 - t * .3));
+      const h = CH * (.22 + .2 * (.5 + .5 * Math.sin(u * 5 - t * .35))) * (.35 + .65 * p), lean = 10 * Math.sin(u * 6 + t * .4);
+      const fade = Math.min(1, (span - u) * 12), bright = (.45 + .55 * (.5 + .5 * Math.sin(u * 11 + t * .6))) * (.4 + .6 * p) * fade;
+      const g = c.createLinearGradient(x, edge, x + lean, edge - h);
+      g.addColorStop(0, `rgba(120,255,200,${.9 * bright})`); g.addColorStop(.3, `rgba(70,240,180,${.45 * bright})`); g.addColorStop(1, 'rgba(255,95,168,0)');
+      c.strokeStyle = g; c.lineCap = 'round';
+      c.globalAlpha = .25; c.lineWidth = 7; c.beginPath(); c.moveTo(x, edge); c.lineTo(x + lean, edge - h); c.stroke();
+      c.globalAlpha = 1; c.lineWidth = 1.6; c.beginPath(); c.moveTo(x, edge); c.lineTo(x + lean, edge - h); c.stroke();
+    }
+    c.globalAlpha = 1;
+  },
+  // Claude: clay nodes turning in depth while the hill outlines draw; colour fills in at the end.
+  clay(c, p, e, t) {
+    const P = this.pic('clay');
+    c.globalAlpha = Math.max(0, (p - .8) / .2); c.drawImage(P.cv, 0, 0); c.globalAlpha = 1;
+    for (let i = 0; i < 3; i++) {
+      const upto = Math.max(0, Math.min(1, p * 1.3 - i * .12)) * CW;
+      c.strokeStyle = i ? '#d6a58a' : '#c96442'; c.lineWidth = 2; c.globalAlpha = .9; c.beginPath();
+      for (let x = 0; x <= upto; x += 5) { const yy = HILL_LINE(x, CW, CH, i, 4 + i); x ? c.lineTo(x, yy) : c.moveTo(x, yy); } c.stroke();
+    }
+    const nodes = [0, 1, 2].map(i => { const th = TAU * t / 4 + i * TAU / 3, z = Math.sin(th); return [CW - 54 + 22 * Math.cos(th), 36 + 9 * z, 6 * (1 + .28 * z), .62 + .38 * (z + 1) / 2, z]; });
+    c.globalAlpha = .3; c.strokeStyle = '#c96442'; c.lineWidth = 1; c.beginPath(); nodes.forEach((q, n) => n ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1])); c.closePath(); c.stroke();
+    nodes.sort((a, b) => a[4] - b[4]).forEach(([nx, ny, r, a]) => { c.globalAlpha = a; c.fillStyle = '#d97757'; c.beginPath(); c.arc(nx, ny, r, 0, TAU); c.fill(); });
+    c.globalAlpha = 1;
+  },
+  // ChatGPT: the dot field, each dot the picture's own colour, arriving in soft clusters.
+  mono(c, p, e, t) {
+    const P = this.pic('mono'), cols = 46, rows = 17, sx = (CW - 40) / cols, sy = (CH - 70) / rows;
+    if (!this.dotTurn) {                     // each dot's turn: cluster order, spread evenly over 0-90 % by rank
+      const raw = []; for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) raw.push(Math.min(Math.hypot((q - 12) / 14, (r - 4) / 6), Math.hypot((q - 30) / 15, (r - 12) / 6)) + (Math.sin(q * 1.7 + r * 2.3) + 1) * .08);
+      const rank = raw.map((v, i) => [v, i]).sort((a, b) => a[0] - b[0]); this.dotTurn = new Array(raw.length);
+      rank.forEach(([, i], n) => { this.dotTurn[i] = n / raw.length * .82; });
+    }
+    // Dots the whole way, as the ChatGPT app shows it (3 Nov). At 100 % a ripple runs out from the middle: the dots
+    // it reaches flash and swell, and the finished picture is underneath where it has passed.
+    const fin = Math.max(0, Math.min(1, (this.p - 1) / .15)), rr = ease(fin) * Math.hypot(CW, CH) * .6;
+    if (fin > 0) { c.save(); c.beginPath(); c.arc(CW / 2, CH / 2, Math.max(0, rr - 12), 0, TAU); c.clip(); c.drawImage(P.cv, 0, 0); c.restore(); }
+    for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) {
+      const th = this.dotTurn[r * cols + q];
+      const on = Math.max(0, Math.min(1, (p - th) * 8)), x = 20 + q * sx + sx / 2, y = 40 + r * sy + sy / 2;
+      const d = Math.hypot(x - CW / 2, y - CH / 2), edge = fin > 0 ? Math.max(0, 1 - Math.abs(d - rr) / 24) : 0;
+      if (fin > 0 && d < rr - 24) continue;                       // the ripple has passed: the picture shows here
+      const i = (Math.min(P.h - 1, Math.round(y)) * P.w + Math.min(P.w - 1, Math.round(x))) * 4, size = on > 0 ? 1.4 + 1.3 * on + .3 * Math.sin(t * 2 + q + r) * on : 1.2;
+      c.globalAlpha = on > 0 ? .35 + .65 * on : .16; c.fillStyle = on > 0 ? `rgb(${P.px[i]},${P.px[i + 1]},${P.px[i + 2]})` : '#5a5a5a';
+      c.beginPath(); c.arc(x, y, size + 2.2 * edge, 0, TAU); c.fill();
+      if (edge > 0) { c.globalAlpha = edge * .75; c.fillStyle = '#ffffff'; c.beginPath(); c.arc(x, y, (size + 2.2 * edge) * .6, 0, TAU); c.fill(); }
+    }
+    c.globalAlpha = 1;
+  },
+  // Grok: progressive refinement - big blocks that halve until the picture is sharp; grain fades.
+  void(c, p, e, t) {
+    e = p;
+    const P = this.pic('void'), block = Math.max(1, Math.round(44 * Math.pow(1 - p, 1.25)));
+    if (!this.tiny) this.tiny = document.createElement('canvas');
+    const tw = Math.max(1, Math.round(P.w / block)), th = Math.max(1, Math.round(P.h / block));
+    this.tiny.width = tw; this.tiny.height = th; const tc = this.tiny.getContext('2d'); tc.drawImage(P.cv, 0, 0, tw, th);
+    c.imageSmoothingEnabled = false; c.globalAlpha = .3 + .7 * e; c.drawImage(this.tiny, 0, 0, tw, th, 0, 0, P.w, P.h); c.imageSmoothingEnabled = true;
+    c.globalAlpha = .25 * (1 - e); for (let k = 0; k < 160; k++) { c.fillStyle = k % 2 ? '#fff' : '#000'; c.fillRect(frac(Math.sin(k * 91.7 + Math.floor(t * 12)) * 43758) * CW, frac(Math.sin(k * 17.3 + Math.floor(t * 12)) * 9157) * CH, 2, 2); }
+    c.globalAlpha = 1;
+  },
+  // Gemini: a sparkle that blooms; the picture opens out from it through a soft circle; a shimmer passes over.
+  prism(c, p, e, t) {
+    e = p;
+    const P = this.pic('prism'), cx = CW / 2, cy = CH / 2, R = Math.hypot(CW, CH) * .62 * p;
+    if (!this.tmp) this.tmp = document.createElement('canvas');
+    const T = this.tmp; T.width = P.w; T.height = P.h; const tc = T.getContext('2d');
+    tc.drawImage(P.cv, 0, 0); tc.globalCompositeOperation = 'destination-in';
+    const m = tc.createRadialGradient(cx, cy, Math.max(0, R - 60), cx, cy, R + 1); m.addColorStop(0, 'rgba(0,0,0,1)'); m.addColorStop(1, 'rgba(0,0,0,0)');
+    tc.fillStyle = m; tc.fillRect(0, 0, P.w, P.h); tc.globalCompositeOperation = 'source-over';
+    c.drawImage(T, 0, 0);
+    const bx = frac(t / 2.8) * CW * 2 - CW * .5, sh = c.createLinearGradient(bx - 120, 0, bx + 120, 0);
+    sh.addColorStop(0, 'rgba(168,199,250,0)'); sh.addColorStop(.5, `rgba(168,199,250,${.18 * (1 - e * .7)})`); sh.addColorStop(1, 'rgba(217,101,112,0)');
+    c.fillStyle = sh; c.fillRect(0, 0, CW, CH);
+    const sr = 18 + 26 * e * (1 - e) * 2 + 10 * (1 - p), rot = t * .5;
+    c.save(); c.translate(cx, cy); c.rotate(rot); c.globalAlpha = 1 - Math.pow(p, 4) * .9;
+    const g = c.createLinearGradient(-sr, -sr, sr, sr); g.addColorStop(0, '#4285f4'); g.addColorStop(.55, '#9b72cb'); g.addColorStop(1, '#d96570');
+    c.shadowColor = 'rgba(66,133,244,.7)'; c.shadowBlur = 18; c.fillStyle = g; c.beginPath();
+    for (let k = 0; k < 4; k++) { const a0 = k * Math.PI / 2 - Math.PI / 2, a1 = a0 + Math.PI / 2; if (!k) c.moveTo(Math.cos(a0) * sr, Math.sin(a0) * sr); c.quadraticCurveTo(Math.cos(a0 + Math.PI / 4) * sr * .14, Math.sin(a0 + Math.PI / 4) * sr * .14, Math.cos(a1) * sr, Math.sin(a1) * sr); }
+    c.closePath(); c.fill(); c.restore(); c.globalAlpha = 1;
+  },
+};
+const KEY = { classic: 'classic', dawn: 'sunrise', dusk: 'sunrise', terminal: 'terminal', eclipse: 'eclipse', aurora: 'aurora', clay: 'clay', mono: 'mono', void: 'void', prism: 'prism' };
+const BG = { classic: '#262624', sunrise: '#1b1614', terminal: '#161b18', eclipse: '#07060b', aurora: '#040a12', clay: '#faf9f5', mono: '#1f1f1f', void: '#131211', prism: '#1e1f20' };
+// One frame into a canvas: p is the progress (0-1), t the time in seconds.
+function frame(cv, p, t) {
+  const r = cv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height));
+  if (cv.width !== w * dpr || cv.height !== h * dpr) { cv.width = w * dpr; cv.height = h * dpr; fx.dotTurn = null; }
+  if (CW !== w || CH !== h) { CW = w; CH = h; fx.dotTurn = null; }
+  const key = KEY[document.documentElement.dataset.skin] || 'classic';
+  if (fx.key !== key) { fx.key = key; fx.dotTurn = null; }
+  const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, w, h);
+  c.fillStyle = BG[key]; c.fillRect(0, 0, w, h);
+  fx.p = p; c.save(); fx[key](c, p, ease(p), t); c.restore(); c.globalAlpha = 1;
+}
+// Play in a card until it leaves the page; the shown progress eases toward the real one, so a jump never snaps.
+function play(card) {
+  if (card._fx) return;
+  const o = card._fx = { shown: 0, last: 0 };
+  const loop = now => {
+    if (!card.isConnected) { card._fx = null; return; }
+    requestAnimationFrame(loop);
+    const cv = card.querySelector('canvas.dc-fx');                 // looked up each frame: Images redraws its card
+    if (!cv || document.hidden || now - o.last < 33) return;
+    const still = ['off', 'reduced'].includes(document.documentElement.dataset.motion);
+    o.last = now; o.shown += ((card._target || 0) - o.shown) * (still ? 1 : .12);
+    frame(cv, Math.max(0, Math.min(1, o.shown)), still ? 1.5 : now / 1000);
+  };
+  requestAnimationFrame(loop);
+}
+return { play, frame };
+})();
 // ---- Each look's thinking mark (1.4.6, stage 5.3) ------------------------------------------------------------------
 // The marks approved on the /design canvas (ThinkingMarks board), as they are: forms(act, t) -> particles, draw(ctx, ...).
 // Wrapped so their small helpers (TAU, ease, mix...) stay out of the page's own names. Orbs draws them (mode 'marks').
@@ -13141,8 +13412,11 @@ const ERROR_KINDS = [
    'llama-server isn’t running or is still starting. run.bat starts it; then try again.', ['retry', 'models']],
   [/reports no usable model|no local model|empty registry/i, 'No model can answer this',
    'None of the installed models fits this request. Pick one in Settings › Models.', ['models', 'retry']],
-  [/out of memory|cudaMalloc|failed to load|unable to load|insufficient memory|VRAM/i, 'The model couldn’t load',
-   'There isn’t enough free GPU memory for it right now. Close something heavy, pick a smaller model, or try again.', ['models', 'retry']],
+  // Out of GPU memory (1.4.6): not a dead end - run part of it from RAM, or see what is holding the GPU.
+  [/out of memory|cudaMalloc|failed to allocate|insufficient memory|CUDA error|not enough (?:free )?(?:gpu |video )?memory|VRAM/i, 'Not enough GPU memory for this model',
+   'It needs more video memory than is free right now. Run what doesn’t fit from RAM - slower, but it answers - or see what is using the GPU.', ['ramsplit', 'vram', 'models']],
+  [/failed to load|unable to load/i, 'The model couldn’t load',
+   'Most often it doesn’t fit in the GPU’s free memory. Run what doesn’t fit from RAM, see what is using the GPU, or pick a smaller model.', ['ramsplit', 'vram', 'models', 'retry']],
   [/rate.?limit|\b429\b|quota|too many requests/i, 'The cloud model is busy',
    'It’s limiting how often it answers. Wait a moment and try again.', ['retry']],
   [/timed? ?out|timeout/i, 'The model took too long',
@@ -13159,7 +13433,27 @@ function errorInfo(text) {
 const ERROR_ACTS = {
   retry: ['i-retry', 'Try again'], compress: ['i-layers2', 'Compress this chat'], new: ['i-plus', 'New chat'],
   models: ['i-cpu', 'Models'], diag: ['i-activity', 'Diagnostics'],
+  ramsplit: ['i-layers2', 'Run on RAM too'], vram: ['i-activity', 'What’s using the GPU'],
 };
+// What holds the GPU's memory (/api/gpu/apps): the top apps first, the full list and what to do under More detail.
+async function showVram(card, btn) {
+  let box = card.querySelector('.me-vram');
+  if (box) { box.remove(); return; }
+  box = document.createElement('div'); box.className = 'me-vram'; box.innerHTML = SKELETON_TEXT;
+  card.querySelector('.me-main').appendChild(box);
+  let d; try { d = await api('/api/gpu/apps'); } catch (e) { d = { ok: false, message: e.message }; }
+  if (!d.ok) { box.innerHTML = `<p class="me-body">${esc(d.message || '')}</p>`; return; }
+  const row = a => `<li><span>${esc(a.name)}</span><span class="mono">${fmtSize(a.bytes)}</span></li>`;
+  const top = d.apps.slice(0, 3), rest = d.apps.slice(3, 15);      // More detail goes on from the top three
+  const tips = d.apps.filter(a => a.tip).slice(0, 6).map(a => `<li>${esc(a.tip)}</li>`).join('');
+  box.innerHTML = `<b class="me-vh">Using the GPU now${d.total ? ` · ${fmtSize(d.used)} of ${fmtSize(d.total)}` : ''}</b>
+    <ul class="me-vlist">${top.map(row).join('') || '<li>Nothing reported.</li>'}</ul>
+    <details class="me-raw"><summary>More detail</summary>
+      <ul class="me-vlist">${rest.map(row).join('')}</ul>
+      ${tips ? `<b class="me-vh">What helps</b><ul class="me-vtips">${tips}</ul>` : ''}
+      <ul class="me-vtips"><li>Run on RAM too: the model answers with part of it on the CPU - slower, never stuck.</li><li>A smaller file of the same model (Q4 instead of Q8), or a shorter context, needs less (Settings › Models).</li><li>Settings › Diagnostics shows what each model needs and can fit it for you.</li></ul>
+      ${d.note ? `<p class="me-body">${esc(d.note)}</p>` : ''}</details>`;
+}
 function addError(text, persist = true, ti = null) {
   const info = errorInfo(text);
   const el = document.createElement('div');
@@ -13177,6 +13471,16 @@ function addError(text, persist = true, ti = null) {
     const a = b.dataset.ea;
     if (a === 'copy') { copyText(info.raw, b); return; }
     if (a === 'retry') { if (S.busy) { toast('Wait for the current task to finish.'); return; } retryReply(Number(el.dataset.ti ?? S.transcript.length - 1)); return; }
+    if (a === 'vram') { showVram(el, b); return; }
+    if (a === 'ramsplit') {
+      if (S.busy) { toast('Wait for the current task to finish.'); return; }
+      b.disabled = true;
+      api('/api/local-models/ram-split', { model: S.pinned || S.engaged || '' }).then(r => {
+        toast(r.message || (r.ok ? 'Done.' : 'That didn’t work.'));
+        if (r.ok) retryReply(Number(el.dataset.ti ?? S.transcript.length - 1)); else b.disabled = false;
+      }).catch(e => { toast(e.message); b.disabled = false; });
+      return;
+    }
     ({ compress: () => compressNow(), new: () => newChat(), models: () => openSettings('models'), diag: () => openSettings('diagnostics') })[a]?.();
   });
   $('thread').appendChild(el);
@@ -14861,12 +15165,12 @@ const placeWord = m => { const p = S.placement; return !p || p.model !== m ? '' 
 function paintModelRow(d) {
   const cloud = S.mode === 'cloud', up = !!d.local_up, model = d.local_engaged || S.pinned || '';
   const name = cloud ? (shortModel(S.cloudModel) || 'Cloud models') : model ? shortModel(model) : 'Chat model';
-  const sub = cloud ? 'Cloud' : !up ? (S.mode === 'local' ? "llama-server isn't running" : 'Local models off · cloud first')
+  const sub = cloud ? 'Cloud' : !up ? (S.mode === 'local' ? 'off' : 'Local models off · cloud first')   // short; the tooltip says why (1.4.6)
     : d.local_engaged ? 'Ready' + placeWord(d.local_engaged) : model ? 'Loads when you send' : 'Auto · loads when you send';
   $('llm-name').textContent = name;
   $('llm-sub').textContent = sub;
   $('llm-dot').className = 'dot' + (cloud || d.local_engaged ? ' on' : up ? '' : S.mode === 'local' ? ' err' : '');
-  $('sb-pc-llm').title = `${name} - ${sub}. Opens This PC.`;
+  $('sb-pc-llm').title = !cloud && !up && S.mode === 'local' ? `llama-server isn't running - it starts with the app. Opens This PC.` : `${name} - ${sub}. Opens This PC.`;
 }
 /* ===========================================================================
    New chat
@@ -18972,6 +19276,7 @@ const Globe = (() => {
   // Moving the globe yourself pauses that until your next question, or until you press Resume; the reticle button
   // turns it off altogether (this browser remembers). An interrupted voice reply blocks the rest of its run.
   let blockedRun = -1, manualRun = null, lastWorldKey = '', lastFocus = null, mark = null, followShown = '';
+  let autoOpsRun = null, opsClosedRun = null;        // 1.4.6: the Ops view opened by a reply's first world result
   let following = store.get('globe.follow', true) !== false;
   const followOn = () => following;
   const paused = () => manualRun !== null && manualRun === actState.runId;
@@ -19024,6 +19329,8 @@ const Globe = (() => {
       if (!canFollow()) { paintFollow(); return false; }
     }
     const item = f.layer && data[f.layer] ? data[f.layer].items.find(x => String(x[0]) === String(f.id)) : null;
+    // Lock-on (1.4.6): a tracked thing whose feed isn't loaded yet is fetched now and found again by id when it lands.
+    if (!item && f.layer && f.id != null) { pendingLock = { layer: f.layer, id: String(f.id), name: f.name || f.label || '' }; got[f.layer] = 0; poll(); }
     const km = Math.max(5, Number(f.radius_km) || 300);
     mark = { lat, lon, km, name: f.name || f.label || '', kind: f.kind || '', layer: item ? f.layer : null, item, t0: performance.now(),
              ring: item ? null : smallCircle(lat, lon, Math.min(km, 2500)) };
@@ -19031,6 +19338,23 @@ const Globe = (() => {
     flyTo(lat, lon, Math.max(350, km));                   // a city's own radius leaves nothing around it to see
     showLabel({ ...f, lat, lon });
     return true;
+  }
+  // After every refresh of a feed: the reticle stays on the same aircraft or satellite (found again by its id), and says so
+  // when it has left the feed - a refresh used to leave it on an old copy that stopped moving.
+  let pendingLock = null;
+  function relock(layer) {
+    const items = (data[layer] && data[layer].items) || [];
+    if (pendingLock && pendingLock.layer === layer) {
+      const it = items.find(x => String(x[0]) === pendingLock.id);
+      if (it && mark) { mark.layer = layer; mark.item = it; mark.ring = null; sel = { layer, item: it }; }
+      else if (!it) showLabel({ name: `${pendingLock.name || 'That'} - not in the feed right now` });
+      pendingLock = null;
+    }
+    if (sel && sel.layer === layer) {
+      const it = items.find(x => String(x[0]) === String(sel.item[0]));
+      if (it) { sel.item = it; if (mark && mark.layer === layer) mark.item = it; }
+      else { showLabel({ name: `${(mark && mark.name) || 'It'} - not in the feed right now` }); sel = null; if (mark && mark.layer === layer) mark.item = null; }
+    }
   }
   function onWorldEvent(e, runId) {
     if (mode === 'off' || runId <= blockedRun) return;
@@ -19041,6 +19365,9 @@ const Globe = (() => {
     if (!e.ok || !e.world) { const el = $('ops-focus'); if (el) el.hidden = true; return; }
     const w = e.world, f = w.focus || {};
     if (f.t) focusT = Math.max(focusT, f.t);
+    // The first world result of a reply opens the Ops view (1.4.6) - the background globe alone, zoomed out, looked like
+    // nothing happened. Not again in that reply once you closed it.
+    if (mode !== 'ops' && root.dataset.secret === 'mossad' && runId !== autoOpsRun && runId !== opsClosedRun) { autoOpsRun = runId; toggleOps(true); }
     evidence(w, f);
     if (!focusOn({ ...f, name: f.name || f.label }) && canFollow()) showLabel({ name: `${w.action}${f.name || f.label ? ' · ' + (f.name || f.label) : ''}` });
   }
@@ -19462,7 +19789,7 @@ const Globe = (() => {
       const on = id === 'aurora' ? layerOn('space') : layerOn(id);
       if (!on || (mode === 'bg' && !BG.includes(id)) || (!force && now - (got[id] || 0) < POLL[id] * 1000)) continue;
       got[id] = now;
-      api(`/api/osint/layer/${id}`).then(d => { data[id] = d; schedule(); }).catch(() => { got[id] = 0; });
+      api(`/api/osint/layer/${id}`).then(d => { data[id] = d; relock(id); schedule(); }).catch(() => { got[id] = 0; });
     }
   }
   async function beat() {
@@ -19620,7 +19947,9 @@ const Globe = (() => {
   }
   function toggleOps(force) {
     if (root.dataset.secret !== 'mossad') return;
-    tabStore.set('opsView', typeof force === 'boolean' ? force : !tabStore.get('opsView', false));
+    const open = typeof force === 'boolean' ? force : !tabStore.get('opsView', false);
+    if (!open && autoOpsRun != null) opsClosedRun = autoOpsRun;      // you closed it: this reply doesn't reopen it
+    tabStore.set('opsView', open);
     withTransition(sync);
   }
   async function setLayer(id, on) {
@@ -21076,8 +21405,8 @@ function renderHome() {
   const row = c => `<button type="button" class="home-continue" onclick="${c.id === S.chatId ? 'resumeChat()' : `openChat('${jsArg(c.id)}')`}" title="${esc(c.title)}">
       <span><b>${esc(c.title)}</b><small>${c.id === S.chatId && S.busy ? 'Working on it now' : esc(fmtAgo(c.updated))}${c.turns ? ` · ${c.turns} message${c.turns === 1 ? '' : 's'}` : ''}</small></span>${icon('i-chev', 'xs')}</button>`;
   const list = !chats ? SKELETON_ROWS : chats.length ? chats.slice(0, 4).map(row).join('') : '';
-  const html = !chats || chats.length
-    ? `<section class="home-list" aria-label="Continue"><h2>${S.project ? `In ${esc(S.project.name)}` : 'Continue'}</h2>${list}</section>` : '';
+  // 1.4.6 unslop: no Continue list - it was the sidebar's chats again. Home shows only what's waiting for you.
+  const html = false ? `<section class="home-list" aria-label="Continue"><h2>${S.project ? `In ${esc(S.project.name)}` : 'Continue'}</h2>${list}</section>` : '';
   setHtmlIfChanged(box, waitingHtml() + html);
 }
 /* ---- New UI: "Waiting for you" on Home - tasks due, drafts the assistant wrote, a profile update to check ------- */
