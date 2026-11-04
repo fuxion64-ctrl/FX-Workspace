@@ -192,6 +192,11 @@ def finder_cancel():
     return model_finder.cancel()
 
 
+@router.post("/api/model-finder/pause")
+def finder_pause():
+    return model_finder.pause()
+
+
 # ==== Notes & tasks =============================================================================================
 class NoteBody(BaseModel):
     body: str = ""

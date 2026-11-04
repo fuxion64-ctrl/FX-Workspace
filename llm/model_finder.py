@@ -52,6 +52,7 @@ _ACTIVE_RX = re.compile(r"[-_]A(\d+(?:\.\d+)?)B", re.I)
 _lock = threading.Lock()
 _state: dict = {"state": "idle", "repo": "", "file": "", "done": 0, "total": 0, "error": "", "added": None}
 _cancel = threading.Event()
+_paused = threading.Event()          # set with _cancel by pause(): the stop ends as "paused", not "cancelled"
 _cache: dict = {}            # url -> (at, value): search and file lists for 10 minutes
 
 
@@ -210,6 +211,17 @@ def status() -> dict:
 
 
 def cancel() -> dict:
+    _paused.clear()
+    _cancel.set()
+    return {"ok": True}
+
+
+def pause() -> dict:
+    """Stop for now, keeping every piece downloaded so far: Resume (download() again) carries on from there (1.4.6)."""
+    with _lock:
+        if _state.get("state") != "running":
+            return {"ok": False, "message": "Nothing is downloading."}
+    _paused.set()
     _cancel.set()
     return {"ok": True}
 
@@ -235,9 +247,10 @@ def download(repo: str, path: str, with_mmproj: bool = True) -> dict:
         if _state["state"] == "running":
             return {"ok": False, "message": f"Already downloading {_state['file']}."}
         total = sum(p["size"] for p in parts) + (proj["size"] if proj else 0)
-        _state.update(state="running", repo=repo, file=os.path.basename(path), done=0, total=total, error="", added=None,
-                      started=time.time())
+        _state.update(state="running", repo=repo, file=os.path.basename(path), path=path, mmproj=bool(with_mmproj),
+                      done=0, total=total, error="", added=None, started=time.time())
         _cancel.clear()
+        _paused.clear()
     # Include owner and subfolder: repos (and variants within one repo) may
     # publish identical basenames, especially mmproj-F16.gguf.
     identity = repo + "/" + path.rpartition("/")[0]
@@ -354,7 +367,10 @@ def _run(repo: str, folder: str, parts: list, proj: dict | None) -> None:
             _state.update(state="done", done=_state["total"], added=added, restarted=restarted)
     except InterruptedError as e:
         with _lock:
-            _state.update(state="cancelled", error=str(e))
+            if _paused.is_set():
+                _state.update(state="paused", error="")
+            else:
+                _state.update(state="cancelled", error=str(e))
     except Exception as e:
         with _lock:
             _state.update(state="failed", error=str(e)[:300])

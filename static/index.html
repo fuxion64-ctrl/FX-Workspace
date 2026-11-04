@@ -3393,8 +3393,25 @@ span.tier.input { padding: 0; border: 0; width: 8px; height: 8px; min-height: 0;
 .careful-note .cn-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
 .careful-note .cn-check { flex-shrink: 0; opacity: 1; }
 /* A picture being drawn for the answer in progress (ImagesView paintChatDraw) */
-.draw-card { width: min(100%, 360px); border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); overflow: hidden; margin-top: 8px; }
-.draw-card .dc-pic { height: 150px; display: flex; align-items: center; justify-content: center; color: var(--faint); }
+/* The drawing in progress (1.4.6): the animation floats in its own frame, shaped like the picture, with one tiny
+   line under it - no card around it. */
+.draw-card { position: relative; width: max-content; max-width: 100%; margin-top: 8px; }
+.draw-card .dc-pic { position: relative; width: 240px; height: 240px; max-width: 100%; border-radius: 14px; overflow: hidden; border: 1px solid var(--border); background: var(--surface); }
+.draw-card .dc-prog { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: color-mix(in srgb, var(--text) 55%, transparent); transform-origin: left; transform: scaleX(.02); transition: transform .4s ease; }
+.draw-card .dc-meta { display: flex; align-items: center; gap: 6px; min-height: 24px; padding: 4px 2px 0; font-size: 11.5px; color: var(--muted); }
+.draw-card .dc-meta .mono { font-size: 11px; font-variant-numeric: tabular-nums; }
+.draw-card .dc-meta .grow { flex: 1; }
+.draw-card .dc-dot { color: var(--faint); }
+.draw-card .dc-model { display: inline-flex; align-items: center; gap: 2px; padding: 1px 4px; margin: 0 -4px; border: 0; border-radius: 6px; background: none; color: inherit; font: inherit; cursor: pointer; }
+.draw-card .dc-model:hover, .draw-card .dc-model:focus-visible { background: var(--surface-2); color: var(--text); }
+.draw-card .dc-stop { width: 22px; height: 22px; opacity: .7; }
+.draw-card .dc-stop:hover { opacity: 1; }
+.draw-card .dc-menu { position: absolute; top: calc(100% + 4px); z-index: 30; min-width: 200px; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); box-shadow: 0 8px 24px rgba(0, 0, 0, .18); }
+.draw-card .dc-menu-h { padding: 4px 8px; font-size: 11px; color: var(--faint); }
+.draw-card .dc-menu button { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 6px 8px; border: 0; border-radius: 6px; background: none; color: var(--text); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.draw-card .dc-menu button:hover, .draw-card .dc-menu button:focus-visible { background: var(--surface-2); }
+.draw-card .dc-menu small { margin-left: 4px; font-size: 11.5px; color: var(--muted); }
+.draw-card .dc-menu { max-height: 320px; overflow-y: auto; }
 .draw-card .dc-fx { width: 100%; height: 100%; display: block; }
 .draw-card .dc-pic .icon { width: 28px; height: 28px; }
 .draw-card .dc-body { padding: 10px 12px 12px; display: grid; gap: 7px; }
@@ -3519,6 +3536,8 @@ span.tier.input { padding: 0; border: 0; width: 8px; height: 8px; min-height: 0;
 .im-add-row .input { flex: 1; min-width: 0; height: 30px; font-size: 12.5px; }
 .im-add-out { margin: 0; min-height: 1em; font-size: 12.5px; color: var(--muted); }
 .im-add-out.err { color: var(--danger-text); }
+.im-add-out .im-test { display: inline-flex; align-items: center; gap: 8px; }
+.im-add-out .im-test img { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; }
 .img-model-wrap { display: grid; gap: 4px; }
 .img-model-wrap > .img-model { height: 100%; }
 .im-remove { justify-self: start; font-size: 12px; }
@@ -7038,23 +7057,50 @@ const ImagesView = (() => {
       turn.drawEl = document.createElement('div');
       turn.drawEl.className = 'draw-card rise';
       turn.drawEl.setAttribute('role', 'status');
-      // The look's own "Creating image" (DRAW_FX) plays in the picture area, made once; only the text below changes.
-      turn.drawEl.innerHTML = '<div class="dc-pic"><canvas class="dc-fx" aria-hidden="true"></canvas></div><div class="dc-body"></div>';
+      // 1.4.6: the look's own "Creating image" (DRAW_FX) floats on its own, framed like the picture it will become,
+      // with one tiny line under it (step, model - a picker for the next pictures - and Stop). No card around it.
+      turn.drawEl.innerHTML = '<div class="dc-pic"><canvas class="dc-fx" aria-hidden="true"></canvas><i class="dc-prog"></i></div><div class="dc-meta"></div>';
       turn.wrap.appendChild(turn.drawEl);
       DRAW_FX.play(turn.drawEl);
       scrollToBottom();
     }
+    // The frame takes the picture's own shape: at most 240 tall and 380 wide.
+    const pic = turn.drawEl.querySelector('.dc-pic');
+    if (j.width && j.height && pic.dataset.ar !== `${j.width}x${j.height}`) {
+      const ar = j.width / j.height; let h = 240, w = h * ar;
+      if (w > 380) { w = 380; h = w / ar; }
+      pic.style.width = `${Math.round(w)}px`; pic.style.height = `${Math.round(h)}px`; pic.dataset.ar = `${j.width}x${j.height}`;
+    }
     const pct = j.stage === 'warming' && j.total ? j.done / j.total : j.progress || 0;
-    const stage = { warming: 'Reading the model from disk', freeing: 'Making room on the GPU', loading: 'Loading', encoding: 'Reading the prompt',
+    const stage = { warming: 'Reading the model', freeing: 'Making room on the GPU', loading: 'Loading', encoding: 'Reading the prompt',
                     drawing: 'Drawing', finishing: 'Finishing', saving: 'Saving', waiting: 'Waiting for the GPU' }[j.stage] || 'Working';
-    const detail = j.stage === 'drawing' && j.steps ? `step ${j.step} of ${j.steps}${j.images > 1 ? ` · picture ${j.image} of ${j.images}` : ''}`
-      : j.stage === 'warming' && j.total ? `${(j.done / 1073741824).toFixed(1)} of ${(j.total / 1073741824).toFixed(1)} GB` : '';
-    const left = j.left != null && j.stage === 'drawing' ? `About ${Math.max(1, Math.round(j.left))} s left · ` : '';
+    const count = j.stage === 'drawing' && j.steps ? `${j.step}/${j.steps}${j.images > 1 ? ` · ${j.image} of ${j.images}` : ''}`
+      : j.stage === 'warming' && j.total ? `${(j.done / 1073741824).toFixed(1)}/${(j.total / 1073741824).toFixed(1)} GB` : stage;
+    const left = j.left != null && j.stage === 'drawing' ? `${Math.max(1, Math.round(j.left))} s left` : '';
     // The reveal follows the drawing itself: still before the first step, whole once it is finishing.
     turn.drawEl._target = j.stage === 'drawing' ? (j.progress || 0) : ['finishing', 'saving'].includes(j.stage) ? 1 : 0;
-    setHtmlIfChanged(turn.drawEl.querySelector('.dc-body'), `<div class="dc-top"><b>${stage}</b>${detail ? `<span class="mono">${esc(detail)}</span>` : ''}<span class="grow"></span><button type="button" class="btn sm ghost" onclick="ImagesView.stop()">${icon('i-stop', 'xs')}Stop</button></div>
-      <div class="bar"><i style="width:${Math.round(Math.max(0.03, pct) * 100)}%"></i></div>
-      <div class="dc-sub">${left}${esc(j.model || '')}${j.width ? ` · ${j.width}×${j.height}` : ''}${j.stage === 'warming' ? ' · only the first picture after a restart' : ''}</div>`);
+    turn.drawEl.querySelector('.dc-prog').style.transform = `scaleX(${Math.max(0.02, Math.min(1, pct)).toFixed(3)})`;
+    const title = `${stage}${j.width ? ` · ${j.width}×${j.height}` : ''}${j.stage === 'warming' ? ' · only the first picture after a restart' : ''}`;
+    setHtmlIfChanged(turn.drawEl.querySelector('.dc-meta'), `<span class="mono" title="${esc(title)}">${esc(count)}</span>${left ? `<span class="dc-dot">·</span><span class="mono">${left}</span>` : ''}${j.model ? `<span class="dc-dot">·</span><button type="button" class="dc-model" onclick="ImagesView.pickModel(this)" aria-haspopup="menu" title="The model for your next pictures">${esc(j.model)}${icon('i-chev', 'xs')}</button>` : ''}<span class="grow"></span><button type="button" class="icon-btn dc-stop" onclick="ImagesView.stop()" aria-label="Stop drawing" title="Stop">${icon('i-stop', 'xs')}</button>`);
+  }
+  // The model picker on the drawing line: the picture in progress keeps its model; the choice is for the next ones.
+  function pickModel(btn) {
+    document.querySelectorAll('.dc-menu').forEach(m => m.remove());
+    const cur = (S.settings || {}).image_quality || quality();
+    const menu = document.createElement('div');
+    menu.className = 'dc-menu'; menu.setAttribute('role', 'menu');
+    menu.innerHTML = `<div class="dc-menu-h">Next pictures</div>` + choices().map(([id, name, about]) =>
+      `<button type="button" role="menuitemradio" aria-checked="${id === cur}" data-q="${esc(id)}" data-name="${esc(name)}"><span>${esc(name)}${about && about !== name ? ` <small>${esc(about)}</small>` : ''}</span>${id === cur ? icon('i-check', 'xs') : ''}</button>`).join('');
+    btn.closest('.draw-card').appendChild(menu);
+    menu.style.left = `${btn.offsetLeft}px`;
+    const close = e => { if (!menu.contains(e.target) && e.target !== btn) { menu.remove(); document.removeEventListener('pointerdown', close, true); } };
+    document.addEventListener('pointerdown', close, true);
+    menu.onclick = async e => {
+      const b = e.target.closest('button[data-q]'); if (!b) return;
+      menu.remove(); document.removeEventListener('pointerdown', close, true);
+      st.quality = b.dataset.q;
+      try { await saveSettings({ image_quality: b.dataset.q }); toast(`Next pictures use ${b.dataset.name}.`); } catch (err) { toast(err.message); }
+    };
   }
   async function load() {
     const p = new URLSearchParams({ limit: '240' });
@@ -7449,7 +7495,7 @@ const ImagesView = (() => {
   function search(q) { st.q = q.trim(); clearTimeout(qT); qT = setTimeout(load, 220); }
   async function stop() { try { await api('/api/images/stop', {}); toast('Stopping…'); } catch (e) { toast(e.message); } poll(); }
   async function unload() { try { await api('/api/images/unload', {}); toast('The image engine let go of its memory.'); } catch (e) { toast(e.message); } poll(); }
-  return { render, poll, load, reload: load, make, again, edit, expandOpen, expandSet, expandGo, clearRef, pickRef, improve, fav, trash, restore, purge, emptyTrash, copy, useSeed, toChat, select, view, filterBy, search, stop, unload, set,
+  return { render, poll, load, reload: load, make, again, edit, expandOpen, expandSet, expandGo, clearRef, pickRef, improve, fav, trash, restore, purge, emptyTrash, copy, useSeed, toChat, select, view, filterBy, search, stop, unload, set, pickModel,
     openSeq, closeSeq, variants,
     style: id => { st.styles.has(id) ? st.styles.delete(id) : st.styles.add(id); paintGen(); },
     toggleNeg: () => { st.showNeg = !st.showNeg; paintGen(); if (st.showNeg) setTimeout(() => $('iv-negative') && $('iv-negative').focus(), 0); },
@@ -13662,7 +13708,7 @@ function buildWorkLines(steps) {
 }
 function buildSteps(events, live) {
   const el = document.createElement('div');
-  el.className = 'steps' + (live ? ' open' : '');
+  el.className = 'steps';            // closed until you click it, live or not (1.4.6: an auto-opened row pushed the reply around)
   el.innerHTML = `<button class="steps-head">${live ? '<span class="spinner"></span>' : icon('i-bolt', 'xs')}<span class="steps-summary">${stepsSummary(events, live)}</span>${icon('i-chev', 'sm chev')}</button><div class="steps-body">${events.map(stepRow).join('')}</div>`;
   el.querySelector('.steps-head').onclick = () => el.classList.toggle('open');
   return el;
@@ -17033,9 +17079,30 @@ async function addImageModel(form) {
   try {
     const r = await api('/api/images/models/add', { path });
     if (!r.ok) { out.textContent = r.message; out.classList.add('err'); return; }
-    toast(`Added ${r.model.name} - it's in Images now.`);
     renderImages({ status: r.status });
+    testImageModel(r.model);
   } catch (e) { out.textContent = e.message; out.classList.add('err'); }
+}
+/* A test picture right after adding (1.4.6, stage 3.2): proves the engine can really run the file. A small square
+   in the model's own settings; it goes to the image trash afterwards so the gallery only has your pictures. If it
+   fails, the engine's reason is shown with a button to take the model off the list again. */
+const TEST_PROMPT = 'a red apple on a wooden table, soft daylight, photo';
+async function testImageModel(m) {
+  toast(`Added ${m.name} - making a test picture to check it works…`, { ms: 6000 });
+  let r;
+  try { r = await api('/api/images/generate', { prompt: TEST_PROMPT, quality: m.key, size: 'square', count: 1 }); }
+  catch (e) { r = { ok: false, message: e.message }; }
+  const box = document.querySelector('.im-add-out');
+  if (r.ok) {
+    const pic = r.image.images ? r.image.images[0] : r.image;
+    api(`/api/images/${encodeURIComponent(pic.id)}/trash`, {}).catch(() => {});
+    if (box) { box.classList.remove('err'); box.innerHTML = `<span class="im-test"><img src="${esc(pic.thumb || pic.url)}" alt="The test picture"> ${esc(m.name)} works - it's in Images now. The test picture is in the image trash.</span>`; }
+    toast(`${m.name} works - it's in Images now.`);
+  } else {
+    const msg = `${m.name} was added, but the test picture didn't work: ${r.message || 'the engine stopped'}`;
+    if (box) { box.classList.add('err'); box.innerHTML = `${esc(msg)} <button type="button" class="btn sm" onclick="removeImageModel('${jsArg(m.key)}')">Remove it from the list</button>`; }
+    else toast(msg, { ms: 9000 });
+  }
 }
 async function removeImageModel(key) {
   try { const r = await api('/api/images/models/remove', { key }); if (!r.ok) { toast(r.message); return; } toast('Removed from the list - the file is still where it was.'); renderImages({ status: r.status }); }
@@ -22305,8 +22372,13 @@ S.finder = { q: '', results: null, hw: null, files: {}, open: null, status: null
 const FIT_LABEL = { gpu: ['ok', 'Fits on the GPU'], partial: ['warn', 'Part runs from RAM - slower'], no: ['bad', "Too big for this PC"] };
 function finderGroup() {
   const f = S.finder, hw = f.hw;
-  const st = f.status && f.status.state === 'running' ? f.status : null;
-  const dl = st ? `<div class="mf-dl" role="status"><span class="spinner"></span><span class="grow">${st.checking ? `Checking ${esc(st.checking)}…` : `Downloading ${esc(st.file)} - ${(st.done / 2 ** 30).toFixed(2)} of ${(st.total / 2 ** 30).toFixed(2)} GB`}</span><div class="bar"><i style="width:${st.total ? Math.round(100 * st.done / st.total) : 0}%"></i></div><button type="button" class="btn sm" onclick="finderCancel()">Cancel</button></div>`
+  const st = f.status && ['running', 'paused'].includes(f.status.state) ? f.status : null;
+  const gb = n => (n / 2 ** 30).toFixed(2);
+  const rate = st && st.state === 'running' && f.rate > 0 ? f.rate : 0;   // bytes/s, from the last few polls
+  const left = rate ? Math.max(0, (st.total - st.done) / rate) : 0;
+  const when = s => s < 90 ? `${Math.ceil(s)} s` : s < 5400 ? `${Math.round(s / 60)} min` : `${(s / 3600).toFixed(1)} h`;
+  const meta = st && st.state === 'running' && !st.checking && rate ? ` · ${(rate / 2 ** 20).toFixed(1)} MB/s · about ${when(left)} left` : '';
+  const dl = st ? `<div class="mf-dl" role="status">${st.state === 'paused' ? '' : '<span class="spinner"></span>'}<span class="grow">${st.checking ? `Checking ${esc(st.checking)}…` : `${st.state === 'paused' ? 'Paused' : 'Downloading'} ${esc(st.file)} - ${gb(st.done)} of ${gb(st.total)} GB${meta}`}</span><div class="bar"><i style="width:${st.total ? Math.round(100 * st.done / st.total) : 0}%"></i></div>${st.state === 'paused' ? `<button type="button" class="btn sm primary" onclick="finderResume()">Resume</button>` : `<button type="button" class="btn sm" onclick="finderPause()">Pause</button>`}<button type="button" class="btn sm" onclick="finderCancel()">Cancel</button></div>`
     : f.status && ['failed', 'cancelled'].includes(f.status.state) ? `<p class="af-state" role="alert">${esc(f.status.error)}</p>` : '';
   const files = repo => {
     const x = f.files[repo]; if (!x) return `<div class="mf-files">${SKELETON_TEXT}</div>`;
@@ -22353,13 +22425,18 @@ async function finderFiles(repo) {
   }
   finderRepaint();
 }
-async function finderDownload(repo, path) {
-  const r = await api('/api/model-finder/download', { repo, path, mmproj: true }).catch(e => ({ ok: false, message: e.message }));
+async function finderDownload(repo, path, mmproj = true) {
+  S.finder.samples = [];
+  const r = await api('/api/model-finder/download', { repo, path, mmproj }).catch(e => ({ ok: false, message: e.message }));
   if (!r.ok) { toast(r.message); return; }
   S.finder.status = r; finderRepaint(); finderPoll();
 }
 async function finderPoll() {
   const s = await api('/api/model-finder/status').catch(() => null); if (!s) return;
+  // Speed over the last ~10 s of polls, so one slow second doesn't swing "time left".
+  const now = Date.now(), smp = (S.finder.samples = (S.finder.samples || []).filter(x => now - x[0] < 10000 && x[1] <= s.done));
+  if (s.state === 'running' && !s.checking) smp.push([now, s.done]); else S.finder.samples = [];
+  S.finder.rate = smp.length > 1 ? (smp[smp.length - 1][1] - smp[0][1]) / ((smp[smp.length - 1][0] - smp[0][0]) / 1000) : 0;
   S.finder.status = s;
   if (s.state === 'running') { const box = document.querySelector('.mf-dl'); if (box) { finderRepaint(); } setTimeout(finderPoll, 1200); return; }
   if (s.state === 'done') {
@@ -22369,7 +22446,14 @@ async function finderPoll() {
   }
   finderRepaint();
 }
-function finderCancel() { api('/api/model-finder/cancel', {}).catch(() => {}); }
+function finderCancel() {
+  const st = S.finder.status;
+  if (st && st.state === 'paused') { S.finder.status = { state: 'idle' }; finderRepaint(); return; }   // nothing running: just drop it (the part stays on disk)
+  api('/api/model-finder/cancel', {}).catch(() => {});
+}
+function finderPause() { api('/api/model-finder/pause', {}).catch(() => {}); }
+// Resume = start the same file again: every piece already on disk is kept and the download carries on from there.
+function finderResume() { const st = S.finder.status || {}; if (st.repo && st.path) finderDownload(st.repo, st.path, st.mmproj !== false); }
 
 /* ===========================================================================
    Boot
