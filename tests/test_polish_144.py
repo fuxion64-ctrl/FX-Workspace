@@ -116,6 +116,18 @@ class PageScriptTests(unittest.TestCase):
         self.assertIn("data: renderDataFiles", page)
         self.assertIn("function hideIpGroup(d)", page)       # 1.4.6: Tor's rows became one "Hide my IP" choice
 
+    def test_the_tor_tag_says_what_goes_through_tor(self):
+        from web import netlayer
+        base = {"net_route": "direct", "net_components": {"search": "app", "models": "app", "other": "app"}}
+        cases = [({}, None), ({"net_route": "tor"}, "all"), ({"net_components": {"search": "tor", "models": "app", "other": "app"}}, "search"),
+                 ({"net_route": "tor", "net_components": {"search": "app", "models": "direct", "other": "app"}}, "search")]
+        for change, want in cases:
+            with patch.object(netlayer, "settings", return_value={**base, **change}), patch.dict(netlayer._state, {"session_direct": False}):
+                self.assertEqual(netlayer.tor_use(), want, change)
+        with patch.object(netlayer, "settings", return_value={**base, "net_route": "tor"}), patch.dict(netlayer._state, {"session_direct": True}):
+            self.assertIsNone(netlayer.tor_use())                  # "Go direct for this session" - no tag
+        self.assertIn('id="tor-tag"', CalmMotionTests.page)
+
     def test_one_switch_stops_loading_while_typing(self):
         # 1.4.6 (a user's request): "Get models ready while I type" off - typing loads nothing, chat or pictures.
         from core import config

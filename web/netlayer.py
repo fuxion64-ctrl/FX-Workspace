@@ -370,6 +370,19 @@ def route_for(comp: str = "other") -> Route:
     return DIRECT
 
 
+def tor_use() -> str | None:
+    """What goes through Tor now - "all", "search" or None - for the main screen's Tor tag. Reads the settings
+    only: unlike route_for it never starts the built-in Tor."""
+    if _state["session_direct"]:
+        return None
+    s = settings()
+    comps = s["net_components"]
+    kind = lambda comp: s["net_route"] if comps.get(comp, "app") == "app" else comps.get(comp)
+    if all(kind(c) == "tor" for c in COMPONENTS):
+        return "all"
+    return "search" if kind("search") == "tor" else None
+
+
 def is_local(host: str) -> bool:
     h = str(host or "").strip("[]").lower()
     if h in ("localhost", "") or h.endswith(".localhost"):

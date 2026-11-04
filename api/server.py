@@ -3075,7 +3075,9 @@ def get_state(focused: int = None, since: int = 0, log_since: int = 0):
         "metrics": system_metrics.snapshot_nonblocking(active_model=shared.app_state.get("local_engaged")),
         "placement": _model_placement(shared.app_state.get("local_engaged")),
         "diagnostics": _diagnostics_counts(),
-        "net": {"blocked": netlayer.blocked_state(), "session_direct": netlayer.session_direct()},   # the kill-switch banner
+        "net": {"blocked": netlayer.blocked_state(), "session_direct": netlayer.session_direct(),   # the kill-switch banner
+                "tor": (tor := netlayer.tor_use()),                                            # ...and the Tor tag
+                "tor_state": tor_service.status().get("state") if tor and netlayer.uses_builtin_tor() else None},
     }
 
 

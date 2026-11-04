@@ -2745,6 +2745,15 @@ body.resizing .sidebar { transition: none; }
 .net-ind .ni-lat:empty { display: none; }
 .net-ind.blocked { border-color: var(--danger); }
 .net-ind.blocked .ni-badge { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--danger); }
+/* 1.4.6: while Tor carries the traffic, a small tag says so (Settings > Web search and network > Hide my IP). */
+.tor-tag { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface); color: var(--text-2); font: 500 11.5px/1 var(--sans); cursor: pointer; white-space: nowrap; }
+.tor-tag[hidden] { display: none; }
+.tor-tag::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #7d4698; }
+.tor-tag:hover { border-color: var(--border-strong); color: var(--text); }
+.tor-tag.connecting::before { background: var(--faint); }
+.tor-tag.down { border-color: var(--danger); color: var(--danger); }
+.tor-tag.down::before { background: var(--danger); }
 @media (max-width: 760px) { .net-ind .ni-speed, .net-ind .ni-lat { display: none; } }
 @media (max-width: 480px) { .net-ind { display: none; } }
 .net-banner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 6px 16px 0; padding: 8px 12px; border-radius: 10px;
@@ -5703,6 +5712,7 @@ html.voice-on .idle-screen { display: none !important; }
       <span class="topbar-brand" aria-hidden="true"><svg><use href="#mark"/></svg></span>
       <div class="chat-title" id="chat-title"></div>
       <div class="topbar-right">
+        <button class="tor-tag" id="tor-tag" hidden onclick="openSettings('network')"></button>
         <button class="net-ind" id="net-ind" hidden onclick="openSettings('network')" title="Network: speed, route and privacy (Settings > Web search and network)" aria-label="Network speed and route">
           <span class="ni-speed"><span class="ni-down" id="ni-down">–</span><span class="ni-up" id="ni-up">–</span></span>
           <span class="ni-badge" id="ni-badge">Direct</span><span class="ni-lat" id="ni-lat"></span>
@@ -14201,7 +14211,7 @@ async function poll() {
     renderPlan(d.plan);
     renderMetrics(d.metrics, d);
     S.placement = d.placement || null; syncDiagnostics(d.diagnostics);
-    if (d.net) NetIndicator.banner(d.net.blocked);
+    if (d.net) { NetIndicator.banner(d.net.blocked); torTag(d.net); }
     // The mini window's chat strip reads these (Overlay.paint): the turn, Stop, a waiting approval, the model to send with.
     S.turnInfo = d.turn || null; S.runInfo = d.run || 'idle'; S.approvalWaiting = !!d.pending_approval;
     S.pinnedLocal = d.local_pinned || ''; if (d.mode) S.serverMode = d.mode;
@@ -14798,7 +14808,7 @@ const SETTINGS_WORDS = {
   agent: 'agent effort quick balanced thorough reviewed cross-checked workflow prompt prep revisions routing careful honest truthful fact check tools by itself auto browser response mode raw enhanced ground rules',
   images: 'images pictures draw flux z-image krea quality size seed filter gpu vram engine move drive disk speed warm step cache',
   websearch: 'web search privacy private maximum local only providers brave tavily searxng history cache keys browser built-in edge window',
-  network: 'network proxy tor vpn kill switch leak test route dns',
+  network: 'network proxy tor onion hide my ip address anonymous vpn kill switch leak test route dns',
   mcp: 'mcp servers tools plugins roblox studio',
   permissions: 'permissions approve ask allow deny destructive input benign tools',
   privacy: 'privacy temporary chat screenshots cloud data delete history limits refuse refused refusal outside app limits censor censored uncensored abliterated relaxed restrictions filter safety guard',
@@ -16392,6 +16402,20 @@ async function dataClear(kind, btn) {
    (tor_service.py) is used; without it, a Tor already running on this PC (Tor Browser, the Expert Bundle) is found by
    itself. Its status and New identity show beside it; bridges only when Tor can't connect (or are already set). The
    kill switch is always on and needs no row: if Tor or the proxy goes down, traffic stops. */
+// The top bar's Tor tag (from /api/state's net.tor): "Tor" when everything goes through it, "Searches via Tor"
+// when only searching does; greyed while it connects, red when it's down (and then nothing is sent).
+function torTag(net) {
+  const el = $('tor-tag'); if (!el) return;
+  const use = net.tor, st = net.tor_state;
+  el.hidden = !use;
+  if (!use) return;
+  const label = use === 'all' ? 'Tor only' : 'Searches via Tor', down = st === 'failed', wait = st === 'connecting';
+  const text = down ? `${label} · down` : wait ? `${label} · connecting` : label;
+  if (el.textContent !== text) el.textContent = text;
+  el.classList.toggle('down', down); el.classList.toggle('connecting', wait);
+  el.title = (use === 'all' ? 'Everything this app sends goes through Tor.' : 'Web searches and the pages it reads go through Tor; models and downloads go direct.')
+    + (down ? ' Tor is down, so that traffic is stopped - nothing goes direct.' : '') + ' Settings > Web search and network.';
+}
 function hideIpMode(n) {
   const c = n.net_components || {};
   return n.net_route === 'tor' ? 'all' : c.search === 'tor' ? 'search' : ['proxy', 'system'].includes(n.net_route) ? 'proxy' : 'off';
@@ -16399,6 +16423,7 @@ function hideIpMode(n) {
 function hideMyIp(v) {
   const n = S.netNow || {}, c = { ...(n.net_components || {}) }, t = S.netTor || {};
   const src = t.available ? 'builtin' : 'external';
+  torTag({ tor: v === 'all' || v === 'search' ? v : null, tor_state: t.state });   // at once - the state poll waits while Settings is open
   if (v === 'off') return saveNet({ net_route: 'direct', net_components: { ...c, search: c.search === 'tor' ? 'app' : c.search } });
   if (v === 'search') return saveNet({ net_route: n.net_route === 'tor' ? 'direct' : n.net_route, net_components: { ...c, search: 'tor' }, net_tor_source: src });
   if (v === 'all') return saveNet({ net_route: 'tor', net_components: { search: 'app', models: 'app', other: 'app' }, net_tor_source: src });
@@ -16409,7 +16434,7 @@ function hideIpGroup(d) {
   const builtin = t.available && n.net_tor_source !== 'external';
   const desc = { off: 'Sites see this PC’s own address.', search: 'Web searches and the pages it reads go through Tor - the sites don’t see your address. Slower; some sites refuse Tor. Models and downloads go direct.',
     all: 'Everything this app sends goes through Tor - searches, cloud models and downloads. Slowest.', proxy: 'Everything goes through a proxy you choose - Windows’ own, or an address.' }[mode];
-  const rows = [rowHtml('Hide my IP', desc, seg([['off', 'Off'], ['search', 'When searching'], ['all', 'For everything'], ['proxy', 'My own proxy']], mode, 'hideMyIp'))];
+  const rows = [rowHtml('Hide my IP', desc, seg([['off', 'Off'], ['search', 'Tor for searches'], ['all', 'Tor for everything'], ['proxy', 'My own proxy']], mode, 'hideMyIp'))];
   if (tor && builtin) {
     rows.push(`<div class="row"><div class="row-text"><b>Tor</b><small id="tor-status" aria-live="polite">${torStatusText(t)}</small></div><div class="tor-acts" id="tor-acts">${torActs(t)}</div></div>`);
     if (t.state === 'failed' || (n.net_tor_bridges || 'off') !== 'off') {
@@ -16428,7 +16453,7 @@ function hideIpGroup(d) {
     if (n.net_route === 'proxy') rows.push(rowHtml('Proxy address', 'SOCKS5 or HTTP, e.g. socks5://127.0.0.1:1080', `<input class="input" style="max-width:260px" value="${esc(n.net_proxy || '')}" placeholder="socks5://127.0.0.1:1080" aria-label="Proxy address" onchange="saveNet({net_proxy:this.value})">`));
   }
   const note = mode === 'off' ? '' : '<p class="set-note" style="margin:6px 0 0">If Tor or the proxy goes down, traffic stops - it never goes direct by itself.</p>';
-  return `<div class="set-group" id="tor-group">${rows.join('')}${note}</div>`;
+  return `<div class="set-group" id="tor-group"><div class="gt">Tor and your IP address <small>· the top bar shows a Tor tag while it's on</small></div>${rows.join('')}${note}</div>`;
 }
 function torStatusText(t) {
   if (t.state === 'ready') return `Connected${t.seconds ? ` in ${Math.round(t.seconds)} s` : ''}${t.bridges && t.bridges !== 'off' ? ` · through ${esc(t.bridges)} bridges` : ''} · each chat gets its own circuit`;
