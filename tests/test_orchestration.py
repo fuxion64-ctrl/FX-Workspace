@@ -1,4 +1,4 @@
-﻿"""Deterministic tests for the production pass: typed tools + executor,
+"""Deterministic tests for the production pass: typed tools + executor,
 messaging providers and permissions, non-disruptive inspection, the
 orchestration pipeline (effort, prompt preparation, planner, reviewer,
 revision, cancellation), model routing/handoff, and the theme system.
@@ -945,7 +945,7 @@ class ThemeTests(unittest.TestCase):
         shared = self.css.count(':root:is([data-skin="eclipse"],[data-skin="dawn"],[data-skin="dusk"])')
         self.assertGreater(shared, 20)
         # Only the palette and the starfield are Eclipse's own (its by-day tone adds [data-tone="light"] rules).
-        self.assertEqual(len(re.findall(r':root\[data-skin="eclipse"\](?!\[)', self.css)), 2)
+        self.assertEqual(len(re.findall(r':root\[data-skin="eclipse"\](?![\[:])', self.css)), 2)
 
     def test_dawn_is_calmer_than_eclipse(self):
         dawn_idle = float(re.search(r':root\[data-skin="dawn"\] \.halo \{ opacity: ([\d.]+)', self.css).group(1))
