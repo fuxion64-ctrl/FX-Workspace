@@ -491,7 +491,15 @@ class AgentBrowser:
                     self._cdp.close()
                     self._cdp = None
             if self._route is None and self._alive() and not self.close_leftover():
-                self._refuse_unowned_browser()
+                # Someone else's browser (or another program) has the control port: never touch it - ours moves to
+                # a free port instead of refusing to start (1.4.6).
+                import ports
+                self.port = ports.pick(self.port + 1, avoid=(TEMP_PORT,) if self.port != TEMP_PORT else ())
+                ports.note("browser" if self.port != TEMP_PORT else "browser_temp", self.port, "moved")
+            elif self._route is None and not self._alive():
+                import ports
+                if not ports.is_free(self.port):          # a program that isn't a browser holds it
+                    self.port = ports.pick(self.port + 1, avoid=(TEMP_PORT,))
             if not self._alive():
                 exe = self.executable or self.find_executable()
                 if not exe:

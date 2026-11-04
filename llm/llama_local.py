@@ -54,6 +54,24 @@ os.environ["NO_PROXY"] = _no_proxy
 os.environ["no_proxy"] = _no_proxy
 
 _MODELS_URL = f"{LLAMA_SERVER_BASE.rstrip('/')}/models"
+
+
+def set_port(port: int) -> None:
+    """Move the app to a router on another port (1.4.6: another program held 8090, llama_builds.ensure_running
+    started ours on a free one). Every caller reads these names at call time - config.LLAMA_SERVER_BASE too."""
+    global LLAMA_PORT, LLAMA_SERVER_BASE, _MODELS_URL
+    LLAMA_PORT = int(port)
+    LLAMA_SERVER_BASE = f"http://{LLAMA_HOST}:{LLAMA_PORT}/v1"
+    _MODELS_URL = f"{LLAMA_SERVER_BASE}/models"
+    os.environ["LLAMA_PORT"] = str(LLAMA_PORT)
+    os.environ["LLAMA_SERVER_BASE"] = LLAMA_SERVER_BASE
+    import sys
+    cfg = sys.modules.get("core.config")
+    if cfg is not None:
+        cfg.LLAMA_SERVER_BASE = LLAMA_SERVER_BASE
+    invalidate_cache()
+
+
 _CACHE_TTL = 20.0
 # A refused connection to a closed localhost port takes 1-2 s on Windows (TCP
 # SYN retries), and /api/state asks "is the server up?" on every UI poll. A
@@ -608,10 +626,13 @@ def force_load(model_id: str, timeout: float = 180.0, back: bool = True) -> floa
     try:
         resp.raise_for_status()
     except requests.HTTPError as e:
-        hint = load_hint(model_id)
+        # The router's own words ("model name=X failed to load") are in the body, not in requests' "500 Server
+        # Error" line - load_failure.explain needs them to find the real cause (1.4.6).
+        body = (resp.text or "").strip()[:300]
+        text, hint = f"{e}{f' - {body}' if body else ''}", load_hint(model_id)
         if hint:
-            raise RuntimeError(f"{e}.{hint}") from e
-        raise
+            raise RuntimeError(f"{text}.{hint}") from e
+        raise requests.HTTPError(text, response=resp) from e
     return time.time() - t0
 
 
@@ -647,9 +668,17 @@ def cheapest_other_model(exclude: str, candidates: list[str]) -> str | None:
     return min(others, key=lambda m: (model_file_size(m) is None, model_file_size(m) or 0))
 
 
-def unreachable_message() -> str:
-    return (f"llama-server is not answering on {LLAMA_SERVER_BASE}. Start it (run.bat does this "
-            "automatically) or switch the mode selector to Cloud.")
+def unreachable_message(restarted: str = "") -> str:
+    """Kept parseable: the page matches "llama-server is not answering". No run.bat in it (1.4.6) - the installed
+    app has none; the app restarts llama-server itself (llama_builds.ensure_running)."""
+    tail = f" {restarted}" if restarted else (" The app tried to start it again and couldn't - see Settings › "
+                                             "Diagnostics, or switch the mode selector to Cloud.")
+    return f"llama-server is not answering on {LLAMA_SERVER_BASE}.{tail}"
+
+
+def router_log_path() -> str:
+    """The router's log when the app runs it windowless (launcher.pyw, llama_builds)."""
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "logs", "llama-server.log")
 
 
 def empty_registry_message() -> str:

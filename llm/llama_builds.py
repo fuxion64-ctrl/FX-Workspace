@@ -297,8 +297,163 @@ def switch(kind: str, run: dict | None = None) -> None:
                            "See data/logs/llama-server.log, or set Settings › Models › llama.cpp build to the other build.")
 
 
+# ---- keeping the router up (1.4.6) ---------------------------------------------------------------------------
+# When llama-server died (a crash in a model load, closed by hand, killed by Windows for memory) or stopped answering,
+# nothing started it again: every later message said "Couldn't reach the local server. Is run.bat still running?"
+# until the whole app was restarted. Now a reply that finds it down starts it first (models.call_local), and a
+# watchdog notices on its own - a dead process at once, a hung one after HUNG_CHECKS probes in a row.
+RESTART_LIMIT = 3                     # restarts per RESTART_WINDOW before it is left down (a crash loop)
+RESTART_WINDOW = 600.0
+WATCH_EVERY = 10.0
+HUNG_CHECKS = 3
+_watch = {"thread": None, "restarts": [], "last": "", "seen_up": False, "fails": 0, "stop": threading.Event()}
+
+
+def adopt(proc) -> None:
+    """launcher.pyw's own router: stopped with the app and watched like one this module started."""
+    if proc is not None:
+        _started["proc"] = proc
+
+
+def _autostart() -> bool:
+    return os.environ.get("AUTOSTART_LLAMA", "1") == "1"
+
+
+def _restart_exe() -> str | None:
+    """The build to start: the one that ran last, else the newest llama.cpp, else PrismML's."""
+    last = (_run_cache.get("run") or {}).get("exe") or llama_local.server_executable()
+    if last and _exists(last):
+        return last
+    return exe_of("latest") or exe_of("prism")
+
+
+def _too_many() -> bool:
+    now = time.time()
+    _watch["restarts"] = [t for t in _watch["restarts"] if now - t < RESTART_WINDOW]
+    return len(_watch["restarts"]) >= RESTART_LIMIT
+
+
+def status_line() -> str:
+    """What the last recovery did, for Diagnostics and the error text."""
+    return _watch["last"]
+
+
+@local_runtime.exclusive
+def ensure_running(reason: str = "", wait: float = READY_TIMEOUT) -> dict:
+    """Make sure llama-server answers; start it again when it doesn't. {"ok", "restarted", "message"}.
+    A hung router of ours is stopped first; a port another program holds moves the router to a free one."""
+    import ports
+    import events as event_log
+    with _lock:
+        if _answers():
+            _watch["seen_up"] = True
+            return {"ok": True, "restarted": False, "message": ""}
+        if not _autostart():
+            return {"ok": False, "restarted": False, "message": "llama-server isn't started by the app here (AUTOSTART_LLAMA=0)."}
+        exe = _restart_exe()
+        if not exe:
+            return {"ok": False, "restarted": False,
+                    "message": "llama-server isn't installed (local\\llama.cpp) - install it from Settings › Models, or use Cloud."}
+        if _too_many():
+            msg = (f"llama-server stopped {RESTART_LIMIT} times in {int(RESTART_WINDOW / 60)} minutes, so the app left it "
+                   "off. The log says why: data\\logs\\llama-server.log. Restart the app to try again.")
+            _watch["last"] = msg
+            return {"ok": False, "restarted": False, "message": msg}
+        _watch["restarts"].append(time.time())
+        port = llama_local.LLAMA_PORT
+        info = ports.holder(port)
+        moved = ""
+        if info and (_router_at(_psutil(), info["pid"]) or ports.is_ours(info)):
+            event_log.log_action(f"llama-server (process {info['pid']}) holds port {port} but doesn't answer - stopping it.")
+            ports.stop_tree(info["pid"], wait_port=port)
+        elif info or not ports.is_free(port):
+            new = ports.pick(port + 1)
+            moved = f" Port {port} is used by {ports.describe(info)}, so it now runs on {new}."
+            llama_local.set_port(new)
+            ports.note("llama", new, "moved", ports.describe(info))
+        proc = _started["proc"]
+        if proc is not None and proc.poll() is None:
+            _stop(proc.pid)                  # ours, but not answering
+        event_log.log_action(f"llama-server isn't answering{f' ({reason})' if reason else ''} - starting it again.{moved}")
+        forget()
+        _start(exe, _args_like({}))
+        ok = _wait_ready(wait)
+        forget()
+        llama_local.invalidate_cache()
+        if ok:
+            _watch["seen_up"] = True
+            _watch["last"] = f"llama-server had stopped; the app started it again at {time.strftime('%H:%M')}.{moved}"
+            event_log.log_action(_watch["last"])
+            return {"ok": True, "restarted": True, "message": _watch["last"]}
+        _watch["last"] = f"llama-server didn't start again ({exe}). The log says why: data\\logs\\llama-server.log."
+        event_log.log_action(_watch["last"])
+        return {"ok": False, "restarted": True, "message": _watch["last"]}
+
+
+def _psutil():
+    try:
+        import psutil
+        return psutil
+    except ImportError:
+        return None
+
+
+def _hung_or_dead() -> bool:
+    """Down right now: our process exited, or nothing answers on the port (probed fresh)."""
+    proc = _started["proc"]
+    if proc is not None and proc.poll() is not None:
+        return True
+    return not _answers()
+
+
+def _watchdog() -> None:
+    while not _watch["stop"].wait(WATCH_EVERY):
+        try:
+            if not _autostart() or not _watch["seen_up"] or switching():
+                if not _watch["seen_up"] and _answers():
+                    _watch["seen_up"] = True
+                continue
+            if local_runtime.busy():
+                # A reply or a load runs on the router: a slow answer then is the GPU at work, not a hang - a dead
+                # process still counts.
+                proc = _started["proc"]
+                if not (proc is not None and proc.poll() is not None):
+                    _watch["fails"] = 0
+                    continue
+            if _hung_or_dead():
+                _watch["fails"] += 1
+                proc = _started["proc"]
+                dead = proc is not None and proc.poll() is not None
+                if dead or _watch["fails"] >= HUNG_CHECKS:
+                    _watch["fails"] = 0
+                    ensure_running("watchdog")
+            else:
+                _watch["fails"] = 0
+        except Exception:
+            pass
+
+
+def switching() -> bool:
+    """A build switch holds the router lock (it stops and starts the router itself)."""
+    got = _lock.acquire(blocking=False)
+    if got:
+        _lock.release()
+    return not got
+
+
+def start_watchdog() -> None:
+    if os.environ.get("AGENTIC_DISABLE_LLAMA_WATCHDOG") == "1":
+        return
+    t = _watch["thread"]
+    if t is None or not t.is_alive():
+        _watch["stop"].clear()
+        _watch["thread"] = threading.Thread(target=_watchdog, daemon=True, name="llama-watchdog")
+        _watch["thread"].start()
+
+
 def stop_started() -> None:
     """On app exit: the windowless router this app started stops with it (as launcher.pyw's own would)."""
+    _watch["stop"].set()
     proc = _started["proc"]
     if proc is not None and proc.poll() is None:
         try:

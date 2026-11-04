@@ -15,7 +15,9 @@ const fs = require('fs');
 const http = require('http');
 const { spawn } = require('child_process');
 
-const APP_URL = 'http://127.0.0.1:8000';
+// The server's address. 8000 unless another program holds it - then the launcher picks a free port and writes it to
+// data/run/ports.json, and this follows it (1.4.6).
+let APP_URL = 'http://127.0.0.1:8000';
 const TITLE = 'FX Workspace';
 const IS_WIN = process.platform === 'win32';
 const START_TIMEOUT_MS = 180000;             // a first start syncs Python packages and starts llama-server
@@ -70,12 +72,41 @@ function pythonFor(root) {
 const asset = name => path.join(__dirname, 'assets', name);
 
 // ---- the server ----------------------------------------------------------------------------------------
-function ping() {
+const sameDir = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+
+// This install's server answers at url: /api/whoami names its folder (1.4.6). Another program on the port - or
+// another copy of FX Workspace - doesn't count: before, any 200 from /api/settings did, and the app opened that.
+function pingAt(url, root) {
   return new Promise(resolve => {
-    const req = http.get(APP_URL + '/api/settings', { timeout: 1500 }, res => { res.resume(); resolve(res.statusCode === 200); });
+    const req = http.get(url + '/api/whoami', { timeout: 1500 }, res => {
+      let body = ''; res.setEncoding('utf8'); res.on('data', c => { body += c; });
+      res.on('end', () => {
+        if (res.statusCode === 404) {                            // a version from before whoami: its settings answer
+          const r2 = http.get(url + '/api/settings', { timeout: 1500 }, r => { r.resume(); resolve(r.statusCode === 200); });
+          r2.on('error', () => resolve(false)); r2.on('timeout', () => { r2.destroy(); resolve(false); });
+          return;
+        }
+        try { const d = JSON.parse(body); resolve(d.app === 'fx-workspace' && (!root || !d.root || sameDir(d.root, root))); }
+        catch (e) { resolve(false); }
+      });
+    });
     req.on('error', () => resolve(false));
     req.on('timeout', () => { req.destroy(); resolve(false); });
   });
+}
+function ping() { return pingAt(APP_URL, findRoot()); }
+
+// Where the launcher says the app listens (data/run/ports.json), else 8000.
+function runPort(root) {
+  try { const p = Number(JSON.parse(fs.readFileSync(path.join(root, 'data', 'run', 'ports.json'), 'utf8')).app); return p > 0 && p < 65536 ? p : null; }
+  catch (e) { return null; }
+}
+async function findServer(root) {
+  for (const port of [...new Set([runPort(root), 8000].filter(Boolean))]) {
+    const url = `http://127.0.0.1:${port}`;
+    if (await pingAt(url, root)) { APP_URL = url; return true; }
+  }
+  return false;
 }
 
 function status(text) {
@@ -83,8 +114,9 @@ function status(text) {
 }
 
 async function startServer() {
-  if (await ping()) return { ok: true };                      // already running (run.bat console, an earlier start)
   const root = findRoot();
+  if (root && await findServer(root)) return { ok: true };   // already running (run.bat console, an earlier start)
+  if (!root && await ping()) return { ok: true };
   if (!root) return { ok: false, message: 'The FX Workspace files were not found next to the app.\n\nReinstall it, or set FX_ROOT to the folder with launcher.pyw.' };
   const python = pythonFor(root);
   if (!python) return { ok: false, message: `FX Workspace isn't set up yet: there is no Python environment in\n${path.join(root, '.venv')}\n\nRun the installer (or install.bat) first.` };
@@ -97,12 +129,13 @@ async function startServer() {
     stdio: 'ignore', windowsHide: true, detached: true,
   });
   let exited = null;
-  server.on('exit', code => { exited = code; });
+  serverExited = false;
+  server.on('exit', code => { exited = code; serverExited = true; });
   const started = Date.now();
   let hint = 0;
   while (Date.now() - started < START_TIMEOUT_MS) {
-    if (await ping()) return { ok: true };
-    if (exited !== null && !(await ping())) {
+    if (await findServer(root)) return { ok: true };        // the port it chose is in data/run/ports.json
+    if (exited !== null && !(await findServer(root))) {
       return { ok: false, message: `The server stopped while starting (exit code ${exited}).\n\nDetails: ${path.join(root, 'data', 'logs', 'server.log')}` };
     }
     const secs = Math.round((Date.now() - started) / 1000);
@@ -111,6 +144,26 @@ async function startServer() {
     await new Promise(r => setTimeout(r, 600));
   }
   return { ok: false, message: `The server didn't answer within ${START_TIMEOUT_MS / 1000} s.\n\nDetails: ${path.join(root, 'data', 'logs', 'server.log')}` };
+}
+
+// The server stopped while the app runs (1.4.6): it is started again and the page reloads, instead of every
+// message saying "Couldn't reach the local server" until the app was restarted by hand. Only when its process is
+// really gone (or, for one this app didn't start, after ~15 s without an answer) - a busy server is never killed.
+let serverExited = false, watchFails = 0, restarting = false;
+const restarts = [];
+async function watchServer() {
+  if (quitting || restarting || !serverUp) return;
+  if (await ping()) { watchFails = 0; return; }
+  watchFails++;
+  if (!(serverExited || (!server && watchFails >= 5))) return;
+  const now = Date.now();
+  while (restarts.length && now - restarts[0] > 600000) restarts.shift();
+  if (restarts.length >= 3) return;                         // a crash loop: leave it; the page says it can't reach it
+  restarts.push(now); restarting = true; watchFails = 0;
+  try {
+    const r = await startServer();
+    if (r.ok && win && !win.isDestroyed()) win.loadURL(APP_URL);
+  } finally { restarting = false; }
 }
 
 function stopServer() {
@@ -410,6 +463,7 @@ if (!app.requestSingleInstanceLock()) {
     if (START_HIDDEN) postJSON('/api/shell/window', { visible: false });
     await pollShell();
     setInterval(pollShell, 1000);
+    setInterval(watchServer, 3000);
   });
   // The main window closing for good (close-to-tray off) quits from its 'closed' handler; the mini window alone
   // closing never quits the app.

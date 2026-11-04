@@ -133,6 +133,32 @@ def _append_observation(text: str):
         "[OBSERVATION from the host] " + untrusted.frame("machine state (window titles)", text, found))})
 
 
+# ---- a picture is the answer (1.4.6) -------------------------------------------------------------------------
+# "Make an image of a toaster": after generate_image the loop used to ask the text model for a reply. That meant
+# waiting for it to load back onto the GPU the image engine had just used (Ornith 9B timed out), and a small model
+# that couldn't see the picture went looking for it - eight file searches in a fresh chat, then "This chat is too
+# long for the model" (4 Nov 2026). The picture is already in the chat (the page shows it from the tool's event),
+# so a request that only asks for pictures ends right there, with the app's own line.
+_MORE_THAN_A_PICTURE = re.compile(
+    r"\?|\b(?:and|then|also|plus)\b[^.!\n]{0,60}\b(?:write|tell|explain|describe|give|list|save|send|post|email|search|"
+    r"find|look up|compare|summari[sz]e|translate|code|open|upload|copy|move|rename|print|read)\b", re.I)
+
+
+def _wants_more_than_pictures(request: str) -> bool:
+    return bool(_MORE_THAN_A_PICTURE.search(request or ""))
+
+
+def picture_reply(prose: str, made: list) -> str:
+    """The reply under pictures that are the whole answer: what the model wrote with the call (when it is short and
+    not a description of calling the tool), else a plain line from the app."""
+    text = model_output.split_reasoning(prose or "")[0].strip()
+    if text and len(text) <= 500 and not re.search(r"generate_image|tool|I(?:'ll| will) (?:now )?(?:make|create|generate)", text, re.I):
+        return text
+    n = len(made)
+    return ("Here's your picture." if n <= 1 else f"Here are your {n} pictures.") + \
+        " Tell me what to change and I'll make another."
+
+
 def _signature_set(parsed) -> frozenset:
     return frozenset(ctx.signature(name, args) for _tc, name, args in parsed)
 
@@ -718,9 +744,12 @@ def run_agent_loop():
                 continue
         repeat_rounds = 0
 
+        step_ran = []                    # (tool, ok) of this step's calls - a picture may end the turn (below)
+
         def run_and_record(tc, n, a):
             nonlocal mutation_epoch
             res = runtime.execute_tool_guarded(n, a, tool_call_id=tc.id, links=_step_links(thought_id, a))
+            step_ran.append((n, bool(res.get("ok"))))
             if res.get("ok") and n not in schemas.READ_ONLY_TOOLS and n not in _PLAN_TOOLS:
                 mutation_epoch += 1             # the machine changed: earlier reads may be stale now
             sig = ctx.signature(n, a)
@@ -806,6 +835,16 @@ def run_agent_loop():
                 return {"status": "success", "rejected": True,
                         "message": "I stopped because you rejected the proposed actions. Tell me how you'd like to proceed.",
                         "plan": shared.task_board.as_dict()}
+
+        # Pictures that are the whole answer: done now, without another model call (see _MORE_THAN_A_PICTURE).
+        made = shared.app_state.get("turn_images") or []
+        if (step_ran and made and all(n == "generate_image" and ok for n, ok in step_ran)
+                and not (shared.task_board.steps and not shared.task_board.is_complete())
+                and not _wants_more_than_pictures(shared.app_state.get("current_user_request") or "")):
+            message = picture_reply(prose, made)
+            shared.app_state["conversation"].append({"role": "assistant", "content": message})
+            event_log.log_action("The picture is the answer - finished without asking the model again.")
+            return {"status": "success", "message": message, "plan": shared.task_board.as_dict()}
 
     event_log.log_action("Step limit reached; asking for a closing summary.")
     summary = final_summary()

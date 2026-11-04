@@ -43,7 +43,8 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual(paths.llama_dirs()[0], paths.home("llama.cpp"))
         self.assertEqual(paths.prism_dirs()[0], paths.home("llama.cpp", "prism"))
         self.assertIn('env["AGENTIC_WINDOWLESS"] = "1"', self.src)    # a router the app restarts stays windowless
-        self.assertIn('host="127.0.0.1", port=8000', self.src)
+        self.assertIn('host="127.0.0.1", port=APP_PORT', self.src)       # 8000 unless taken (choose_ports, 1.4.6)
+        self.assertIn("APP_PORT = 8000", self.src)
         self.assertIn('env.setdefault("LLAMA_HOST", "127.0.0.1")', self.src)
         self.assertNotIn("0.0.0.0", self.src)
 

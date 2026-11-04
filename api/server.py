@@ -1455,7 +1455,9 @@ def force_load_model(body: ForceLoadRequest):
         return {"status": "success", "message": f"'{resolved}' is loaded and {'pinned' if body.pin else 'ready'} ({t_total:.1f}s).", "seconds": t_total,
                 "model": resolved, "pinned": bool(body.pin)}
     except Exception as e:
-        return {"status": "error", "message": f"Force-load failed: {str(e)[:600]}"}
+        import load_failure
+        why = load_failure.explain(body.model, e)          # the real cause, not a bare 500 (1.4.6)
+        return {"status": "error", "message": why or f"Force-load failed: {str(e)[:600]}"}
     finally:
         shared.app_state["model_loading"] = None
         _model_load_lock.release()
@@ -1509,7 +1511,9 @@ def warm_local_model(body: WarmRequest):
                 event_log.log_action(f"Loaded {model} while you typed ({seconds:.1f}s).")
         except Exception as e:
             model_monitor.record(model, label="Load the model", source="Loading ahead while you type", ok=False)
-            event_log.log_action(f"Couldn't load {model} ahead of the message: {str(e)[:160]}")
+            import load_failure
+            event_log.log_action(f"Couldn't load {model} ahead of the message: "
+                                 f"{(load_failure.explain(model, e) or str(e))[:240]}")
         finally:
             local_runtime.loading.update(model=None, since=0.0)
             _warming["model"] = None
@@ -1542,6 +1546,14 @@ def _start_background_services():
         netlayer.install()
     netlayer.apply_env()
     threading.Thread(target=netlayer.start_builtin_tor, daemon=True, name="tor-start").start()   # when a route uses it
+    # llama-server that stops or hangs is started again by itself (1.4.6) - it used to stay down until a restart.
+    llama_builds.start_watchdog()
+    try:
+        import ports
+        ports.note("app", APP_PORT)
+        ports.note("llama", llama_local.LLAMA_PORT)
+    except Exception:
+        pass
     # Phone access, when it's on (remote_access.py): its listener starts once this server is up.
     if (shared.app_state["settings"].get("remote_access") or "off") != "off":
         threading.Timer(3, lambda: remote_access.sync()).start()
@@ -3139,6 +3151,16 @@ def gpu_apps_view():
         return {"ok": False, "message": f"Couldn't read the GPU: {str(e)[:200]}"}
 
 
+@app.get("/api/whoami")
+def whoami():
+    """Which app answers on this port (1.4.6): the desktop app, launcher.pyw and run.bat ask before they reuse a
+    server - another program on 8000 answered /api/settings with 404 and the app then failed to bind the port."""
+    import app_version
+    return {"app": "fx-workspace", "root": os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "pid": os.getpid(), "port": APP_PORT, "llama_port": llama_local.LLAMA_PORT,
+            "version": app_version.current()}
+
+
 class RamSplitRequest(BaseModel):
     model: str | None = None
 
@@ -3157,15 +3179,39 @@ def ram_split(body: RamSplitRequest):
         return {"ok": False, "message": "Pick the model first - it isn't in models.ini."}
     if tasks.turns.running() or _model_loading():
         return {"ok": False, "message": "Busy - wait for the current task to finish."}
-    err = llama_local.set_model_options({model: {"ngl": "auto", "fit": None, "fit-target": diagnostics.MARGIN_MB}})
-    if err:
-        return {"ok": False, "message": err}
+    cfg = next((c for c in llama_local.list_model_configs() if c["name"] == model), {})
+    path = cfg.get("model_path") or ""
+    if not path or not os.path.exists(path):
+        # Not a memory problem at all (1.4.6: Gemma-4-E4B-Tools' file had been moved) - RAM can't help.
+        return {"ok": False, "message": f"{model}'s model file isn't there ({path or 'no path'}) - RAM won't help. "
+                                        "Pick another model, or Scan for models in Settings › Models."}
+    # Hybrid models (Qwen 3.5) crawl when their layers are split (diagnostics.keeps_whole): they stay whole on the GPU
+    # with a smaller window and a q8_0 cache instead, and the driver keeps any rest in shared memory.
+    whole = diagnostics.keeps_whole(diagnostics.meta_for(path))
+    if whole:
+        ctx = int(llama_local.model_options(model).get("ctx-size") or 65536)
+        change = {"ngl": 99, "fit": None, "fit-target": None, "ctx-size": min(ctx, diagnostics.MIN_CTX),
+                  "cache-type-k": "q8_0", "cache-type-v": "q8_0", "flash-attn": "on"}
+    else:
+        change = {"ngl": "auto", "fit": None, "fit-target": diagnostics.MARGIN_MB}
+    try:
+        # set_model_options returns its backup's path on success and raises on a problem. Its return value used to be
+        # read as an error, so every press said "That didn't work" with a backup file's name (fixed 4 Nov 2026).
+        llama_local.set_model_options({model: change})
+    except (KeyError, ValueError, OSError) as e:
+        return {"ok": False, "message": f"Couldn't change {model}'s settings: {e}"}
     try:
         llama_local.unload_all()              # the next message loads it with the new split
     except Exception:
         pass
+    if whole:
+        event_log.log_action(f"{model}: kept whole on the GPU at {change['ctx-size']:,} tokens with a q8_0 cache (it crawls when split).")
+        return {"ok": True, "model": model, "change": change,
+                "message": f"{model} now uses a {change['ctx-size']:,}-token window with a smaller cache, so it fits better - "
+                           "what still doesn't fit comes from shared memory."}
     event_log.log_action(f"{model}: set to run partly from RAM (GPU layers auto, {diagnostics.MARGIN_MB} MB left free).")
-    return {"ok": True, "model": model, "message": f"{model} now runs what fits on the GPU and the rest from RAM - slower, but it answers."}
+    return {"ok": True, "model": model, "change": change,
+            "message": f"{model} now runs what fits on the GPU and the rest from RAM - slower, but it answers."}
 
 
 @app.get("/api/storage/map")

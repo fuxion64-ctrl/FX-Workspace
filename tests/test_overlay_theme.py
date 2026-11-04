@@ -232,8 +232,8 @@ class AppWindowTests(unittest.TestCase):
             bat = f.read()
         self.assertIn("app_window.py --wait-and-open", bat)
         self.assertIn("app_window.py --open", bat)
-        self.assertIn("Start-Process 'http://127.0.0.1:8000'", bat)             # APP_WINDOW=0: a browser tab
-        self.assertIn('--host 127.0.0.1 --port 8000', bat)                       # the server is still local-only
+        self.assertIn("Start-Process 'http://127.0.0.1:%APP_PORT%'", bat)             # APP_WINDOW=0: a browser tab
+        self.assertIn('--host 127.0.0.1 --port %APP_PORT%', bat)                       # the server is still local-only
 
 
 if __name__ == "__main__":

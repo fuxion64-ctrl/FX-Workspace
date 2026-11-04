@@ -36,8 +36,16 @@ IS_WIN = os.name == "nt"
 VENV_PY = os.path.join(BASE, ".venv", "Scripts", "python.exe") if IS_WIN else os.path.join(BASE, ".venv", "bin", "python")
 LLAMA_EXE = "llama-server.exe" if IS_WIN else "llama-server"
 TITLE = "FX Workspace"
-APP_URL = "http://127.0.0.1:8000"
+APP_PORT = 8000                       # preferred; another program there moves the app up (choose_ports, 1.4.6)
+APP_URL = f"http://127.0.0.1:{APP_PORT}"
 CLOSE_GRACE = 4.0                     # seconds without the app window before the server stops (a reload is quicker)
+
+
+def _set_app_port(port: int) -> None:
+    global APP_PORT, APP_URL
+    APP_PORT, APP_URL = int(port), f"http://127.0.0.1:{int(port)}"
+    os.environ["AGENTIC_PORT"] = str(APP_PORT)
+    os.environ["AGENTIC_APP_URL"] = APP_URL
 
 
 def message(text: str, error: bool = True) -> None:
@@ -63,6 +71,56 @@ def answers(url: str, timeout: float = 2.0) -> bool:
             return r.status == 200
     except Exception:
         return False
+
+
+def is_this_app(port: int, timeout: float = 2.0) -> bool:
+    """This install's server answers on the port (its /api/whoami names this folder). An older copy without whoami
+    counts when /api/settings answers and its process runs from this folder."""
+    import json
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    try:
+        with opener.open(f"http://127.0.0.1:{int(port)}/api/whoami", timeout=timeout) as r:
+            data = json.loads(r.read().decode("utf-8", "replace"))
+        return data.get("app") == "fx-workspace" and \
+            os.path.normcase(os.path.abspath(data.get("root") or "")) == os.path.normcase(BASE)
+    except Exception:
+        pass
+    if answers(f"http://127.0.0.1:{int(port)}/api/settings", timeout):
+        import ports
+        return ports.is_ours(ports.holder(int(port)), BASE)
+    return False
+
+
+def find_running() -> int | None:
+    """The port this app already serves on (started earlier, or by run.bat console), or None."""
+    import ports
+    run = ports.read_run()
+    for port in dict.fromkeys(p for p in (run.get("app"), APP_PORT) if p):
+        if is_this_app(port):
+            return int(port)
+    return None
+
+
+def choose_ports() -> None:
+    """The app's port and llama-server's (1.4.6). The preferred one when it's free; a crashed run's leftover of this
+    app is stopped and its port taken back; another program keeps its port and ours moves to a free one - the desktop
+    app, a second start and the page follow it through data/run/ports.json. In 1.4.5 another program on 8000 meant
+    "FX Workspace could not start (is port 8000 taken?)"."""
+    import ports
+    app = ports.claim(int(os.environ.get("AGENTIC_PORT") or APP_PORT))
+    _set_app_port(app["port"])
+    if app["how"] != "free":
+        print(f"Port: the app uses {app['port']} ({app['how']}{' - ' + app['held_by'] if app.get('held_by') else ''}).", flush=True)
+
+    def router_alive(port: int) -> bool:
+        return answers(f"http://127.0.0.1:{port}/v1/models", 3)
+    llama = ports.claim(int(os.environ.get("LLAMA_PORT") or 8090), alive=router_alive, avoid=(app["port"],))
+    os.environ["LLAMA_PORT"] = str(llama["port"])
+    if llama["how"] != "free":
+        print(f"Port: llama-server uses {llama['port']} ({llama['how']}"
+              f"{' - ' + llama['held_by'] if llama.get('held_by') else ''}).", flush=True)
+    ports.write_run({"app": app["port"], "llama": llama["port"], "pid": os.getpid(), "root": BASE,
+                     "app_note": app.get("held_by") or "", "llama_note": llama.get("held_by") or ""})
 
 
 def sync_dependencies(log) -> bool:
@@ -320,7 +378,7 @@ def wait_for_previous(limit: float = 30.0) -> bool:
     for real (it answers) or doesn't finish in time."""
     end = time.time() + limit
     while time.time() < end:
-        if answers(f"{APP_URL}/api/settings", 1.0):
+        if find_running():
             return False
         time.sleep(0.5)
         if single_instance():
@@ -334,8 +392,10 @@ def main() -> int:
         # Already starting or running: show its window (when it's still starting, its own window is coming).
         # No logging here - the running launcher has the log open. Under the desktop app, Electron shows it.
         sys.stdout = sys.stderr = open(os.devnull, "w")
-        if not shell_mode() and answers(f"{APP_URL}/api/settings"):
+        running = find_running()
+        if not shell_mode() and running:
             import app_window
+            _set_app_port(running)
             app_window.open_app(APP_URL)
         return 0
     out = log_file("server")
@@ -350,7 +410,11 @@ def main() -> int:
         threading.Thread(target=tray_sweep.sweep, daemon=True, name="tray-sweep").start()
     except Exception:
         pass
-    if answers(f"{APP_URL}/api/settings"):              # a server started some other way (run.bat console)
+    running = find_running()
+    if running:                                        # a server started some other way (run.bat console)
+        _set_app_port(running)
+        import ports
+        ports.write_run({"app": running})
         if not shell_mode():
             import app_window
             app_window.open_app(APP_URL)
@@ -359,6 +423,7 @@ def main() -> int:
         message("Installing the Python dependencies failed.\n\nDetails: data\\logs\\server.log\n"
                 "Run run.bat console to see it happen.")
         return 1
+    choose_ports()
     environment()
     load_keys()
     import shutil
@@ -366,9 +431,14 @@ def main() -> int:
     shutil.copyfile(os.path.join(BASE, "index.html"), os.path.join(BASE, "static", "index.html"))
     llama = start_llama()
     try:
+        import llama_builds
+        llama_builds.adopt(llama)          # watched and restarted if it stops (1.4.6), stopped with the app
+    except Exception:
+        pass
+    try:
         import uvicorn
         # A stream still open (the Studio overlay's, say) must not hold the shutdown up.
-        server = uvicorn.Server(uvicorn.Config("main:app", host="127.0.0.1", port=8000, timeout_graceful_shutdown=5))
+        server = uvicorn.Server(uvicorn.Config("main:app", host="127.0.0.1", port=APP_PORT, timeout_graceful_shutdown=5))
         threading.Thread(target=watch, args=(server,), daemon=True, name="app-window-watch").start()
         print(f"Starting the API at {APP_URL} ...", flush=True)
         try:
@@ -376,7 +446,10 @@ def main() -> int:
         except SystemExit:
             pass
         if not server.started:
-            message("FX Workspace could not start (is port 8000 taken?).\n\nDetails: data\\logs\\server.log")
+            import ports
+            held = ports.describe(ports.holder(APP_PORT)) if not ports.is_free(APP_PORT) else ""
+            message(f"FX Workspace could not listen on port {APP_PORT}{f' - {held} holds it' if held else ''}.\n\n"
+                    "Start it again: it picks a free port by itself. Details: data\\logs\\server.log")
             return 1
         print("FX Workspace stopped.", flush=True)
         return 0

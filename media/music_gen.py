@@ -118,6 +118,12 @@ def _start(progress) -> None:
     if _alive() and _healthy():
         return
     stop()
+    global PORT, BASE
+    import ports
+    if not ports.is_free(PORT):           # another program there would be asked for our songs (1.4.6)
+        PORT = ports.pick(PORT + 1, avoid=(int(os.environ.get("AGENTIC_PORT") or 8000),))
+        BASE = f"http://127.0.0.1:{PORT}"
+        ports.note("music", PORT, "moved")
     root = _cfg()["music_root"]
     env = {**os.environ, "ACESTEP_API_HOST": "127.0.0.1", "ACESTEP_API_PORT": str(PORT),
            "ACESTEP_INIT_LLM": "true", "ACESTEP_LM_MODEL_PATH": LM_MODEL, "ACESTEP_LM_BACKEND": "pt",

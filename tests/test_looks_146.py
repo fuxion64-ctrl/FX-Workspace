@@ -121,8 +121,11 @@ class GpuMemoryOptionsTests(unittest.TestCase):
         from api import server
         from connect import remote_access
         self.assertIn(("POST", "/api/local-models/ram-split"), remote_access.PHONE_BLOCKED)
-        with patch("llama_local.list_model_configs", return_value=[{"name": "M"}]), \
-                patch("llama_local.set_model_options", return_value=None) as setopts, patch("llama_local.unload_all"), \
+        # set_model_options returns its backup's path on success - the mock used to return None, which hid that the
+        # endpoint read the path as an error (1.4.6 reliability; tests/test_reliability_146.py runs it for real).
+        with patch("llama_local.list_model_configs", return_value=[{"name": "M", "model_path": __file__}]), \
+                patch("llama_local.set_model_options", return_value="models.ini.bak-1") as setopts, \
+                patch("llama_local.unload_all"), patch("diagnostics.meta_for", return_value={"arch": "llama"}), \
                 patch.object(server.tasks.turns, "running", return_value=False):
             r = server.ram_split(server.RamSplitRequest(model="M"))
         self.assertTrue(r["ok"], r)

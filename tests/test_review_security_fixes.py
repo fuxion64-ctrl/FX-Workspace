@@ -194,17 +194,25 @@ class BrowserPolicyTests(unittest.TestCase):
         self.assertIsNone(self.b._watch_stop)
 
     def test_unknown_browser_is_neither_reused_nor_closed(self):
+        # 1.4.6: an unknown browser on the control port is still never reused or closed - ours now starts on a free
+        # port instead of refusing to start at all.
         self.vpn["active"] = True
-        with patch.object(self.b, "_alive", return_value=True), \
+        taken = self.b.port
+        with patch.object(self.b, "_alive", side_effect=lambda: self.b.port == taken), \
+                patch.object(self.b, "close_leftover", return_value=False) as leftover, \
+                patch("ports.pick", return_value=taken + 5), patch("ports.note"), \
                 patch.object(browser, "CDP") as connect:
-            with self.assertRaisesRegex(browser.BrowserError, "control port"):
+            with self.assertRaisesRegex(AssertionError, "must not launch a real browser"):   # the launch, faked
                 self.b.ensure()
             connect.assert_not_called()
+            leftover.assert_called_once()                    # only a browser of our own profile may be closed
             # The patch is process-wide, so a GPU poll from another test's background thread can land here too;
             # only a browser launch (it always carries the debugging port) counts.
             launches = [c for c in self.spawn.call_args_list
                         if any(str(a).startswith("--remote-debugging-port") for a in c.args[0])]
-            self.assertEqual(launches, [])
+            self.assertEqual(len(launches), 1)
+            self.assertIn(f"--remote-debugging-port={taken + 5}", launches[0].args[0])
+        self.b.port = taken
 
 
 if __name__ == "__main__":

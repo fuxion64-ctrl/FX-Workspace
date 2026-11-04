@@ -118,6 +118,23 @@ if not exist "keys.local.bat" (
 )
 call "keys.local.bat"
 
+REM ---- Ports (1.4.6) -------------------------------------------------------
+REM 8000 for the app and 8090 for llama-server, unless another program holds them: then the
+REM next free port (base\ports.py). A llama-server of this app that already answers is kept.
+set "APP_PORT=8000"
+curl -s -o nul -m 2 -f "http://127.0.0.1:8000/api/whoami"
+if errorlevel 1 (
+    for /f "delims=" %%p in ('"%VENV_PY%" -c "import core.modpath, ports; print(ports.pick(8000))"') do set "APP_PORT=%%p"
+)
+curl -s -o nul -m 3 "http://%LLAMA_HOST%:%LLAMA_PORT%/v1/models"
+if errorlevel 1 (
+    for /f "delims=" %%p in ('"%VENV_PY%" -c "import core.modpath, ports; print(ports.pick(8090))"') do set "LLAMA_PORT=%%p"
+)
+set "AGENTIC_PORT=%APP_PORT%"
+set "AGENTIC_APP_URL=http://127.0.0.1:%APP_PORT%"
+if not "%APP_PORT%"=="8000" echo [NOTICE] Port 8000 is taken - FX Workspace uses %APP_PORT%.
+if not "%LLAMA_PORT%"=="8090" echo [NOTICE] Port 8090 is taken - llama-server uses %LLAMA_PORT%.
+
 REM ---- Start llama-server when needed -------------------------------------
 curl -s -o nul -m 3 "http://%LLAMA_HOST%:%LLAMA_PORT%/v1/models"
 if errorlevel 1 if "%AUTOSTART_LLAMA%"=="1" (
@@ -145,33 +162,34 @@ copy /y "index.html" "static\index.html" >nul
 REM ---- How the workspace opens -------------------------------------------
 REM APP_WINDOW=1: a window of its own (Edge or Chrome in app mode - no tabs,
 REM its own taskbar button; app_window.py). 0: a tab in your default browser.
-REM Either way http://127.0.0.1:8000 still opens in any browser on this PC.
+REM Either way http://127.0.0.1:%APP_PORT% still opens in any browser on this PC.
 if not defined APP_WINDOW set "APP_WINDOW=1"
 set "VENV_PYW=%~dp0.venv\Scripts\pythonw.exe"
 if not exist "%VENV_PYW%" set "VENV_PYW=%VENV_PY%"
 
 REM Already running (e.g. run.bat started twice)? Just open it - a second
 REM server would fail on the busy port and leave a confusing "stopped" window.
-curl -s -o nul -m 2 "http://127.0.0.1:8000/api/settings"
+REM /api/whoami: only FX Workspace answers it (another program on 8000 doesn't count).
+curl -s -o nul -m 2 -f "http://127.0.0.1:%APP_PORT%/api/whoami"
 if not errorlevel 1 (
     echo FX Workspace is already running - opening it.
     if "%APP_WINDOW%"=="1" (
         start "" "%VENV_PYW%" app_window.py --open
     ) else (
-        start "" "http://127.0.0.1:8000"
+        start "" "http://127.0.0.1:%APP_PORT%"
     )
     exit /b 0
 )
 
-echo Starting the API at http://127.0.0.1:8000 ...
+echo Starting the API at http://127.0.0.1:%APP_PORT% ...
 REM Open the window only once the server answers, instead of racing it to a
 REM "can't connect" page.
 if "%APP_WINDOW%"=="1" (
     start "" "%VENV_PYW%" app_window.py --wait-and-open
 ) else (
-    start "" /min powershell -NoProfile -WindowStyle Hidden -Command "for($i=0;$i -lt 60;$i++){try{Invoke-WebRequest 'http://127.0.0.1:8000/api/settings' -UseBasicParsing -TimeoutSec 1 | Out-Null; Start-Process 'http://127.0.0.1:8000'; break}catch{Start-Sleep -Milliseconds 500}}"
+    start "" /min powershell -NoProfile -WindowStyle Hidden -Command "for($i=0;$i -lt 60;$i++){try{Invoke-WebRequest 'http://127.0.0.1:%APP_PORT%/api/settings' -UseBasicParsing -TimeoutSec 1 | Out-Null; Start-Process 'http://127.0.0.1:%APP_PORT%'; break}catch{Start-Sleep -Milliseconds 500}}"
 )
-"%VENV_PY%" -m uvicorn main:app --host 127.0.0.1 --port 8000
+"%VENV_PY%" -m uvicorn main:app --host 127.0.0.1 --port %APP_PORT%
 
 echo.
 echo FX Workspace stopped.

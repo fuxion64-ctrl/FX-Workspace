@@ -677,7 +677,13 @@ def execute_tool(tool_name: str, args: dict) -> dict:
             res = image_gen.generate_image_tool(args, ref_image=ref, should_cancel=run_control.is_stopped,
                                                 progress=lambda msg: event_log.progress(label=f"Making an image - {msg}"))
             if res.get("ok"):                          # shown under the reply (agent/tasks._with_images)
-                shared.app_state.setdefault("turn_images", []).extend(res.get("images") or [res["image"]])
+                made = res.get("images") or [res["image"]]
+                shared.app_state.setdefault("turn_images", []).extend(made)
+                # ...and in the chat at once (1.4.6): the page draws them from this event, without waiting for the
+                # chat model to load back onto the GPU and reply.
+                event_log.emit_event("image", "Picture ready" if len(made) == 1 else f"{len(made)} pictures ready",
+                                     status="done", images=[{k: m.get(k) for k in ("url", "model", "seed", "width", "height")}
+                                                            for m in made])
             return res
 
         elif tool_name in ("compute_stats", "make_chart"):      # exact statistics and checked charts (stats_tools.py)

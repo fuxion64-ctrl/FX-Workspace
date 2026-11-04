@@ -422,6 +422,12 @@ class _Whisper:
             if not exe or not path:
                 raise RuntimeError("Voice isn't set up yet - Settings > Voice > Set up voice.")
             self.gpu = gpu
+            # Another program (or a second copy of the app) on the port answered "/" as if it were ours (1.4.6).
+            global WHISPER_PORT
+            import ports
+            if not ports.is_free(WHISPER_PORT):
+                WHISPER_PORT = ports.pick(WHISPER_PORT + 1)
+                ports.note("whisper", WHISPER_PORT, "moved")
             threads = "4" if gpu else str(max(2, min(8, (os.cpu_count() or 4) - 2)))
             self.proc = subprocess.Popen([exe, "-m", path, "--host", "127.0.0.1", "--port", str(WHISPER_PORT), "-t", threads],
                                          cwd=os.path.dirname(exe), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,

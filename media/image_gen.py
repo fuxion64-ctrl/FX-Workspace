@@ -532,6 +532,25 @@ def stop() -> None:
         _stop()
 
 
+def _claim_port() -> None:
+    """A free port for the next sd-server (1.4.6). Another program on 8095 - or a second copy of this app - made the
+    new engine fail to listen, or worse, answered the readiness check as if it were ours and drew with ITS model.
+    A leftover sd-server of this app (a crash) is stopped; anything else keeps its port and ours moves up."""
+    global PORT, BASE
+    import ports
+    if ports.is_free(PORT):
+        return
+    info = ports.holder(PORT)
+    if info and "sd-server" in (info.get("name") or "").lower() and ports.is_ours(info, _cfg()["image_root"]):
+        if ports.stop_tree(info["pid"], wait_port=PORT, timeout=10):
+            return
+    old = PORT
+    PORT = ports.pick(PORT + 1)
+    BASE = f"http://127.0.0.1:{PORT}"
+    ports.note("sd_server", PORT, "moved", ports.describe(info))
+    print(f"[image] port {old} is used by {ports.describe(info)} - the image engine uses {PORT}.", flush=True)
+
+
 def _start(key: str, progress=None, reserve: float | None = None) -> None:
     """Start sd-server for this model (stopping another one first) and wait until it answers."""
     global _proc, _proc_key, _last_error, _start_free, _log_path, _proc_reserve
@@ -543,6 +562,7 @@ def _start(key: str, progress=None, reserve: float | None = None) -> None:
     if not installed(key):
         raise ImageError(f"{MODELS[key]['name']} isn't downloaded yet (Settings > Images).", "not_installed")
     _stop()
+    _claim_port()
     _start_free = free_vram_mb() or 0
     reserve = cfg["image_vram_reserve"] if reserve is None else reserve
     f = model_files(key)
@@ -1676,7 +1696,9 @@ def generate_image_tool(args: dict, ref_image: bytes | None = None, should_cance
     keep = ("id", "url", "model", "seed", "width", "height", "seconds")
     n = len(made)
     return {"ok": True, "image": {k: img[k] for k in keep}, "images": [{k: x[k] for k in keep} for x in made],
-            "message": (f"Done - {'your image' if n == 1 else f'{n} images'} for this request "
-                        f"{'is' if n == 1 else 'are'} ready ({img['model']}, {img['width']}x{img['height']}, "
-                        f"{img['seconds']} s, seed {img['seed']}); the app puts {'it' if n == 1 else 'them'} under your "
-                        "reply. Reply in one or two sentences: what the picture shows, and one variation you could make.")}
+            # Plainly, 1.4.6: a small model that read "the app puts it under your reply" still went looking for the
+            # file on disk (8 searches, then the chat overflowed). It is shown; there is nothing to find or open.
+            "message": (f"Done - {'the picture is' if n == 1 else f'the {n} pictures are'} ALREADY SHOWN to the user in "
+                        f"the chat ({img['model']}, {img['width']}x{img['height']}, {img['seconds']} s, seed {img['seed']}). "
+                        "Do NOT search for, open, read or save the file - there is nothing to find and you can't see it. "
+                        "If you reply at all, one short sentence; or carry on with the rest of the request.")}

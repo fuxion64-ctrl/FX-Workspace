@@ -172,7 +172,7 @@ class EveryClientGoesThroughTheLayerTests(unittest.TestCase):
         from urllib.parse import urlparse
         self.assertTrue(netlayer.is_local(urlparse(llama_local.LLAMA_SERVER_BASE).hostname))
         bat = (HERE / "run.bat").read_text(encoding="utf-8", errors="replace")
-        self.assertIn("--host 127.0.0.1 --port 8000", bat)                   # the app
+        self.assertIn("--host 127.0.0.1 --port %APP_PORT%", bat)                   # the app
         self.assertIn('set "LLAMA_HOST=127.0.0.1"', bat)                    # llama-server
         self.assertNotIn("0.0.0.0", bat)
 

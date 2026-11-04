@@ -607,7 +607,11 @@ class AgentOrchestrator:
             # deterministic desktop route ran was checked by the route itself: a model review of it only repeated the
             # route's own result as "issues to fix" (D48).
             routed_only = bool(state.tool_results) and all(r.get("internal") for r in state.tool_results)
-            rmode = "off" if bare or routed_only else reviewer_mode(profile, analysis, mutations)
+            # Pictures that are the answer are judged by looking at them too: a text review only reloaded the chat
+            # model after the image engine and kept the user waiting for nothing (1.4.6).
+            pictured = bool(state.tool_results) and all(r.get("tool") == "generate_image" and r.get("ok")
+                                                        for r in state.tool_results)
+            rmode = "off" if bare or routed_only or pictured else reviewer_mode(profile, analysis, mutations)
             if cross_requested and rmode != "off" and result.get("status") == "success" and not result.get("rejected"):
                 status = self.cross_check_status()
                 if status.get("available"):

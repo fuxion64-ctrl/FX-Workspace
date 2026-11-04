@@ -43,7 +43,8 @@ PHONE_BLOCKED = (("POST", "/api/settings"), ("POST", "/api/keys"), ("*", "/api/r
                  ("POST", "/api/network"), ("POST", "/api/channels"), ("POST", "/api/mcp"), ("POST", "/api/connectors"),
                  ("POST", "/api/version/install"), ("POST", "/api/shell"), ("POST", "/api/notify/quiet/open"),
                  ("*", "/api/data-files"), ("POST", "/api/images/models"),
-                 ("POST", "/api/local-models/ram-split"))   # 1.4.6: it rewrites models.ini
+                 ("POST", "/api/local-models/ram-split"),   # 1.4.6: it rewrites models.ini
+                 ("GET", "/api/whoami"))                    # 1.4.6: the install folder and process - for this PC only
 
 _lock = threading.RLock()
 _fails: dict = {}                     # ip -> [failure times]
@@ -255,12 +256,24 @@ def sync(settings: dict | None = None) -> dict:
     if s["remote_access"] != "off" and has_password():
         ip = bind_address(s["remote_access"])
         want = (ip, s["remote_port"]) if ip and allowed_address(ip) else None
+    if want and _server.get("asked") == want and running():
+        return status()                  # already up on the port it moved to
     if want == _server["bind"] and (want is None or running()):
         return status()
     stop()
+    _server["moved"] = ""
     if want:
+        import ports
         import uvicorn
         from api.server import app
+        asked = want
+        # Another program on the phone port (1.4.6): the listener died silently and the page still showed its
+        # address. Now it takes the next free port and says so; the address shown is the one it really listens on.
+        if not ports.is_free(want[1], want[0]):
+            held = ports.describe(ports.holder(want[1]))
+            want = (want[0], ports.pick(want[1] + 1, want[0]))
+            _server["moved"] = f"Port {asked[1]} is used by {held}, so phone access uses {want[1]}."
+        _server["asked"] = asked
         # lifespan off: the app's startup (background services) already ran on 127.0.0.1:8000.
         srv = uvicorn.Server(uvicorn.Config(app, host=want[0], port=want[1], log_level="warning", lifespan="off",
                                             timeout_graceful_shutdown=3))
@@ -284,8 +297,11 @@ def status() -> dict:
             why = ("Tailscale isn't running on this PC (no 100.x address). Install it from tailscale.com, sign in on "
                    "the PC and the phone, then come back." if s["remote_access"] == "tailscale"
                    else "No home-network address found - is the PC connected to your router?")
-    return {**s, "running": running(), "url": f"http://{bind[0]}:{bind[1]}/" if bind else None,
-            "addresses": found, "has_password": has_password(), "devices": devices(), "problem": why}
+        elif bind and not running():
+            why = f"Phone access couldn't listen on port {bind[1]} - another program may hold it. Turn it off and on again."
+    return {**s, "running": running(), "url": f"http://{bind[0]}:{bind[1]}/" if bind and running() else None,
+            "addresses": found, "has_password": has_password(), "devices": devices(), "problem": why,
+            **({"note": _server["moved"]} if _server.get("moved") else {})}
 
 
 def qr_svg(text: str) -> str:

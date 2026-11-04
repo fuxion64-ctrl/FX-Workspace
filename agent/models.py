@@ -20,6 +20,7 @@ import context as ctx
 import elements
 import llama_builds
 import llama_local
+import load_failure
 import history
 import llm_compat
 import llm_stream
@@ -556,7 +557,14 @@ def _queued_wait():
 def call_local(messages, requires_vision: bool, model_name: str = None):
     reported = llama_local.server_models(force=True)
     if reported is None:
-        raise RuntimeError(llama_local.unreachable_message())
+        # Down (crashed, closed, hung): start it again and carry on, instead of a dead end (1.4.6).
+        ev = shared.app_state.get("running_model_event")
+        if isinstance(ev, dict) and ev.get("status") == "running":
+            event_log.update_event(ev, phase="loading", loading="llama-server", loading_since=time.time())
+        back = llama_builds.ensure_running("a reply needs it")
+        reported = llama_local.server_models(force=True) if back["ok"] else None
+        if reported is None:
+            raise RuntimeError(llama_local.unreachable_message(back.get("message") or ""))
     if not reported:
         raise RuntimeError(llama_local.empty_registry_message())
 
@@ -619,20 +627,70 @@ def call_local(messages, requires_vision: bool, model_name: str = None):
     except llm_stream.StreamCancelled:
         raise RunStopped("user")          # Stop while the model was writing: nothing it wrote is used
     except Exception as e:
-        if ("Connection error" in str(e) or "ConnectError" in type(e).__name__) and not llama_local.server_is_up():
-            raise RuntimeError(llama_local.unreachable_message())
+        if _connection_lost(e) and llama_local.server_models(force=True) is None:
+            # It died under the reply (1.4.6): start it again now, so Try again works straight away.
+            back = llama_builds.ensure_running("it stopped during a reply")
+            if back["ok"]:
+                raise RuntimeError("llama-server stopped in the middle of the reply and was started again - "
+                                   "Try again to get the answer.")
+            raise RuntimeError(llama_local.unreachable_message(back.get("message") or ""))
         over = context_overflow(e)
         if over is not None:
             # Kept parseable ("... exceeds the available context size ...") so call_model can trim and retry once.
             sent, window = over
+            alone = _drop_oversized_request(window or llama_local.model_context_limit(model_name))
+            if alone:
+                raise RuntimeError(f"Your message is too long for {model_name}: about {alone:,} tokens, and it reads "
+                                   f"{window or llama_local.model_context_limit(model_name):,} at once. Attach it as a file "
+                                   "instead (the app reads files in parts), or pick a model with a bigger window. It was "
+                                   "left out of the chat, so the chat goes on as before.")
             raise RuntimeError(f"This chat is too long for {model_name}: the request{f' ({sent} tokens)' if sent else ''} "
                                f"exceeds the available context size{f' ({window} tokens)' if window else ''} even after "
                                "older messages were dropped. Compress the chat "
                                "(the ring beside the message box), start a new one, or pick a model with a bigger window.")
+        why = load_failure.explain(model_name, e)          # the real cause, from the router's log (1.4.6)
+        if why:
+            raise RuntimeError(why)
         raise RuntimeError(f"Local model '{model_name}' failed: {str(e)[:250]}" + llama_local.load_hint(model_name))
     finally:
         if load_watch:
             load_watch.set()
+
+
+def _drop_oversized_request(window: int) -> int:
+    """The latest user message alone is bigger than the model's window: put a note in its place and return its
+    estimated size (0 when it isn't). Kept, it failed every later message too - "Say hi" after a 166,000-character
+    paste was still "too long" (live test, 4 Nov 2026), until the chat was compressed by hand."""
+    conv = shared.app_state.get("conversation") or []
+    for i in range(len(conv) - 1, -1, -1):
+        m = conv[i]
+        if m.get("role") != "user":
+            continue
+        text = m.get("content") if isinstance(m.get("content"), str) else ""
+        size = _approx_tokens({"c": text})
+        if not text or size < max(1000, int(window * 0.8)):
+            return 0
+        conv[i] = {**m, "content": f"[A message of {len(text):,} characters was here - too long for this model to read "
+                                   "at once, so it was left out. Ask the user to attach it as a file or send a shorter part.]"}
+        return size
+    return 0
+
+
+def _router_ready() -> bool:
+    """A fresh look (never the 20 s cache) before a helper call, and a restart when it's down or hung (1.4.6).
+    On the cached answer, a router that had stopped answering made the prompt-prep and planner calls each wait their
+    full 120 s timeout before the reply itself began - 329 s for "hi" in the live test (4 Nov 2026)."""
+    if llama_local.server_models(force=True) is not None:
+        return True
+    return bool(llama_builds.ensure_running("a helper call needs it")["ok"]) and \
+        llama_local.server_models(force=True) is not None
+
+
+def _connection_lost(e) -> bool:
+    """The connection to llama-server broke or never opened (not an HTTP error it answered with)."""
+    text = f"{type(e).__name__} {e}"
+    return bool(re.search(r"Connection ?(?:error|refused|reset|aborted)|ConnectError|RemoteProtocolError|"
+                          r"ReadError|Server disconnected|RemoteDisconnected|peer closed|incomplete chunked", text, re.I))
 
 
 # ---- streaming (llm_stream.py -> stream_hub.py -> GET /api/stream) -----------------
@@ -1076,7 +1134,7 @@ def model_json(system: str, user: str, max_tokens: int = 600, secondary: bool = 
         if mode == config.MODE_LOCAL or (mode == config.MODE_AUTO and not candidate_pairs(False)):
             if secondary:
                 return None          # one local model at a time - no free second opinion
-            if llama_local.server_models() is None:
+            if not _router_ready():
                 return None
             model = shared.app_state.get("local_engaged") or resolve_local_model(False)
             if not model:
@@ -1133,8 +1191,8 @@ def model_text(system: str, user: str, max_tokens: int = 1500, model: str | None
     if model and model.startswith("local:"):
         local = model[6:]
     elif not model and (mode == config.MODE_LOCAL or (mode == config.MODE_AUTO and not candidate_pairs(False))):
-        if llama_local.server_models() is None:
-            raise RuntimeError(llama_local.unreachable_message())
+        if not _router_ready():
+            raise RuntimeError(llama_local.unreachable_message(llama_builds.status_line()))
         local = shared.app_state.get("local_engaged") or resolve_local_model(False)
         if not local:
             raise RuntimeError(llama_local.empty_registry_message())

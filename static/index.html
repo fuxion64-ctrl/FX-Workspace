@@ -6313,7 +6313,7 @@ async function api(path, body, method) {
   const opts = body === undefined ? { method: method || 'GET' } : { method: method || 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
   let res;
   try { res = await fetch(path, opts); }
-  catch (_) { throw Object.assign(new Error("Couldn't reach the local server. Is run.bat still running?"), { network: true }); }
+  catch (_) { throw Object.assign(new Error("Couldn't reach FX Workspace’s server - it may be restarting."), { network: true }); }
   let data = null;
   try { data = await res.json(); } catch (_) { /* non-JSON body, e.g. a plain 500 page */ }
   if (!res.ok) {
@@ -11017,7 +11017,7 @@ async function openEngineMenu(anchor) {
   if (S.mode === 'cloud') html += `<div class="pop-desc">Cloud mode uses ${esc(shortModel(S.cloudModel) || 'your cloud models')}, falling back through your cloud favorites. Local models below apply when you switch back.</div>`;
   html += `<div class="pop-head">Local model</div>`;
   html += row('', 'Auto', 'Picks from your favorites; switches to vision only when a screenshot needs it', '');
-  if (!S.localModels.length) html += `<div class="pop-desc">llama-server reported no models. Check that run.bat started it.</div>`;
+  if (!S.localModels.length) html += `<div class="pop-desc">llama-server reported no models. Settings › Models scans for them; Diagnostics shows whether llama-server runs.</div>`;
   S.localModels.forEach(m => {
     const badges = (m.vision ? '<span class="pill vision">vision</span>' : '') + (S.engaged === m.id ? '<span class="pill loaded">loaded</span>' + placementPill(m.id, true) : '') + (m.favorite ? '<span class="pill">favorite</span>' : '');
     html += row(m.id, m.id, m.vision ? 'Reads screenshots' : 'Text', badges, m);
@@ -13688,19 +13688,32 @@ const BrowserPanel = (() => {
 const ERROR_KINDS = [
   [/too long for|exceeds the available context size|exceed_context_size/i, 'This chat is too long for the model',
    'The model can only read so much at once. Compress the chat to keep going here, or start a new chat.', ['compress', 'new', 'retry']],
+  // The causes llm/load_failure.py reads from llama-server's log (1.4.6) - each says what it is, with the action
+  // that helps. A failed load used to be "most often it doesn't fit in the GPU" whatever it was (a moved file, RAM).
+  [/model file isn.t there|image projector \(mmproj\) file isn.t there/i, 'The model’s file is missing',
+   'It was moved, renamed or deleted. Pick another model, or scan for models in Settings › Models.', ['models']],
+  [/not enough free system memory/i, 'Not enough free RAM for this model',
+   'The PC’s memory is too full to load it. Close big programs and try again, or pick a smaller model.', ['retry', 'models']],
+  [/doesn.t support its format|looks damaged or incomplete|refused an option|projector \(mmproj\) was refused|can.t load on this llama\.cpp build/i, 'The model couldn’t load',
+   'llama-server refused it - Details says why. Pick another model, or check it in Settings › Diagnostics.', ['models', 'diag']],
+  [/stopped in the middle of the reply and was started again/i, 'The local model server restarted',
+   'It stopped while answering. The app started it again - try again for the answer.', ['retry']],
   [/llama-server is not answering|Connection error|ConnectError|ECONNREFUSED/i, 'The local model server isn’t answering',
-   'llama-server isn’t running or is still starting. run.bat starts it; then try again.', ['retry', 'models']],
+   'llama-server stopped and couldn’t be started again. Try again, or see Settings › Diagnostics.', ['retry', 'diag', 'models']],
   [/reports no usable model|no local model|empty registry/i, 'No model can answer this',
    'None of the installed models fits this request. Pick one in Settings › Models.', ['models', 'retry']],
   // Out of GPU memory (1.4.6): not a dead end - run part of it from RAM, or see what is holding the GPU.
   [/out of memory|cudaMalloc|failed to allocate|insufficient memory|CUDA error|not enough (?:free )?(?:gpu |video )?memory|VRAM/i, 'Not enough GPU memory for this model',
    'It needs more video memory than is free right now. Run what doesn’t fit from RAM - slower, but it answers - or see what is using the GPU.', ['ramsplit', 'vram', 'models']],
-  [/failed to load|unable to load/i, 'The model couldn’t load',
-   'Most often it doesn’t fit in the GPU’s free memory. Run what doesn’t fit from RAM, see what is using the GPU, or pick a smaller model.', ['ramsplit', 'vram', 'models', 'retry']],
+  // A load that failed for a reason nobody could read: no guess at memory - its log line is under Details.
+  [/failed to load|unable to load|couldn.t load \(llama-server/i, 'The model couldn’t load',
+   'llama-server couldn’t start it - Details shows its last words. Try again, or pick another model.', ['retry', 'models', 'diag']],
   [/rate.?limit|\b429\b|quota|too many requests/i, 'The cloud model is busy',
    'It’s limiting how often it answers. Wait a moment and try again.', ['retry']],
   [/timed? ?out|timeout/i, 'The model took too long',
    'It stopped answering partway. Try again - a lower effort level answers sooner.', ['retry', 'models']],
+  [/Couldn.t reach FX Workspace|Lost contact with FX Workspace/i, 'FX Workspace’s server isn’t answering',
+   'It may be restarting - the desktop app starts it again by itself. Try again in a moment.', ['retry']],
 ];
 function errorInfo(text) {
   const raw = String(text || '');
@@ -14268,6 +14281,15 @@ function updateTurn(events) {
     if (!turn.researchEl) { turn.researchEl = document.createElement('div'); turn.researchEl.className = 'research-progress'; turn.modelEl.after(turn.researchEl); }
     paintResearch(turn.researchEl, rp.research || {});
   }
+  // A picture shows the moment it's made (1.4.6), from generate_image's event - not after the chat model has loaded
+  // back onto the GPU and replied. The finished reply carries the same pictures, and replaces this with the turn.
+  const pics = sortedEvents(turn.events).filter(e => e.kind === 'image' && Array.isArray(e.images)).flatMap(e => e.images).filter(p => p && p.url);
+  if (pics.length && (!turn.picsEl || turn.picsEl.dataset.n !== String(pics.length))) {
+    if (!turn.picsEl) { turn.picsEl = document.createElement('div'); turn.picsEl.className = 'assistant-body live-pictures'; turn.wrap.appendChild(turn.picsEl); }
+    turn.picsEl.dataset.n = String(pics.length);
+    turn.picsEl.innerHTML = renderMarkdown(pics.map(p => `![${p.model || 'Picture'} - seed ${p.seed ?? ''}](${p.url})`).join('\n'));
+    scrollToBottom();
+  }
   const web = sortedEvents(turn.events).filter(isWebEvent);
   if (web.length) {                          // searches and page reads: the search row, not the step list
     if (!turn.webEl) {
@@ -14354,7 +14376,7 @@ async function sendPrompt(text, opts = {}) {
     if (running && running.status === 'running') data = await waitForTurn(running.id);
     else if (start.status === 'accepted') { S.turn.startSeq = Math.min(S.turn.startSeq, start.turn.event_seq ?? S.turn.startSeq); data = await waitForTurn(start.turn.id); }
     else data = start;
-  } catch (e) { data = { status: 'error', message: e.message || "Couldn't reach the local server. Is run.bat still running?" }; }
+  } catch (e) { data = { status: 'error', message: e.message || "Couldn't reach FX Workspace’s server - it may be restarting." }; }
   await completeTurn(data);
 }
 
@@ -14410,7 +14432,7 @@ async function waitForTurn(id) {
       if (t.status === 'done') return t.result;
       return { status: 'error', message: t.message || 'The server no longer knows about this task (it may have restarted).' };
     } catch (_) {
-      if (++failures >= 8) { store.del('pendingTurn'); return { status: 'error', message: 'Lost contact with the local server while the task was running. Is run.bat still running?' }; }
+      if (++failures >= 8) { store.del('pendingTurn'); return { status: 'error', message: 'Lost contact with FX Workspace’s server while the task was running - it may have restarted.' }; }
       await new Promise(r => setTimeout(r, 1500));
     }
   }
@@ -16474,7 +16496,7 @@ function renderModelsCached() {
       ${S.engaged ? `<p class="lead" style="margin-bottom:10px">Loaded now: <span class="mono">${esc(S.engaged)}</span>${S.engagedIsVision ? ' - a vision model, so it stays loaded for text too' : ''}</p>` : ''}
       <div class="sr-only" aria-live="polite" id="bench-live"></div>
       ${S.bench.loadError ? `<p class="lead" role="alert">Couldn't load benchmark results: ${esc(S.bench.loadError)}</p>` : ''}
-      <div class="list-box">${rows || (gone.length ? '' : S.localModelsError ? `<div class="list-row" role="alert">Couldn't load the model list: ${esc(S.localModelsError)} <button class="af-link" onclick="renderModelsTab()">Retry</button></div>` : '<div class="list-row muted">llama-server reported no models and models.ini lists none. Check that run.bat started it.</div>')}</div>
+      <div class="list-box">${rows || (gone.length ? '' : S.localModelsError ? `<div class="list-row" role="alert">Couldn't load the model list: ${esc(S.localModelsError)} <button class="af-link" onclick="renderModelsTab()">Retry</button></div>` : '<div class="list-row muted">llama-server reported no models and models.ini lists none. Scan for models above, or add a .gguf file to local\\models.</div>')}</div>
       ${goneHtml}
       <p class="set-note" style="margin:10px 0 0">More GPU layers is faster but needs more video memory. If a model won't load, lower GPU layers or context.</p></div>
     <div class="set-group">

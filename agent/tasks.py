@@ -895,6 +895,15 @@ def _with_images(result):
     made = shared.app_state.get("turn_images") or []
     if not made or not isinstance(result, dict) or not result.get("message"):
         return result
+    if result.get("status") in ("error", "stopped"):
+        # The picture was made, then the reply failed or was stopped (1.4.6: "This chat is too long" after a toaster
+        # picture): the picture stays in the chat - it was lost with the failed reply - and the problem is said under it.
+        note = str(result.get("partial") or "").strip()
+        why = str(result["message"]).strip()
+        result = {**result, "status": "success", "after_error": why,
+                  "message": (note + "\n\n" if note else "") + agent_loop.picture_reply("", made) +
+                             f"\n\n*{'Stopped' if result.get('status') == 'stopped' else 'Then this went wrong'}: {why}*"}
+        shared.app_state.setdefault("conversation", []).append({"role": "assistant", "content": result["message"]})
     lines = "\n".join(f"![{img['model']} - seed {img['seed']}]({img['url']})" for img in made)
     message = f"{str(result['message']).rstrip()}\n\n{lines}"
     convo = shared.app_state.get("conversation") or []
