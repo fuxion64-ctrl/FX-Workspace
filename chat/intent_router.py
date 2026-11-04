@@ -426,6 +426,20 @@ _OFFER_RE = re.compile(r"\?\s*$|\b(?:should i|shall i|do you want|would you like
                        r"if you want|let me know|which (?:one|option)|i can\b)", re.I)
 
 
+# Text the reply itself is (classify_turn): "write / draft / compose (me) a <poem | email | function ...>".
+_TEXT_ANSWER_RE = re.compile(
+    rf"^(?:{_ASK})*(?:write|draft|compose|give)\s+(?:me\s+|us\s+)?(?:(?:a|an|the|some|\d+|one|two|three|few|short|quick|"
+    r"simple|small|nice|funny|polite|formal|python|javascript|typescript|js|c\+\+|c#|java|rust|go|sql|bash|regex|html|css)\s+)*"
+    r"(?:function|method|class|regex|regular expression|one-?liner|snippet|query|poem|haiku|limerick|song|lyrics|joke|"
+    r"story|essay|paragraph|email|e-mail|letter|cover letter|message|reply|tweet|post|caption|bio|slogan|speech|toast|"
+    r"outline|summary|description|definition|example|algorithm)s?\b")
+# ...unless it says where the text goes: then it's something to make on the PC.
+_HAS_TARGET_RE = re.compile(
+    r"\b(?:file|folder|directory|desktop|documents|downloads|disk|drive|save|saved|saving|store|into|doc|document|note|"
+    r"notes|studio|roblox|lua|luau|place|run|execute|test it|and test|send|post it|clipboard)\b|[a-z]:\\|\.\w{2,4}\b",
+    re.I)
+
+
 def _follows_offer(message: str, previous: dict | None) -> bool:
     """A short yes / "up to you" right after the assistant asked or offered."""
     if not previous or not _FOLLOW_UP_RE.match(message):
@@ -515,6 +529,12 @@ def classify_turn(message: str, with_vision: bool = False, previous: dict | None
     if not explicit_action and not question:
         explicit_action = bool(re.match(r"^(?:please\s+)?(?:switch|change|make|turn|set|put|go|use)\b.*\b(?:dark|light)(?:\s+(?:mode|theme))?\b", work)
                                or re.match(r"^(?:please\s+)?(?:switch|change|set)\b.*\b(?:theme|appearance)\b", work))
+    # "Write a Python function that ...", "draft an email to my landlord": the answer IS the text, written in the
+    # reply - nothing on the PC changes (1.4.6, stage 2: on the "write" verb alone the 4B model got run_python, ran the
+    # function "to test it" and the user got an approval card for code they had only asked to see). Anything with
+    # somewhere to put it - a file, a folder, a doc or note, Studio / Lua - stays an action.
+    if explicit_action and _TEXT_ANSWER_RE.match(work) and not _HAS_TARGET_RE.search(work):
+        return {"mode": "none", "allow_mutation": False, "reason": "asked to write something in the reply"}
     if explicit_action:
         return {"mode": "action", "allow_mutation": True, "reason": "explicit current-turn action"}
 

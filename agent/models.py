@@ -773,6 +773,7 @@ def _complete_with_protocol(kwargs: dict, model_name: str, turn_tools: list, can
     native/generic (server grammar via `tools`) -> schema (our JSON schema on
     the whole reply) -> text (lenient parsing)."""
     protocol = model_caps.protocol(model_name)
+    force = bool(shared.app_state.pop("force_tool_once", False))     # agent/loop: the retry after a described step
     if not turn_tools:
         return _local_complete(kwargs, cancel), kwargs, protocol
     while True:
@@ -780,7 +781,7 @@ def _complete_with_protocol(kwargs: dict, model_name: str, turn_tools: list, can
         attempt["extra_body"] = dict(kwargs.get("extra_body") or {})
         if protocol in (None, "native", "generic"):
             attempt["tools"] = turn_tools
-            attempt["tool_choice"] = "auto"
+            attempt["tool_choice"] = "required" if force else "auto"
         else:
             attempt["messages"] = list(kwargs["messages"]) + [
                 {"role": "system", "content": model_caps.catalogue_prompt(turn_tools)}]

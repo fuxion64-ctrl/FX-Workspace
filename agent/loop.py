@@ -414,6 +414,7 @@ def _budget_stop(budget, spent: str) -> dict:
 
 def run_agent_loop():
     shared.app_state["last_tool_signature_set"] = None
+    shared.app_state.pop("force_tool_once", None)        # a stopped run's unused one never reaches the next request
     local = shared.app_state.get("mode") == config.MODE_LOCAL
     # The orchestrator sets a budget from the effort profile; otherwise the defaults.
     budget = shared.app_state.get("iteration_budget") or {}
@@ -525,6 +526,10 @@ def run_agent_loop():
                     f"[SYSTEM] You replied with text but called no tool, and {target} is not done. "
                     "Do not describe the action - make the tool call now. If you are actually finished, "
                     "mark the remaining steps with update_plan first.")})
+                # The retry may only be a tool call (llama.cpp's tool_choice "required", 1.4.6): asked in words alone, a
+                # small model often described the step a second time and used up both retries. update_plan is
+                # offered with the plan, so "I'm finished" stays possible; every call still goes through approval.
+                shared.app_state["force_tool_once"] = True
                 continue
             shared.app_state["conversation"].append({"role": "assistant", "content": prose})
             # Say what really happened: an empty reply is not a confirmation.

@@ -14,8 +14,9 @@ measuring - never assumed (moe_test.py's way: llama-server's own timings, the mo
 
 A setting is kept only when it is clearly better: prompt reading +10% (writing no worse than -3%) for step 1,
 writing +5% (prompt reading no worse than -2%) for step 2. Otherwise the model keeps what it had. models.ini is
-backed up first, and anything that fails puts the old values back. Chats wait while it measures (the local runtime
-is reserved for each measurement). Results: data/speed_tune.json, shown in Settings.
+backed up first, and anything that fails puts the old values back. Chats can run while it tunes (1.4.6): between
+measurements it pauses for them and gives the model its own settings back; a chat waits at most for the step in
+hand. Results: data/speed_tune.json, shown in Settings.
 """
 from __future__ import annotations
 
@@ -136,19 +137,54 @@ def _measure(name: str) -> dict:
     return {"prompt_tps": avg(p), "gen_tps": avg(g)}
 
 
-def _with(name: str, opts: dict) -> dict:
-    """Load the model with these options and measure it; notes when it spilled into shared GPU memory."""
+QUIET_S = 20          # after a reply the next message often follows: the tune waits this long before it goes on
+
+
+def _chat_active() -> bool:
+    """A reply is running, or one ended less than QUIET_S ago."""
+    try:
+        import agent.tasks as tasks
+        cur = tasks.turns.current()
+    except Exception:
+        return False
+    if not cur:
+        return False
+    return cur.get("status") == "running" or time.time() - (cur.get("ended") or 0) < QUIET_S
+
+
+def _yield_to_chats(name: str, before: dict | None) -> bool:
+    """Between measurements (1.4.6): while you chat, the tune waits - and the model gets its own settings back, so
+    the chat loads it as it normally is, not with a setting being tried. The next measurement reloads it anyway."""
+    if before is None or not _chat_active():
+        return False
+    import llama_local
+    llama_local.set_model_options({name: before}, backup=False)
+    saved = state["progress"]
+    state["progress"] = "Paused while you chat - it goes on by itself"
+    while _chat_active():
+        time.sleep(2)
+    state["progress"] = saved
+    return True
+
+
+def _with(name: str, opts: dict, before: dict | None = None) -> dict:
+    """Load the model with these options and measure it; notes when it spilled into shared GPU memory. One step holds
+    the model from the load to the last measurement, so a chat that starts meanwhile waits for this step only (about
+    a minute) instead of finding the model unloaded under it; between steps the tune pauses for chats."""
     import diagnostics
     import llama_local
-    llama_local.set_model_options({name: opts}, backup=False)
-    llama_local.unload_all()
-    llama_local.force_load(name, timeout=600)
-    place = diagnostics.placement(name) or {}
-    spilled = place.get("state") == "spilled"
-    row = {**opts, "spilled": spilled}
-    if spilled:                                                   # several times slower: not worth measuring
-        return {**row, "prompt_tps": None, "gen_tps": None}
-    return {**row, **_measure(name)}
+    import local_runtime
+    _yield_to_chats(name, before)
+    with local_runtime.reserve():
+        llama_local.set_model_options({name: opts}, backup=False)
+        llama_local.unload_all()
+        llama_local.force_load(name, timeout=600)
+        place = diagnostics.placement(name) or {}
+        spilled = place.get("state") == "spilled"
+        row = {**opts, "spilled": spilled}
+        if spilled:                                               # several times slower: not worth measuring
+            return {**row, "prompt_tps": None, "gen_tps": None}
+        return {**row, **_measure(name)}
 
 
 def run(name: str) -> dict:
@@ -168,12 +204,12 @@ def run(name: str) -> dict:
         # 1. prompt reading
         state["progress"] = "Measuring as it is"
         cur_b, cur_ub = int(effective.get("batch-size") or 2048), int(effective.get("ubatch-size") or 512)
-        base = {"batch": cur_b, "ubatch": cur_ub, **_with(name, {})}
+        base = {"batch": cur_b, "ubatch": cur_ub, **_with(name, {}, before)}
         tried = []
         for i, (b, ub) in enumerate([x for x in BATCHES if x != (cur_b, cur_ub)], 1):
             state["progress"] = f"Prompt reading {b}/{ub}"
             try:
-                tried.append({"batch": b, "ubatch": ub, **_with(name, {"batch-size": b, "ubatch-size": ub})})
+                tried.append({"batch": b, "ubatch": ub, **_with(name, {"batch-size": b, "ubatch-size": ub}, before)})
             except Exception as e:                                    # didn't load: noted, next one
                 tried.append({"batch": b, "ubatch": ub, "error": str(e)[:160], "prompt_tps": None, "gen_tps": None})
         keep, why = decide_prefill(base, [t for t in tried if not t.get("spilled")])
@@ -185,12 +221,12 @@ def run(name: str) -> dict:
         if model["moe"]:
             cur = int(effective.get("n-cpu-moe") or 0)
             state["progress"] = "GPU split as it is"
-            base2 = {"n_cpu_moe": cur, **_with(name, {"n-cpu-moe": cur or None})}
+            base2 = {"n_cpu_moe": cur, **_with(name, {"n-cpu-moe": cur or None}, normal)}
             tried2 = []
             for n in split_values(cur, model.get("layers")):
                 state["progress"] = f"GPU split: {n} layers' experts in RAM"
                 try:
-                    t = {"n_cpu_moe": n, **_with(name, {"n-cpu-moe": n})}
+                    t = {"n_cpu_moe": n, **_with(name, {"n-cpu-moe": n}, normal)}
                 except Exception as e:
                     t = {"n_cpu_moe": n, "error": str(e)[:160], "prompt_tps": None, "gen_tps": None}
                 tried2.append(t)
@@ -229,4 +265,4 @@ def start(name: str) -> dict:
         finally:
             state.update(running=None, progress="")
     threading.Thread(target=work, daemon=True, name="speed-tune").start()
-    return {"ok": True, "message": f"Tuning {name} - about 10-20 minutes. Chats wait while it measures."}
+    return {"ok": True, "message": f"Tuning {name} - about 10-20 minutes. You can keep chatting: it pauses for you."}

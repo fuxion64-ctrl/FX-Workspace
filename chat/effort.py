@@ -185,6 +185,11 @@ def auto_level(analysis: dict, voice: bool = False) -> tuple[str, str]:
         return "extra", "complex action"
     if analysis.get("complex") or parts >= 3:
         return "high", "multi-part request"
+    # A one-step look ("what's using my PC", "list the files in ...") changes nothing: a model-written plan and a
+    # model review only made the user wait - 1.2-2.2 s for the plan and ~1.1 s for the review on Qwen 3.5 4B, measured
+    # 4 Nov 2026 (stage 2). Changes keep High: they are planned and checked.
+    if mode == "read" and words < 40:
+        return "normal", "a quick look - nothing changes"
     if mode in ("read", "action"):
         return "high", "tool-based request"
     return "normal", "conversation" if voice else "standard request"

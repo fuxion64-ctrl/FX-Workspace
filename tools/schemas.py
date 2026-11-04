@@ -329,7 +329,27 @@ def tools_for_current_turn(local: bool = False) -> list:
         return []
     hidden = search_mode_hidden()
     tools = tools_for_mode(local, (shared.app_state.get("turn_policy") or {}).get("mode", "none"))
-    return [t for t in tools if t["function"]["name"] not in hidden] if hidden else tools
+    tools = [t for t in tools if t["function"]["name"] not in hidden] if hidden else tools
+    return stable_order(tools) if local else tools
+
+
+# The tools nearly every turn has, first and always in this order; use_tools (which turns more on) last (1.4.6).
+# Local chat templates put the tool list at the very top of the prompt, so llama.cpp can only reuse what it read
+# for the last message up to the first tool that differs: with the shared ones first, a question after a
+# "list my files" keeps at least those.
+_FIRST = ("web_search", "fetch_page", "web_read")
+_LAST = ("use_tools",)
+
+
+def stable_order(tools: list) -> list:
+    rank = {n: i for i, n in enumerate(_FIRST)}
+    last = {n: i for i, n in enumerate(_LAST)}
+
+    def key(pair):
+        i, t = pair
+        name = t["function"]["name"]
+        return (0, rank[name]) if name in rank else (2, last[name]) if name in last else (1, i)
+    return [t for _i, t in sorted(enumerate(tools), key=key)]
 
 
 BROWSER_TOOL_NAMES = {"browser_open", "browser_read", "browser_click", "browser_fill"}

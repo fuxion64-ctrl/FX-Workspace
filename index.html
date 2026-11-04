@@ -15198,7 +15198,7 @@ async function renderSpeedTune() {
   const pick = S.speedPick && d.models.some(m => m.name === S.speedPick) ? S.speedPick : (d.models.find(m => m.moe) || d.models[0]).name;
   const tuned = d.models.filter(m => res[m.name]);
   box.innerHTML = `<div class="gt">Tune speed <small>· measured, never assumed</small></div>
-    <p class="muted">Tries bigger prompt-reading batches, and for mixture-of-experts models how many layers' experts stay in system RAM, reloading the model for each and timing a long prompt. A setting is kept only if it is clearly faster and fits the GPU without spilling. 10-20 minutes per model; chats wait meanwhile.</p>
+    <p class="muted">Tries bigger prompt-reading batches, and for mixture-of-experts models how many layers' experts stay in system RAM, reloading the model for each and timing a long prompt. A setting is kept only if it is clearly faster and fits the GPU without spilling. 10-20 minutes per model; you can keep chatting - it pauses for you.</p>
     <div class="set-row"><select class="input" style="max-width:320px" aria-label="Model to tune" onchange="S.speedPick=this.value" ${run ? 'disabled' : ''}>${d.models.map(m => `<option value="${esc(m.name)}"${m.name === pick ? ' selected' : ''}>${esc(m.name)}${m.moe ? ' · experts' : ''}</option>`).join('')}</select>
       <button class="btn sm" ${run ? 'disabled' : ''} onclick="api('/api/speed-tune',{model:S.speedPick||'${jsArg(pick)}'}).then(r=>{toast(r.message);renderSpeedTune();})">${run ? esc(`${run}: ${d.state.progress || 'Tuning…'}`) : 'Tune speed'}</button></div>
     ${tuned.map(m => { const r = res[m.name], pf = r.prefill, sl = r.split;

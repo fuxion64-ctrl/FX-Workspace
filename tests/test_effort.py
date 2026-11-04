@@ -67,7 +67,10 @@ class CapabilityTests(unittest.TestCase):
         self.assertEqual(effort.choose_level(s, "m"), ("high", "model"))
         self.assertEqual(effort.choose_level(s, "m", session="auto"), ("auto", "session"))
         self.assertEqual(effort.auto_level({"mode": "none", "words": 2, "trivial": True})[0], "low")
-        self.assertEqual(effort.auto_level({"mode": "read", "words": 7, "trivial": False})[0], "high")
+        # A quick look is Balanced (no model plan or review); a long read and any change are High (1.4.6).
+        self.assertEqual(effort.auto_level({"mode": "read", "words": 7, "trivial": False})[0], "normal")
+        self.assertEqual(effort.auto_level({"mode": "read", "words": 45, "trivial": False})[0], "high")
+        self.assertEqual(effort.auto_level({"mode": "action", "words": 7, "trivial": False})[0], "high")
         self.assertEqual(effort.auto_level({"mode": "action", "words": 90, "parts": 4, "complex": True})[0], "extra")
         self.assertEqual(effort.auto_level({"mode": "action", "words": 140, "parts": 6, "complex": True})[0], "max")
 
