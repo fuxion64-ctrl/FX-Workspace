@@ -146,6 +146,7 @@ DEFAULT_SETTINGS = {
     "chat_warmup": True,                # typing a message loads the local chat model meanwhile (/api/local-models/warm)
     "update_check": True,               # look for a newer version by itself; Home offers it (app_version.start_auto)
     "claude_mark": "regular",           # the Claude look's thinking mark: regular (3D orbs) or liquid
+    "ai_looks": "new",                  # Claude/ChatGPT/Grok/Gemini looks: new (from their design files, 1.4.6) or original
     "unlocked_themes": [],              # secret themes found (index.html SECRET_THEMES); never switched on by itself
     **image_gen.DEFAULT_SETTINGS,       # Settings > Images (image_gen.py)
     # MossadGPT's world monitor (osint/): feeds collected on this PC while it's on screen.
@@ -300,6 +301,7 @@ def clean_privacy_settings(s: dict) -> dict:
                          ("start_hidden", True), ("search_sources", True), ("chat_warmup", True), ("update_check", True)):
         out[key] = s.get(key) if isinstance(s.get(key), bool) else default
     out["claude_mark"] = s.get("claude_mark") if s.get("claude_mark") in ("regular", "liquid") else "regular"
+    out["ai_looks"] = s.get("ai_looks") if s.get("ai_looks") in ("new", "original") else "new"
     out["mini_place"] = s.get("mini_place") if s.get("mini_place") in MINI_PLACES else "studio"
     out["idle_unload"] = str(s.get("idle_unload")) if str(s.get("idle_unload")) in IDLE_UNLOAD else "15"
     out["search_cache_minutes"] = int(_num(s.get("search_cache_minutes", 15), 0, 1440, 15))

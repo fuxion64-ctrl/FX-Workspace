@@ -427,6 +427,7 @@ class SettingsUpdate(BaseModel):
     chat_warmup: bool | None = None          # load the local chat model while a message is typed
     update_check: bool | None = None         # look for a newer version by itself (app_version.start_auto)
     claude_mark: str | None = None           # the Claude look's thinking mark: "regular" or "liquid"
+    ai_looks: str | None = None              # the AI looks: "new" (1.4.6, from their design files) or "original"
     mini_place: str | None = None            # the mini window's place (mini_window.py)
     start_with_windows: bool | None = None   # the desktop app starts at sign-in...
     start_hidden: bool | None = None         # ...in the tray

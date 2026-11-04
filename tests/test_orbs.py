@@ -106,9 +106,13 @@ class EngineTests(unittest.TestCase):
         from core import config
         self.assertEqual(config.DEFAULT_SETTINGS["think_mark"], "auto")
         self.assertIn("think_mark: str | None = None", (ROOT / "api" / "server.py").read_text(encoding="utf-8"))
-        self.assertIn("seg([['auto', 'Auto'], ['orbs', 'Orbs'], ['legacy', 'Legacy']]", HTML)
-        # Auto: orbs, but the AI-inspired appearances and the secret theme keep their own marks.
-        self.assertIn("if (m === 'auto') return ['mono', 'void', 'prism'].includes(d.skin) ? 'legacy' : 'orbs';", ORBS)
+        # 1.4.6: Auto ("New" in Extras) is each look's own mark from the approved board; Orbs and Legacy stay in Extras.
+        self.assertIn("seg([['auto', 'New'], ['orbs', 'Orbs'], ['legacy', 'Legacy']]", HTML)
+        self.assertIn("if (m === 'auto') return markKey() ? 'marks' : 'orbs';", ORBS)
+        self.assertIn("const MARK_LIB = (() => {", HTML)
+        for key in ("classic", "sunrise", "terminal", "eclipse", "aurora", "claude", "clay2", "mono", "void", "prism"):
+            self.assertIn(f"LOOKS.{key} = {{", HTML)
+        self.assertIn("(S.settings && S.settings.claude_mark) === 'liquid' ? 'clay2' : 'claude'", ORBS)
         self.assertIn("if (d.secret || d.tone === 'mossad') return 'legacy';", ORBS)
 
     def test_legacy_keeps_the_old_marks(self):

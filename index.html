@@ -1475,7 +1475,7 @@ html.fx-desktop .sb-quit:hover { background: var(--hover); color: var(--danger-t
 .ov-b.fav { color: #f2c14e; }
 .iv-fav { position: absolute; left: 7px; top: 7px; color: #f2c14e; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
 .iv-fav .icon { fill: currentColor; }
-.iv-tag { position: absolute; left: 6px; bottom: 6px; font: 10.5px var(--mono); color: #f5f4ee; background: rgba(20, 20, 19, .66); padding: 2px 6px; border-radius: 5px; pointer-events: none; opacity: 0; transition: opacity .15s; }
+.iv-tag { position: absolute; left: 6px; bottom: 6px; font: 10.5px var(--mono); color: #ffffff; background: rgba(20, 20, 19, .66); padding: 2px 6px; border-radius: 5px; pointer-events: none; opacity: 0; transition: opacity .15s; }
 :hover > .iv-tag, :focus-visible > .iv-tag { opacity: 1; }            /* the size tag on hover only (1.4.6 unslop) */
 .iv-neg .af-link { text-decoration: none; color: var(--muted); }
 .iv-neg .af-link:hover { color: var(--text); }
@@ -3106,7 +3106,7 @@ span.tier.input { padding: 0; border: 0; width: 8px; height: 8px; min-height: 0;
 /* Sized by label, one line each. */
 .popover .seg button { flex: 1 1 auto; display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; padding-inline: 9px; }
 .pill { font-size: 11.5px; padding: 1px 6px; border-radius: 5px; background: var(--surface-2); color: var(--muted); margin-left: 6px; font-weight: 500; white-space: nowrap; font-family: var(--sans); }
-.pill.vision { color: var(--info); } .pill.loaded { color: var(--ok); }
+.pill.vision { color: var(--info-text); } .pill.loaded { color: var(--ok); }
 .key-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: 100%; }
 .key-row .input { width: 170px; flex: 0 1 170px; }
 .key-row .pill { margin: 0; }
@@ -4306,7 +4306,40 @@ select.input { padding-right: 6px; height: 30px; font-size: 12.5px; flex: 0 0 au
 /* Effort sliders - each in its own idiom */
 /* ChatGPT-like: a thin rounded track that fills blue, a round white ball; Max goes indigo, Ultra purple. */
 :root[data-skin="mono"] .lv { --lv-handle: 20px; --mono-fill: #0285ff; }
-:root[data-skin="mono"][data-tone="light"] .lv { --mono-fill: #0169cc; }
+/* ---- The AI looks from their public design files (1.4.6, approved 4 Nov) ------------------------------------------
+   Claude: awesome-design-md's claude file; ChatGPT: design-skills' openai; Grok: awesome-design-md's x.ai; Gemini: a
+   community DESIGN.md. Each file's own scheme only (Grok's is dark-only; the others are light). Settings > Appearance >
+   Extras > AI looks: Original brings back the looks from before (data-ai-classic). No logos, no company fonts. */
+:root[data-skin="clay"][data-tone="light"]:not([data-ai-classic]) {
+  --bg: #faf9f5; --bg-sidebar: #f5f0e8; --surface: #faf9f5; --surface-2: #efe9de; --surface-3: #e8e0d2;
+  --border: #e6dfd8; --border-strong: #d8cfc2; --text: #141413; --text-2: #3d3d3a; --muted: #6c6a64; --faint: #8e8b82;
+  --accent: #cc785c; --accent-text: #a9583e; --accent-soft: rgba(204, 120, 92, .12); --user-bubble: #efe9de; --code-bg: #f5f0e8;
+  --info: #3d6a8c;                                   /* 4.5:1 on the cream cards too (the vision pill) */
+  --shadow: 0 1px 3px rgba(20, 20, 19, .08);
+}
+:root[data-skin="clay"][data-tone="light"]:not([data-ai-classic]) .composer { background: var(--bg); border-color: var(--border); box-shadow: none; border-radius: 12px; }
+:root[data-skin="clay"][data-tone="light"]:not([data-ai-classic]) .composer:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(204, 120, 92, .15); }
+:root[data-skin="clay"][data-tone="light"]:not([data-ai-classic]) .greeting { letter-spacing: -1px; font-weight: 400; }
+:root[data-skin="mono"][data-tone="light"]:not([data-ai-classic]) {
+  --text: #212121; --border: #e5e1de; --border-strong: #d6d1cd; --radius: 19px; --shadow: none;
+}
+:root[data-skin="mono"][data-tone="light"]:not([data-ai-classic]) .composer { border-radius: 28px; box-shadow: none; }
+:root[data-skin="mono"][data-tone="light"]:not([data-ai-classic]) :is(.chip, .btn) { border-radius: 22px; }
+:root[data-skin="void"]:not([data-tone="light"]):not([data-ai-classic]) {
+  --bg: #0a0a0a; --bg-sidebar: #0a0a0a; --surface: #191919; --surface-2: #1a1c20; --surface-3: #363a3f;
+  --border: #212327; --border-strong: #363a3f; --text: #ffffff; --text-2: #dadbdf; --muted: #868a90; --faint: #6c7076;
+  --user-bubble: #1a1c20; --radius: 8px; --shadow: none;
+}
+:root[data-skin="void"]:not([data-tone="light"]):not([data-ai-classic]) :is(.btn, .chip, .icon-btn) { border-radius: 999px; }
+:root[data-skin="void"]:not([data-tone="light"]):not([data-ai-classic]) .composer { background: var(--surface-2); border-color: var(--border); border-radius: 8px; box-shadow: none; }
+:root[data-skin="void"]:not([data-tone="light"]):not([data-ai-classic]) .sb-group { font-family: var(--mono); font-size: 11px; font-weight: 400; letter-spacing: .1em; text-transform: uppercase; }
+:root[data-skin="prism"][data-tone="light"]:not([data-ai-classic]) {
+  --bg: #f0f4f8; --bg-sidebar: #f0f4f8; --surface: #ffffff; --surface-2: #f8fafd; --border: #e1e3e1; --border-strong: #c4c7c5;
+  --text: #1f1f1f; --text-2: #444746; --muted: #5f6368; --user-bubble: #ffffff; --shadow: none;
+}
+:root[data-skin="prism"][data-tone="light"]:not([data-ai-classic]) .composer { background: #ffffff; border-color: var(--border); border-radius: 28px; box-shadow: none; }
+:root[data-skin="prism"][data-tone="light"]:not([data-ai-classic]) .chip { border-radius: 999px; background: #ffffff; border: 1px solid var(--border); min-height: 40px; padding: 0 12px; white-space: nowrap; }
+:root[data-skin="prism"][data-tone="light"]:not([data-ai-classic]) #welcome-chips { flex-wrap: nowrap; }:root[data-skin="mono"][data-tone="light"] .lv { --mono-fill: #0169cc; }
 :root[data-skin="mono"] .lv[data-level="max"] { --mono-fill: #5b5bf5; }
 :root[data-skin="mono"] .lv[data-level="ultra"] { --mono-fill: #9b5cf6; }
 :root[data-skin="mono"] .lv-rail { top: 16px; height: 6px; border-radius: 999px; background: color-mix(in srgb, var(--text) 14%, transparent); }
@@ -6473,6 +6506,8 @@ function applyAppearance() {
   else delete root.dataset.secret;
   // The interface (Settings > Appearance): the 2026-10 redesign, or the one before it ("Legacy").
   root.dataset.ui = s.ui_style === 'legacy' ? 'legacy' : 'new';
+  // The AI looks as redrawn from their design files (1.4.6), or as they were (Settings > Appearance > Extras).
+  if (s.ai_looks === 'original') root.dataset.aiClassic = '1'; else delete root.dataset.aiClassic;
   applySkinNav(root.dataset.skin);
   root.dataset.studioLayout = s.studio_layout === 'overlay' ? 'overlay' : 'classic';
   root.dataset.density = s.layout === 'compact' ? 'compact' : 'comfortable';
@@ -12075,6 +12110,486 @@ function orbRetarget(o, act, t, now, form) {
 // The Claude look's starburst (our own drawing: twelve tapered rays round a core), also the CSS mark's --clay-burst.
 const CLAY_BURST = 'M13.50 12.00L13.05 1.45A1.05 1.05 0 0 0 10.95 1.45L10.50 12.00ZM13.26 12.81L17.47 5.46A1.05 1.05 0 0 0 15.71 4.32L10.74 11.19ZM12.79 13.28L20.93 7.71A1.05 1.05 0 0 0 19.83 5.93L11.21 10.72ZM12.00 13.50L19.88 13.05A1.05 1.05 0 0 0 19.88 10.95L12.00 10.50ZM11.19 13.26L20.10 18.48A1.05 1.05 0 0 0 21.24 16.72L12.81 10.74ZM10.72 12.79L15.43 19.55A1.05 1.05 0 0 0 17.22 18.45L13.28 11.21ZM10.50 12.00L10.95 21.51A1.05 1.05 0 0 0 13.05 21.51L13.50 12.00ZM10.74 11.19L6.97 17.86A1.05 1.05 0 0 0 8.73 19.00L13.26 12.81ZM11.21 10.72L2.47 16.65A1.05 1.05 0 0 0 3.58 18.44L12.79 13.28ZM12.00 10.50L3.31 10.95A1.05 1.05 0 0 0 3.31 13.05L12.00 13.50ZM12.81 10.74L4.68 6.02A1.05 1.05 0 0 0 3.54 7.79L11.19 13.26ZM13.28 11.21L8.63 4.55A1.05 1.05 0 0 0 6.84 5.65L10.72 12.79Z';
 let clayBurst = null;
+// ---- Each look's thinking mark (1.4.6, stage 5.3) ------------------------------------------------------------------
+// The marks approved on the /design canvas (ThinkingMarks board), as they are: forms(act, t) -> particles, draw(ctx, ...).
+// Wrapped so their small helpers (TAU, ease, mix...) stay out of the page's own names. Orbs draws them (mode 'marks').
+const MARK_LIB = (() => {
+const TAU = Math.PI * 2;
+const ease = k => k <= 0 ? 0 : k >= 1 ? 1 : k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+const frac = v => v - Math.floor(v);
+const ping = v => { const k = frac(v); return k < .5 ? k * 2 : 2 - k * 2; };
+const tilt = (x, y, deg) => { const r = deg * Math.PI / 180, c = Math.cos(r), s = Math.sin(r); return [x * c - y * s, x * s + y * c]; };
+const rgb = h => { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+const rgba = (h, a) => { const [r, g, b] = rgb(h); return `rgba(${r},${g},${b},${Math.max(0, Math.min(1, a))})`; };
+const shade = (h, k) => { const [r, g, b] = rgb(h); const f = v => Math.round(k > 0 ? v + (255 - v) * k : v * (1 + k)); return `rgb(${f(r)},${f(g)},${f(b)})`; };
+// Angles blend the short way round (a blend of two rotations far apart in time spun the mark fast).
+const mix = (A, B, k, ang) => A.map((a, i) => a.map((v, j) => {
+  let d = B[i][j] - v;
+  if (ang && ang(i, j)) d = ((d % TAU) + TAU * 1.5) % TAU - Math.PI;
+  return v + d * k;
+}));
+const fadeLoop = k => Math.min(1, k / .08) * (k < .85 ? 1 : Math.max(0, 1 - (k - .85) / .15));
+const ACTS = [['think', 'Thinking'], ['read', 'Reading'], ['search', 'Searching'], ['tool', 'Using a tool'], ['write', 'Writing'], ['draw', 'Drawing'], ['wait', 'Waiting for you']];
+
+// ---- each look: forms(act, t) -> particles (same count and fields for every act, so any two blend), draw(...)
+const LOOKS = {};
+
+// Classic - ink and gold: a flat gold dot and two ink dots on their own orbits, far enough apart that they never
+// touch (3 Nov: the shaded spheres went, and the gold one passed through a white one).
+LOOKS.classic = {
+  name: 'Classic', tag: 'Ink and gold',
+  forms(act, t) {
+    const orb = (R, per, ph, r, dir) => { const a = TAU * t / per * dir + ph; return [R * Math.cos(a), R * .86 * Math.sin(a), r, 1, 0, 1]; };
+    switch (act) {
+      case 'think': return [[0, 0, .28 * (1 + .06 * Math.sin(TAU * t / 2.2)), 1, 0, 0], orb(.62, 3.4, 0, .13, 1), orb(.88, 5, 2, .09, -1)];
+      case 'read': { const s = .85 * Math.sin(TAU * t / 2.8); return [0, -.62, .62].map((x, i) => { const f = Math.exp(-(((x - s) / .38) ** 2)); return [x, 0, .1 + .07 * f, .4 + .6 * f, 0, i ? 1 : 0]; }); }
+      case 'search': { const a = TAU * t / 2.8; return [[0, 0, .2, 1, 0, 0], [.72 * Math.cos(a), .66 * Math.sin(a), .13, 1, 0, 1], [.72 * Math.cos(a - .6), .66 * Math.sin(a - .6), .08, .4, 0, 1]]; }
+      case 'tool': return [0, 1, 2].map(i => { const a = TAU * t / 3.6 + i * TAU / 3 - Math.PI / 2; return [.56 * Math.cos(a), .56 * Math.sin(a), .16, 1, 0, i ? 1 : 0]; });
+      case 'write': return [0, 1, 2].map(i => { const th = TAU * t / 3.4 - i * .62; return [.62 * Math.sin(th), .3 * Math.sin(2 * th), [.17, .11, .07][i], [1, .7, .45][i], 0, i ? 1 : 0]; });
+      case 'draw': return [0, 1, 2].map(i => { const a = TAU * t / 4 + i * TAU / 3; return [.52 * Math.cos(a), .52 * Math.sin(a), .17, 1, 0, i === 0 ? 0 : 1]; });
+      default: return [[0, -.06, .24, 1, 0, 2], [-.44, .36 + .05 * Math.sin(TAU * t / 2.8), .1, .6, 0, 1], [.44, .36 + .05 * Math.sin(TAU * t / 2.8 + 1.3), .1, .6, 0, 1]];
+    }
+  },
+  draw(c, P, s, pal, act, t) {
+    for (const q of P) {
+      const [x, y, r, a, , ci] = q; if (r <= 0 || a <= 0) continue;
+      c.globalAlpha = a; c.fillStyle = ci < .5 ? pal.ac : ci < 1.5 ? pal.fg : pal.wn;
+      c.beginPath(); c.arc(x * s, y * s, r * s, 0, TAU); c.fill();
+    }
+    if (act === 'wait') { c.globalAlpha = .3 + .5 * (.5 + .5 * Math.sin(TAU * t / 1.6)); c.strokeStyle = pal.wn; c.lineWidth = 1.5; c.beginPath(); c.arc(0, -.08 * s, .4 * s, 0, TAU); c.stroke(); }
+  },
+};
+
+// Sunrise - a sun on its horizon, with rays: it rises to think, sweeps like a lighthouse to search, sets to wait.
+LOOKS.sunrise = {
+  name: 'Sunrise', tag: 'Sun on the horizon',
+  ang: (i, j) => i > 0 && j === 0,
+  forms(act, t) {
+    const sun = [0, .1, .3, 1, -1, 0, 0, 0, 0], rays = [];
+    for (let k = 0; k < 9; k++) {
+      const up = -Math.PI + (k + .5) * Math.PI / 9; let ang = up, len = .1, a = .8;
+      if (act === 'think') { sun[1] = .14 - .09 * Math.sin(TAU * t / 3.6); len = .13 + .08 * (.5 + .5 * Math.sin(TAU * t / 2.6 - k * .7)); }
+      if (act === 'read') { sun[0] = .62 * Math.sin(TAU * t / 3.2); sun[1] = .2; sun[2] = .17; len = .05; a = .5; }
+      if (act === 'search') { const sw = -Math.PI / 2 + 1.25 * Math.sin(TAU * t / 3.4), f = Math.exp(-(((up - sw) / .32) ** 2)); sun[2] = .24; sun[1] = .14; len = .05 + .42 * f; a = .25 + .75 * f; }
+      if (act === 'tool') { ang = TAU * k / 9 + TAU * t / 5; len = .09; sun[2] = .23; sun[1] = .04; }
+      if (act === 'write') { const e = ease(frac(t / 2.8)); sun[0] = -.72 + 1.44 * e; sun[1] = .2; sun[2] = .12; sun[6] = e; len = .03; a = .4; }
+      if (act === 'draw') { const e = ease(ping(t / 3.4)); sun[2] = .26; sun[1] = .12; len = .05 + .3 * e; a = .4 + .6 * e; }
+      if (act === 'wait') { sun[1] = .2; sun[2] = .27; len = 0; a = 0; sun[7] = .5 + .5 * Math.sin(TAU * t / 1.6); }
+      rays.push([ang, 0, len, a, 0, 0, 0, 0, 0]);
+    }
+    sun[8] = act === 'write' ? 1 : 0;
+    return [sun, ...rays];
+  },
+  draw(c, P, s, pal) {
+    const [sx, sy, sr, , , , drawn, halo, writing] = P[0], H = .2 * s;
+    c.globalAlpha = .55; c.strokeStyle = pal.mu; c.lineWidth = 1.5; c.beginPath(); c.moveTo(-.85 * s, H); c.lineTo(.85 * s, H); c.stroke();
+    if (writing > .01) { c.globalAlpha = writing; c.strokeStyle = pal.ac; c.lineWidth = 2; c.beginPath(); c.moveTo(-.85 * s, H); c.lineTo((-.85 + 1.7 * drawn) * s, H); c.stroke(); }
+    const px = sx * s, py = sy * s, pr = sr * s;
+    c.save(); c.beginPath(); c.rect(-s, -s, 2 * s, H + s - .5); c.clip();
+    const glow = c.createRadialGradient(px, py, pr * .5, px, py, pr * 2.6); glow.addColorStop(0, rgba(pal.ac, .35)); glow.addColorStop(1, rgba(pal.ac, 0));
+    c.globalAlpha = 1; c.fillStyle = glow; c.beginPath(); c.arc(px, py, pr * 2.6, 0, TAU); c.fill();
+    const g = c.createRadialGradient(px, py - pr * .3, pr * .1, px, py, pr); g.addColorStop(0, shade(pal.ac2, .4)); g.addColorStop(1, pal.ac);
+    c.fillStyle = g; c.beginPath(); c.arc(px, py, pr, 0, TAU); c.fill();
+    c.lineCap = 'round'; c.lineWidth = 1.8;
+    for (const [ang, , len, a] of P.slice(1)) {
+      if (len <= .005 || a <= .01) continue;
+      const r0 = pr + .06 * s, r1 = r0 + len * s; c.globalAlpha = a; c.strokeStyle = pal.ac;
+      c.beginPath(); c.moveTo(px + Math.cos(ang) * r0, py + Math.sin(ang) * r0); c.lineTo(px + Math.cos(ang) * r1, py + Math.sin(ang) * r1); c.stroke();
+    }
+    c.restore();
+    if (halo > .01) { c.globalAlpha = .25 + .6 * halo; c.strokeStyle = pal.wn; c.lineWidth = 1.6; c.beginPath(); c.arc(px, py, pr + .12 * s, Math.PI, TAU); c.stroke(); }
+  },
+};
+
+// Terminal - a cursor that moves in steps: a snake to think, a scan to search, typing to write, a block blink to wait.
+LOOKS.terminal = {
+  name: 'Terminal', tag: 'Cursor, in steps',
+  forms(act, t) {
+    const q = Math.floor(t * 8) / 8, g = .28, cells = [];
+    const set = (i, x, y, a, w = .2, h = .2, ci = 0) => { cells[i] = [x * g, y * g, w, a, h, ci]; };
+    for (let i = 0; i < 6; i++) set(i, 0, 0, 0);
+    if (act === 'think') { const path = [[-1, -1], [0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0]], head = Math.floor(q * 3) % 8; for (let k = 0; k < 4; k++) { const [x, y] = path[(head - k + 8) % 8]; set(k, x, y, 1 - k * .23); } }
+    if (act === 'read') { const f = Math.floor(q * 3) % 5; for (let k = 0; k < 5; k++) set(k, -2 + k, 0, k === f ? 1 : .22, .18, .18); }
+    if (act === 'search') { const p = Math.floor(q * 4) % 8, col = p < 5 ? p : 8 - p; for (let k = 0; k < 3; k++) set(k, col - 2, k - 1, 1, .2, .2); for (let k = 0; k < 3; k++) set(k + 3, col - 2 - (p < 5 ? 1 : -1), k - 1, .25, .2, .2); }
+    if (act === 'tool') { const st = Math.floor(q * 2) % 4, pos = [[-.5, -.5], [.5, -.5], [.5, .5], [-.5, .5]]; for (let k = 0; k < 4; k++) { const [x, y] = pos[(k + st) % 4]; set(k, x, y, k === 0 ? 1 : .55, .22, .22); } }
+    if (act === 'write') { const n = Math.floor(frac(t / 3) * 7); for (let k = 0; k < 5; k++) set(k, -2 + k, 0, k < n ? .85 : 0, .16, .16); const blink = Math.floor(t * 2) % 2; set(5, -2 + Math.min(n, 5), 0, blink ? 1 : .3, .1, .3); }
+    if (act === 'draw') { const n = Math.floor(ping(t / 3.2) * 7); const pos = [[-1, -.5], [0, -.5], [-1, .5], [1, -.5], [0, .5], [1, .5]]; pos.forEach(([x, y], k) => set(k, x, y, k < n ? 1 : .15, .26, .26)); }
+    if (act === 'wait') { set(0, 0, 0, Math.floor(t / .8) % 2 ? 1 : .3, .16, .34, 2); }
+    return cells;
+  },
+  draw(c, P, s, pal) {
+    for (const [x, y, w, a, h, ci] of P) {
+      if (a <= .01) continue;
+      const pw = Math.max(2, Math.round(w * s)), ph = Math.max(2, Math.round(h * s));
+      c.globalAlpha = a; c.fillStyle = ci > 1.5 ? pal.wn : pal.ac; c.fillRect(Math.round(x * s - pw / 2), Math.round(y * s - ph / 2), pw, ph);
+    }
+  },
+};
+
+// Eclipse - a dark disc and its corona: a comet of light travels the ring, closes it to write, flares to draw.
+LOOKS.eclipse = {
+  name: 'Eclipse', tag: 'Corona',
+  ang: (i, j) => i < 3 && j === 0,
+  forms(act, t) {
+    const C = []; for (let i = 0; i < 3; i++) C.push([0, 0, 0, 0, 0, 0]);   // [angle, tail, width, alpha, ring, colour]
+    let ring = .2;
+    if (act === 'think') C[0] = [TAU * t / 3.4, 2.1, 2.4, 1, 0, 0];
+    if (act === 'read') { const v = Math.cos(TAU * t / 3); C[0] = [-Math.PI / 2 + 1.15 * Math.sin(TAU * t / 3), v > 0 ? .9 : -.9, 2.2, 1, 0, 0]; }
+    if (act === 'search') { const h = TAU * t / 2.6; C[0] = [h, 1.2, 2.2, 1, 0, 0]; C[1] = [h + Math.PI, 1.2, 2.2, 1, 0, 0]; }
+    if (act === 'tool') { const h = TAU * t / 5; for (let k = 0; k < 3; k++) C[k] = [h + k * TAU / 3, .6, 3, .9, 0, 0]; }
+    if (act === 'write') { const e = ease(frac(t / 3)); C[0] = [-Math.PI / 2 + TAU * e, TAU * e, 2.2, 1 - Math.max(0, (frac(t / 3) - .85) * 6), 0, 0]; }
+    if (act === 'draw') { ring = .25 + .75 * ease(ping(t / 3.4)); }
+    if (act === 'wait') { ring = .35 + .65 * (.5 + .5 * Math.sin(TAU * t / 1.6)); }
+    return [...C, [ring, act === 'wait' ? 1 : 0, 0, 0, 0, 0]];
+  },
+  draw(c, P, s, pal) {
+    const R = .56 * s, [ring, warn] = P[3];
+    const halo = c.createRadialGradient(0, 0, R * .7, 0, 0, R * 1.6); halo.addColorStop(0, rgba(warn > .5 ? pal.wn : pal.ac2, .22 * ring)); halo.addColorStop(1, rgba(pal.ac2, 0));
+    c.globalAlpha = 1; c.fillStyle = halo; c.beginPath(); c.arc(0, 0, R * 1.6, 0, TAU); c.fill();
+    c.globalAlpha = .18 + .7 * ring * (warn > .5 ? 1 : .55); c.strokeStyle = warn > .5 ? pal.wn : pal.ac; c.lineWidth = 1 + 2.4 * ring; c.beginPath(); c.arc(0, 0, R, 0, TAU); c.stroke();
+    for (const [ang, tail, w, a] of P.slice(0, 3)) {
+      if (a <= .01 || Math.abs(tail) < .01) continue;
+      const n = 22;
+      for (let j = 0; j < n; j++) {
+        const k0 = j / n, k1 = (j + 1) / n;
+        c.globalAlpha = a * Math.pow(k1, 1.6); c.strokeStyle = j > n - 3 ? shade(pal.ac2, .3) : pal.ac; c.lineWidth = w * (.4 + .6 * k1); c.lineCap = 'round';
+        c.beginPath(); c.arc(0, 0, R, ang - tail + tail * k0, ang - tail + tail * k1 + (tail > 0 ? .001 : -.001), tail < 0); c.stroke();
+      }
+      c.globalAlpha = a; c.fillStyle = shade(pal.ac2, .4); c.beginPath(); c.arc(Math.cos(ang) * R, Math.sin(ang) * R, w * .9, 0, TAU); c.fill();
+    }
+    c.globalAlpha = 1; c.fillStyle = pal.bg; c.beginPath(); c.arc(0, 0, R - 2.2, 0, TAU); c.fill();
+  },
+};
+
+// Aurora - a curtain of light, as a real aurora hangs: many fine rays under one bright lower edge that folds
+// slowly, fading upward from green to rose (3 Nov: three ribbons read as tendrils).
+const AUR_N = 16;
+LOOKS.aurora = {
+  name: 'Aurora', tag: 'A curtain of light',
+  forms(act, t) {
+    const out = [], k8 = frac(t / 3.4);
+    for (let k = 0; k < AUR_N; k++) {
+      const x = -.86 + k * 1.72 / (AUR_N - 1);
+      let by = .4 + .07 * Math.sin(x * 3.2 + TAU * t / 4.4), h = .62 + .16 * Math.sin(x * 2.1 - TAU * t / 5.6),
+        a = .5 + .4 * (.5 + .5 * Math.sin(x * 4 - TAU * t / 3.8)), lean = .08 * Math.sin(x * 2 + TAU * t / 5), warn = 0;
+      if (act === 'read') { const f = Math.exp(-((x - .72 * Math.sin(TAU * t / 3.2)) ** 2) / .05); a = .18 + .82 * f; h = .55 + .2 * f; }
+      if (act === 'search') { const sw = .6 * Math.sin(TAU * t / 3.8), f = Math.exp(-((x - sw) ** 2) / .09); lean = Math.max(-.22, Math.min(.22, (sw - x) * .35)); a = .3 + .7 * f; h = .5 + .3 * f; }
+      if (act === 'tool') { by = .4 + .1 * Math.sin(x * 4.4 + TAU * t / 3.4); lean = .2 * Math.sin(x * 4.4 + TAU * t / 3.4 + 1.3); a = .6 + .3 * Math.sin(x * 4.4 + TAU * t / 3.4 + 2.4); }
+      if (act === 'write') { const g = Math.max(0, Math.min(1, k8 * 1.25 * AUR_N - k)); h = .12 + .55 * ease(g); a = g * fadeLoop(k8); }
+      if (act === 'draw') { h = .14 + .72 * ease(ping(t / 3.8 - k * .012)); a = .45 + .45 * ease(ping(t / 3.8)); }
+      if (act === 'wait') { by = .4; h = .6; lean = 0; a = .35 + .55 * (.5 + .5 * Math.sin(TAU * t / 1.6)); warn = 1; }
+      out.push([x, by, h, a, lean, warn]);
+    }
+    return out;
+  },
+  draw(c, P, s, pal) {
+    const edge = P.map(q => [q[0] * s, q[1] * s]);
+    c.globalAlpha = 1; c.lineCap = 'round';
+    for (const [x, by, h, a, lean, warn] of P) {
+      if (a <= .01) continue;
+      const x0 = x * s, y0 = by * s, x1 = (x + lean) * s, y1 = (by - h) * s, base = warn > .5 ? pal.wn : pal.ac;
+      const g = c.createLinearGradient(x0, y0, x1, y1); g.addColorStop(0, rgba(base, a)); g.addColorStop(.35, rgba(pal.ac, a * .55)); g.addColorStop(1, rgba(pal.ac2, 0));
+      c.strokeStyle = g;
+      c.globalAlpha = .22; c.lineWidth = Math.max(3, s * .16); c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke();
+      c.globalAlpha = 1; c.lineWidth = Math.max(1, s * .045); c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke();
+    }
+    const avgA = P.reduce((m, q) => m + q[3], 0) / P.length;
+    c.globalAlpha = .55 * avgA; c.strokeStyle = P[0][5] > .5 ? pal.wn : pal.ac; c.lineWidth = Math.max(1.2, s * .05); c.beginPath();
+    edge.forEach(([x, y], n) => n ? c.lineTo(x, y) : c.moveTo(x, y)); c.stroke();
+  },
+};
+
+// Claude - liquid clay: five drops that merge and part as they move, like one fluid (3 Nov: no lines, and a
+// fluid, active motion for every kind of work). Drawn as metaballs: blurred, then cut at a threshold.
+// Claude - playful clay orbs with a character of their own (3 Nov): one darts away fast and springs back with a
+// little overshoot, they hop in turn to read, a scout dashes out and peeks to search, they snap round a square in
+// order for a tool, chase a leader to write, burst out and gather to draw. Flat clay, squashing as they move.
+const springIn = k => 1 - Math.exp(-7 * k) * Math.cos(11 * k);
+const dart = k => k < .2 ? 1 - Math.pow(1 - k / .2, 3) : 1 - springIn((k - .2) / .8);
+LOOKS.clay = {
+  name: 'Claude · playful', tag: 'Kept on the side · playful orbs',
+  ang: (i, j) => j === 5,
+  forms(act, t) {
+    const stretchOf = (f, k, dk = .015) => Math.min(1.55, 1 + Math.abs(f(k + dk) - f(k)) * 6);
+    const O = [];
+    if (act === 'think') {
+      const cyc = Math.floor(t / 2.6), k = frac(t / 2.6), who = cyc % 3, spin = TAU * t / 10;
+      for (let i = 0; i < 3; i++) { const a = spin + i * TAU / 3, d = i === who ? dart(k) : -.06 * dart(k), R = .36 + .44 * d; O.push([R * Math.cos(a), R * Math.sin(a), .17, 1, i === who ? stretchOf(dart, k) : 1, a]); }
+      O.push([0, 0, .08 * (1 + .25 * Math.sin(TAU * t / 1.3)), 1, 1, 0]);
+    }
+    if (act === 'read') for (let i = 0; i < 4; i++) {
+      const k = frac(t / 2.6 - i * .16), up = k < .34 ? Math.sin(Math.PI * k / .34) : 0, land = k >= .34 && k < .46 ? Math.sin(Math.PI * (k - .34) / .12) : 0;
+      O.push([-.6 + i * .4, .12 - .36 * up, .13, 1, up > .05 ? 1 + .25 * up : 1 - .22 * land, Math.PI / 2]);
+    }
+    if (act === 'search') {
+      const cyc = Math.floor(t / 2.8), k = frac(t / 2.8), a = cyc * 2.39 + .6;
+      const out = k < .18 ? 1 - Math.pow(1 - k / .18, 3) : k < .55 ? 1 : 1 - springIn((k - .55) / .45), wig = k > .18 && k < .55 ? .04 * Math.sin((k - .18) * 60) : 0;
+      O.push([(.72 * out) * Math.cos(a) + wig, (.72 * out) * Math.sin(a), .14, 1, k < .18 || k > .55 ? stretchOf(q => q < .18 ? 1 - Math.pow(1 - q / .18, 3) : q < .55 ? 1 : 1 - springIn((q - .55) / .45), k) : 1, a]);
+      for (let i = 0; i < 3; i++) { const b = TAU * t / 6 + i * TAU / 3; O.push([.16 * Math.cos(b) + .06 * out * Math.cos(a), .16 * Math.sin(b) + .06 * out * Math.sin(a), .12, 1, 1, 0]); }
+    }
+    if (act === 'tool') { const n = Math.floor(t / 1.2), k = frac(t / 1.2), base = TAU / 4 * (n + springIn(Math.min(1, k / .7))); for (let i = 0; i < 4; i++) { const a = base + i * TAU / 4; O.push([.44 * Math.cos(a), .44 * Math.sin(a), .13, 1, k < .35 ? 1.25 : 1, a + Math.PI / 2]); } }
+    if (act === 'write') for (let i = 0; i < 4; i++) { const ph = TAU * (t / 3.6) + .45 * Math.sin(TAU * t / .9) - i * .42; O.push([.62 * Math.sin(ph), .3 * Math.sin(2 * ph), .16 - i * .025, 1, 1.15, Math.atan2(.6 * Math.cos(2 * ph), .62 * Math.cos(ph))]); }
+    if (act === 'draw') { const cyc = Math.floor(t / 3), k = frac(t / 3), off = cyc * Math.PI / 4 + TAU * t / 14; const R = k < .16 ? .15 + .5 * (1 - Math.pow(1 - k / .16, 3)) : k < .5 ? .65 : .65 - .5 * springIn((k - .5) / .5); for (let i = 0; i < 4; i++) { const a = off + i * TAU / 4; O.push([R * Math.cos(a), R * Math.sin(a), .13, 1, k < .16 || (k > .5 && k < .7) ? 1.35 : 1, a]); } }
+    if (act === 'wait') { const k = frac(t / 1.8), y = -.28 * Math.abs(Math.sin(Math.PI * k)), sq = Math.abs(Math.sin(Math.PI * k)) < .15 ? .8 : 1; O.push([0, .1 + y, .17, 1, sq, Math.PI / 2]); O.push([-.42, .26, .08, .7, 1, 0]); O.push([.42, .26, .08, .7, 1, 0]); O.push([0, .26, 0, 0, 1, 0]); }
+    return O;
+  },
+  draw(c, P, s, pal) {
+    P.forEach(([x, y, r, a, st, ang], i) => {
+      if (r <= .005 || a <= .01) return;
+      c.globalAlpha = a; c.fillStyle = i === 0 ? pal.ac : pal.ac2;
+      c.beginPath(); c.ellipse(x * s, y * s, r * s * st, r * s / st, ang, 0, TAU); c.fill();
+    });
+  },
+};
+// The playful orbs, smoothed (3 Nov, second pass): every move eases in and out - a clear acceleration and
+// deceleration, never a jump or a spring jitter - and the orbs keep their round shape, only lengthening a little
+// along the way they move, by their real speed. The character stays: one glides out and back in turn, they hop in
+// order, a scout goes out and looks around, they turn a square a quarter at a time, chase a leader, open and gather.
+const seg = (k, a, b) => ease(Math.max(0, Math.min(1, (k - a) / (b - a))));     // eased 0..1 over [a, b] of a cycle
+const CLAY_POS = {
+  think(t) {
+    const cyc = Math.floor(t / 3.2), k = frac(t / 3.2), who = cyc % 3, spin = TAU * t / 12, d = seg(k, 0, .32) - seg(k, .5, .86);
+    const O = [0, 1, 2].map(i => { const a = spin + i * TAU / 3, R = .36 + (i === who ? .4 * d : -.05 * d); return [R * Math.cos(a), R * Math.sin(a), .16, 1]; });
+    return O.concat([[0, 0, .08, 1]]);
+  },
+  read(t) {
+    return [0, 1, 2, 3].map(i => { const k = frac(t / 2.8 - i * .14), h = k < .42 ? Math.sin(Math.PI * ease(k / .42)) : 0; return [-.6 + i * .4, .12 - .3 * h, .13, 1]; });
+  },
+  search(t) {
+    const cyc = Math.floor(t / 3.2), k = frac(t / 3.2), a = cyc * 2.39 + .6, out = seg(k, 0, .3) - seg(k, .62, .95);
+    const look = .35 * Math.sin(TAU * seg(k, .3, .62)) * out;                   // it turns its head slowly while out
+    const O = [[.7 * out * Math.cos(a + look), .7 * out * Math.sin(a + look), .14, 1]];
+    for (let i = 0; i < 3; i++) { const b = TAU * t / 8 + i * TAU / 3; O.push([.16 * Math.cos(b) + .05 * out * Math.cos(a), .16 * Math.sin(b) + .05 * out * Math.sin(a), .11, 1]); }
+    return O;
+  },
+  tool(t) {
+    const n = Math.floor(t / 1.6), k = frac(t / 1.6), base = TAU / 4 * (n + seg(k, 0, .62));
+    return [0, 1, 2, 3].map(i => { const a = base + i * TAU / 4; return [.44 * Math.cos(a), .44 * Math.sin(a), .13, 1]; });
+  },
+  write(t) {
+    return [0, 1, 2, 3].map(i => { const ph = TAU * t / 3.8 + .25 * Math.sin(TAU * t / 1.9) - i * .45; return [.62 * Math.sin(ph), .3 * Math.sin(2 * ph), .16 - i * .025, 1]; });
+  },
+  draw(t) {
+    const cyc = Math.floor(t / 3.4), k = frac(t / 3.4), R = .15 + .5 * (seg(k, 0, .34) - seg(k, .58, .94)), off = cyc * Math.PI / 4 + TAU * t / 16;
+    return [0, 1, 2, 3].map(i => { const a = off + i * TAU / 4; return [R * Math.cos(a), R * Math.sin(a), .13, 1]; });
+  },
+  wait(t) {
+    const f = .5 + .5 * Math.sin(TAU * t / 2.6);                                // a slow float, not a bounce
+    return [[0, .06 - .1 * f, .17, 1], [-.42, .26, .08, .7], [.42, .26, .08, .7], [0, .26, 0, 0]];
+  },
+};
+LOOKS.clay.forms = (act, t) => {
+  const now = (CLAY_POS[act] || CLAY_POS.think)(t), before = (CLAY_POS[act] || CLAY_POS.think)(t - .04);
+  return now.map(([x, y, r, a], i) => {
+    const dx = x - before[i][0], dy = y - before[i][1], speed = Math.hypot(dx, dy) / .04;
+    return [x, y, r, a, 1 + Math.min(.16, speed * .07), speed > .02 ? Math.atan2(dy, dx) : 0];
+  });
+};
+
+// Claude - a small 3D scene (4 Nov, made fresh). Four orbs of one clay colour hold a formation in real depth, seen
+// through a camera: the formation always turns in 3D, so the orbs pass nearer and farther and never sit still.
+// In order, one orb leans toward you, then falls away into the distance - speeding up as it goes, shrinking toward
+// the vanishing point - and fades only once it is far off. A new one flies in from the distance to its place,
+// braking hard to a smooth stop; as it lands, scene time slows to a crawl around it, then picks up again.
+// Round orbs: only a slight lengthening along the way they move on screen.
+const CL = { P: 3.2, D: 3, far: 24 };
+const sstep = (a, b, v) => { const u = Math.max(0, Math.min(1, (v - a) / (b - a))); return u * u * (3 - 2 * u); };
+const clamp01 = v => Math.max(0, Math.min(1, v));
+const inCubic = u => u * u * u, outQuint = u => 1 - Math.pow(1 - u, 5);
+// Scene time: full speed, easing down to 15% while a new orb lands, then back up - never a stop, never a jump.
+const sceneTime = t => {
+  const P = CL.P, f0 = .32, w = .56, h = .85, cyc = Math.floor(t / P), k = frac(t / P), u = clamp01((k - f0) / w);
+  return P * (cyc * (1 - h * w / 2) + k - h * w * (u / 2 - Math.sin(TAU * u) / (4 * Math.PI)));
+};
+const rotY = ([x, y, z], a) => [x * Math.cos(a) + z * Math.sin(a), y, -x * Math.sin(a) + z * Math.cos(a)];
+const rotX = ([x, y, z], a) => [x, y * Math.cos(a) - z * Math.sin(a), y * Math.sin(a) + z * Math.cos(a)];
+const rotZ = ([x, y, z], a) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a), z];
+const TETRA = [[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]].map(v => v.map(c => c * .52 / Math.sqrt(3)));
+// Each kind of work: where orb i sits at scene time T, in 3D, and its size.
+const CL_SLOT = {
+  think: (T, i) => [rotX(rotY(TETRA[i], TAU * T / 7), .5 + .25 * Math.sin(TAU * T / 9)), .15],
+  read: (T, i) => { const w = TAU * T / 2.4 - i * 1.2; return [rotX([-.6 + i * .4 + .04 * Math.sin(TAU * T / 5), -.1 * Math.sin(w), -.22 * (.5 + .5 * Math.sin(w))], .35), .13]; },
+  search: (T, i) => { const a = TAU * T / 5 + i * TAU / 4; return [rotX([.55 * Math.cos(a), 0, .55 * Math.sin(a)], .45), .13]; },
+  tool: (T, i) => { const q = T / 1.6, a = TAU / 4 * (q - Math.sin(TAU * q) / (TAU * 1.8)) + i * TAU / 4 + Math.PI / 4;
+    return [rotY(rotX([.46 * Math.cos(a), .46 * Math.sin(a), 0], .45), .3 * Math.sin(TAU * T / 6)), .13]; },
+  write: (T, i) => { const ph = TAU * T / 4 - i * .55; return [[.62 * Math.sin(ph), .28 * Math.sin(2 * ph), .3 * Math.cos(ph)], .145 - i * .015]; },
+  draw: (T, i) => { const R = .2 + .4 * (.5 - .5 * Math.cos(TAU * T / 4)), a = TAU * T / 8 + i * TAU / 4; return [rotX([R * Math.cos(a), 0, R * Math.sin(a)], .9), .13]; },
+  wait: (T, i) => { if (!i) return [[0, .02 * Math.sin(TAU * T / 2.6), 0], .17 * (1 + .07 * Math.sin(TAU * T / 1.6))];
+    const a = TAU * T / 9 + i * TAU / 3; return [[.5 * Math.cos(a), .32, .9 + .5 * Math.sin(a)], .06]; },
+};
+// The scene at real time t, projected: [x, y, r, alpha] per orb.
+const clScene = (act, t) => {
+  const slot = CL_SLOT[act] || CL_SLOT.think, T = sceneTime(t), cyc = Math.floor(t / CL.P), k = frac(t / CL.P), who = act === 'wait' ? -1 : cyc % 4;
+  return [0, 1, 2, 3].map(i => {
+    let [[x, y, z], r] = slot(T, i), a = 1;
+    if (i === who) {
+      if (k < .32) {                                   // leans in, then falls away faster and faster
+        const lean = -.18 * sstep(0, .08, k) * (1 - sstep(.08, .2, k)), go = inCubic(clamp01((k - .08) / .24));
+        if (act === 'search') { x *= 1 + 1.2 * go; y *= 1 + 1.2 * go; }   // a scout: out and away
+        z += lean + CL.far * go;
+      } else if (k < .4) z += CL.far;                  // gone, far off
+      else { z += CL.far * (1 - outQuint(clamp01((k - .4) / .32))); }   // flies in, brakes to a stop in its place
+    }
+    const sc = CL.D / (z + CL.D);
+    if (i === who) a = sstep(.06, .28, sc);           // fades only once it is small: far away
+    return [x * sc, y * sc, r * sc, a];
+  });
+};
+LOOKS.claude = {
+  name: 'Claude', tag: 'New · a 3D scene, time slows as one lands',
+  ang: (i, j) => j === 5,
+  forms(act, t) {
+    const now = clScene(act, t), before = clScene(act, t - .03);
+    return now.map(([x, y, r, a], i) => {
+      const dx = x - before[i][0], dy = y - before[i][1], speed = Math.hypot(dx, dy) / .03;
+      return [x, y, r, a, 1 + Math.min(.1, speed * .045), speed > .02 ? Math.atan2(dy, dx) : 0];
+    });
+  },
+  draw(c, P, s, pal) {
+    // Nearer (bigger) orbs over farther ones, each with a thin edge of the background, so two passing in depth stay
+    // two round orbs instead of merging into one shape.
+    c.fillStyle = pal.ac; c.strokeStyle = pal.bg; c.lineWidth = Math.max(1.5, s * .03);
+    [...P].sort((p, q) => p[2] - q[2]).forEach(([x, y, r, a, st, ang]) => {
+      if (r <= .004 || a <= .01) return;
+      c.globalAlpha = a; c.beginPath(); c.ellipse(x * s, y * s, r * s * st, r * s / st, ang, 0, TAU); c.stroke(); c.fill();
+    });
+  },
+};
+
+const GOO = { cv: null };
+LOOKS.clay2 = {
+  name: 'Claude · liquid', tag: 'Second option · liquid clay',
+  forms(act, t) {
+    const B = [];
+    if (act === 'think') { for (let i = 0; i < 4; i++) { const a = TAU * t / 5.2 + i * TAU / 4, R = .34 + .2 * Math.sin(TAU * t / 3.4 + i * 1.7); B.push([R * Math.cos(a), R * Math.sin(a), .17, 1]); } B.push([0, 0, .2 * (.65 + .35 * Math.sin(TAU * t / 3.4)), 1]); }
+    if (act === 'read') for (let i = 0; i < 5; i++) { const f = frac(t / 3.2 + i / 5), x = -.95 + 1.9 * f; B.push([x, .08 * Math.sin(x * 4 + TAU * t / 3), .16 * Math.sin(Math.PI * f), 1]); }
+    if (act === 'search') { const a = TAU * t / 3; for (let i = 0; i < 4; i++) { const b = a - i * .32; B.push([.48 * Math.cos(b), .48 * Math.sin(b), .16 - i * .03, 1]); } B.push([0, 0, .11, 1]); }
+    if (act === 'tool') { for (let i = 0; i < 3; i++) { const a = TAU * t / 3.6 + i * TAU / 3; B.push([.2 * Math.cos(a), .2 * Math.sin(a), .16, 1]); } for (let i = 0; i < 2; i++) { const a = -TAU * t / 4.8 + i * Math.PI, R = .54 + .12 * Math.sin(TAU * t / 2.4 + i); B.push([R * Math.cos(a), R * Math.sin(a), .12, 1]); } }
+    if (act === 'write') for (let i = 0; i < 5; i++) { const th = TAU * t / 3.4 - i * .2; B.push([.62 * Math.sin(th), .3 * Math.sin(2 * th), .17 - i * .025, 1]); }
+    if (act === 'draw') { B.push([0, 0, .24, 1]); for (let i = 0; i < 4; i++) { const a = i * TAU / 4 + TAU * t / 9, R = .6 * ease(ping(t / 3.6 + i * .12)); B.push([R * Math.cos(a), R * Math.sin(a), .14, 1]); } }
+    if (act === 'wait') { B.push([0, 0, .23 * (.86 + .14 * Math.sin(TAU * t / 2.4)), 1]); for (let i = 0; i < 4; i++) B.push([0, 0, .05, 1]); }
+    return B;
+  },
+  draw(c, P, s, pal) {
+    const span = 2.6 * s, px = Math.ceil(span * 2), blur = Math.max(2, s * .16);
+    if (!GOO.cv) GOO.cv = document.createElement('canvas');
+    const o = GOO.cv; if (o.width !== px) { o.width = px; o.height = px; }
+    const g = o.getContext('2d', { willReadFrequently: true }); g.clearRect(0, 0, px, px);
+    g.filter = `blur(${blur * 2}px)`; g.fillStyle = '#fff';
+    for (const [x, y, r] of P) { if (r <= .005) continue; g.beginPath(); g.arc(px / 2 + x * s * 2, px / 2 + y * s * 2, r * s * 2 * 1.35, 0, TAU); g.fill(); }
+    g.filter = 'none';
+    const img = g.getImageData(0, 0, px, px), d = img.data, [cr, cg, cb] = rgb(pal.ac);
+    for (let i = 0; i < d.length; i += 4) { const a = Math.max(0, Math.min(255, (d[i + 3] - 120) * 7)); d[i] = cr; d[i + 1] = cg; d[i + 2] = cb; d[i + 3] = a; }
+    g.putImageData(img, 0, 0);
+    c.globalAlpha = 1; c.drawImage(o, -span / 2, -span / 2, span, span);
+  },
+};
+
+// ChatGPT - its one dot, which becomes what it does: breathes, glides, sends a ring, turns square, becomes a caret.
+LOOKS.mono = {
+  name: 'ChatGPT', tag: 'Matches ChatGPT · one dot',
+  forms(act, t) {
+    let x = 0, a = 1, r = .3 * (.78 + .22 * (.5 + .5 * Math.sin(TAU * t / 2.2))), round = 1, aspect = 1, rot = 0, ringR = 0, ringA = 0, line = 0, fill = 1;
+    if (act === 'read') { r = .14; x = .62 * Math.sin(TAU * t / 3); line = .3; }
+    if (act === 'search') { const f = frac(t / 2.4); r = .16; ringR = .2 + .62 * ease(f); ringA = Math.sin(Math.PI * f) * .7; }
+    if (act === 'tool') { r = .27; round = .32; rot = (TAU * t / 7) % TAU; }
+    // The caret types left to right, fades at the end of the line and comes back at its start - it never snaps back.
+    if (act === 'write') { const k = frac(t / 2.8); r = .3; aspect = .16; x = -.62 + 1.24 * ease(Math.min(1, k / .85)); a = fadeLoop(k); line = .32 * a; }
+    if (act === 'draw') { r = .05 + .4 * ease(ping(t / 3.4)); ringR = .46; ringA = .45; }
+    if (act === 'wait') { r = .1; ringR = .4; ringA = .35 + .55 * (.5 + .5 * Math.sin(TAU * t / 1.6)); }
+    return [[x, 0, r, a, rot, round, aspect, ringR, ringA, line, fill]];
+  },
+  ang: (i, j) => j === 4,
+  draw(c, P, s, pal) {
+    const [x, , r, dotA, rot, round, aspect, ringR, ringA, line] = P[0];
+    if (line > .01) { c.globalAlpha = line; c.strokeStyle = pal.mu; c.lineWidth = 1.5; c.beginPath(); c.moveTo(-.66 * s, .34 * s * (aspect < .5 ? 1 : 0)); c.lineTo((aspect < .5 ? x : .66) * s, .34 * s * (aspect < .5 ? 1 : 0)); c.stroke(); }
+    if (ringA > .01) { c.globalAlpha = ringA; c.strokeStyle = pal.fg; c.lineWidth = 1.6; c.beginPath(); c.arc(0, 0, ringR * s, 0, TAU); c.stroke(); }
+    const h = 2 * r * s, w = h * aspect, rad = Math.min(w, h) / 2 * round;
+    c.save(); c.translate(x * s, 0); c.rotate(rot); c.globalAlpha = dotA; c.fillStyle = pal.fg;
+    c.beginPath(); c.roundRect(-w / 2, -h / 2, w, h, rad); c.fill(); c.restore();
+  },
+};
+
+// Grok - a dark core with an accretion disc: it turns, precesses to search, crosses into a gyroscope, jets out to write.
+LOOKS.void = {
+  name: 'Grok', tag: 'Matches Grok · event horizon',
+  forms(act, t) {
+    const N = 18, out = [];
+    for (let k = 0; k < N; k++) {
+      let rx = .8, ry = .28, deg = -18, sp = TAU / 4, ang, x, y, z, a, r = .05;
+      if (act === 'read') { ry = .11; deg = 0; sp = TAU / 3; }
+      if (act === 'search') { deg = -18 + 42 * Math.sin(TAU * t / 5); ry = .32; }
+      if (act === 'tool') { deg = k % 2 ? 42 : -42; ry = .3; sp = TAU / 3.6; }
+      ang = TAU * k / N + sp * t;
+      [x, y] = tilt(rx * Math.cos(ang), ry * Math.sin(ang), deg); z = Math.sin(ang); a = .3 + .7 * (z + 1) / 2;
+      if (act === 'write') { const f = frac(t / 2.4 + k / N); x = -.3 + 1.1 * f; y = .04 * Math.sin(x * 9 + t * 2); z = 1; a = 1 - f; r = .045; }
+      if (act === 'draw') { const f = frac(t / 3 + k / N), rad = .85 * (1 - f), th = 6 * rad + TAU * t / 6; x = rad * Math.cos(th); y = rad * Math.sin(th) * .55; z = 1; a = Math.min(1, rad * 2.4); r = .03 + .03 * rad; }
+      if (act === 'wait') { ang = TAU * k / N; [x, y] = tilt(.8 * Math.cos(ang), .28 * Math.sin(ang), -18); z = Math.sin(ang); a = (.3 + .5 * (z + 1) / 2) * (.45 + .55 * (.5 + .5 * Math.sin(TAU * t / 1.6))); }
+      out.push([x, y, r * (1 + .5 * Math.max(0, z)), a, z, 0]);
+    }
+    return out;
+  },
+  draw(c, P, s, pal) {
+    const dot = q => { c.globalAlpha = q[3]; c.fillStyle = pal.fg; c.beginPath(); c.arc(q[0] * s, q[1] * s, Math.max(.6, q[2] * s), 0, TAU); c.fill(); };
+    P.filter(q => q[4] < 0).forEach(dot);
+    const g = c.createRadialGradient(0, 0, .2 * s, 0, 0, .46 * s); g.addColorStop(0, rgba(pal.fg, .0)); g.addColorStop(.75, rgba(pal.fg, .12)); g.addColorStop(1, rgba(pal.fg, 0));
+    c.globalAlpha = 1; c.fillStyle = g; c.beginPath(); c.arc(0, 0, .46 * s, 0, TAU); c.fill();
+    c.fillStyle = pal.bg; c.beginPath(); c.arc(0, 0, .27 * s, 0, TAU); c.fill();
+    c.strokeStyle = rgba(pal.fg, .9); c.lineWidth = 1.4; c.beginPath(); c.arc(0, 0, .27 * s, 0, TAU); c.stroke();
+    P.filter(q => q[4] >= 0).forEach(dot);
+  },
+};
+
+// Gemini - one four-point sparkle in Gemini's own blue-to-rose, with small glints of light (never three sparkles):
+// it turns slowly to think, a glint orbits to search, glints trail it to write.
+LOOKS.prism = {
+  name: 'Gemini', tag: 'Matches Gemini · sparkle',
+  forms(act, t) {
+    const off = [0, 0, 0, 0, 0, 0], S = [[0, 0, .5 * (.92 + .08 * Math.sin(TAU * t / 2.6)), 1, (TAU * t / 14) % TAU, 0], off.slice(), off.slice(), off.slice()];
+    if (act === 'read') { const sw = .55 * Math.sin(TAU * t / 3.2); S[0] = [sw, -.06, .28, 1, .3 * Math.sin(TAU * t / 3.2), 0]; [-.6, 0, .6].forEach((x, i) => { const f = Math.exp(-(((x - sw) / .3) ** 2)); S[i + 1] = [x, .42, .05 + .03 * f, .25 + .75 * f, 0, 0]; }); }
+    if (act === 'search') { const a = TAU * t / 3.4; S[0] = [0, 0, .34, 1, .15 * Math.sin(TAU * t / 6), 0]; S[1] = [.7 * Math.cos(a), .5 * Math.sin(a), .07, 1, 0, 0]; S[2] = [.7 * Math.cos(a - .45), .5 * Math.sin(a - .45), .05, .45, 0, 0]; }
+    if (act === 'tool') S[0] = [0, 0, .44, 1, (TAU * t / 8) % TAU, 0];
+    if (act === 'write') { const k = frac(t / 3), f = fadeLoop(k); for (let i = 0; i < 4; i++) { const e = ease(Math.min(1, Math.max(0, (k - i * .05) / .85))); S[i] = [-.62 + 1.24 * e, .1 * Math.sin(TAU * e), i ? .06 - i * .012 : .24, (i ? .7 - i * .18 : 1) * f, i ? 0 : .35 * Math.sin(TAU * e), 0]; } }
+    if (act === 'draw') S[0] = [0, 0, .12 + .44 * ease(ping(t / 3.6)), 1, (TAU * t / 18) % TAU, 0];
+    if (act === 'wait') S[0] = [0, 0, .4, 1, 0, .5 + .5 * Math.sin(TAU * t / 1.6)];
+    return S;
+  },
+  ang: (i, j) => j === 4,
+  draw(c, P, s) {
+    P.forEach(([x, y, R, a, rot, glow], i) => {
+      if (R <= .01 || a <= .01) return;
+      const pr = R * s;
+      if (i) {                                           // a glint: a small soft point of the sparkle's light
+        const g = c.createRadialGradient(x * s, y * s, 0, x * s, y * s, pr * 2.2);
+        g.addColorStop(0, 'rgba(220,232,255,1)'); g.addColorStop(.35, 'rgba(155,114,203,.7)'); g.addColorStop(1, 'rgba(66,133,244,0)');
+        c.globalAlpha = a; c.fillStyle = g; c.beginPath(); c.arc(x * s, y * s, pr * 2.2, 0, TAU); c.fill(); return;
+      }
+      c.save(); c.translate(x * s, y * s); c.rotate(rot);
+      const g = c.createLinearGradient(-pr, -pr, pr, pr); g.addColorStop(0, '#4285f4'); g.addColorStop(.55, '#9b72cb'); g.addColorStop(1, '#d96570');
+      if (glow > .01) { c.shadowColor = 'rgba(66,133,244,.8)'; c.shadowBlur = 14 * glow; }
+      c.globalAlpha = a; c.fillStyle = g; c.beginPath();
+      for (let k = 0; k < 4; k++) { const a0 = k * Math.PI / 2 - Math.PI / 2, a1 = a0 + Math.PI / 2; const [px, py] = [Math.cos(a0) * pr, Math.sin(a0) * pr]; if (!k) c.moveTo(px, py); c.quadraticCurveTo(Math.cos(a0 + Math.PI / 4) * pr * .14, Math.sin(a0 + Math.PI / 4) * pr * .14, Math.cos(a1) * pr, Math.sin(a1) * pr); }
+      c.closePath(); c.fill(); c.restore();
+    });
+  },
+};
+
+const ORDER = ['classic', 'sunrise', 'terminal', 'eclipse', 'aurora', 'claude', 'clay', 'clay2', 'mono', 'void', 'prism'];
+const PALS = {
+  classic: [['#262624', '#f5f4ee', '#a6a39a', '#ffc24a', '#ffd98a'], ['#faf9f5', '#1f1e1d', '#67655e', '#d9a033', '#f0c56a']],
+  sunrise: [['#1b1614', '#f6ece3', '#b3a092', '#e8875a', '#ffc79a'], ['#fbf7f1', '#29221c', '#6c6054', '#c4612f', '#eea36e']],
+  terminal: [['#161b18', '#d4ded8', '#8fa699', '#7fd4a0', '#b7c6bd'], ['#f6f8f4', '#1f2d25', '#56695d', '#1e7a4c', '#34463b']],
+  eclipse: [['#07060b', '#f4eee6', '#a79d91', '#ff8a4c', '#ffd9a0'], ['#f6f4fa', '#1d1828', '#665e7c', '#c2561d', '#ff9a5c']],
+  aurora: [['#040a12', '#e9f7f5', '#93b8b4', '#46f0b4', '#ff5fa8'], ['#eef5f6', '#0f2a2c', '#4d6b6c', '#0e9a78', '#e0559b']],
+  claude: [['#262624', '#faf9f5', '#a6a39a', '#d97757', '#d97757'], ['#faf9f5', '#141413', '#64635e', '#c96442', '#c96442']],
+  clay: [['#262624', '#faf9f5', '#a6a39a', '#d97757', '#e89a7a'], ['#faf9f5', '#141413', '#64635e', '#c96442', '#d98a6a']],
+  clay2: [['#262624', '#faf9f5', '#a6a39a', '#d97757', '#f0b08c'], ['#faf9f5', '#141413', '#64635e', '#c96442', '#d97757']],
+  mono: [['#212121', '#ffffff', '#afafaf', '#ffffff', '#bdbdbd'], ['#ffffff', '#0d0d0d', '#5d5d5d', '#0d0d0d', '#5d5d5d']],
+  void: [['#131211', '#fcfcfc', '#9a9996', '#fcfcfc', '#7a7a7a'], ['#f9f8f7', '#050505', '#66655f', '#050505', '#8a8a8a']],
+  prism: [['#131314', '#e3e3e3', '#a8abae', '#a8c7fa', '#d96570'], ['#f8f9fa', '#1f1f1f', '#5e6368', '#0b57d0', '#d96570']],
+};
+return { LOOKS, PALS, mix, ease, frac };
+})();
 var Orbs = (() => {
   const TRAIL = 7;
   const marks = document.getElementsByClassName('think');        // live: new marks join by themselves
@@ -12092,8 +12607,37 @@ var Orbs = (() => {
   function mode() {
     const d = root.dataset, m = (S.settings && S.settings.think_mark) || 'auto';
     if (d.secret || d.tone === 'mossad') return 'legacy';                 // a secret theme keeps its own mark
-    if (m === 'auto') return ['mono', 'void', 'prism'].includes(d.skin) ? 'legacy' : 'orbs';   // Claude's own mark is a node graph: the orbs
+    // 1.4.6: Auto is each look's own mark (MARK_LIB); Orbs and Legacy (the marks from before) stay under Extras.
+    if (m === 'auto') return markKey() ? 'marks' : 'orbs';
     return m === 'legacy' ? 'legacy' : 'orbs';
+  }
+  // The look's mark in MARK_LIB; the Claude look has two (Settings > Appearance: Regular, the 3D one, or Liquid).
+  function markKey() {
+    const skin = root.dataset.skin;
+    if (skin === 'clay') return (S.settings && S.settings.claude_mark) === 'liquid' ? 'clay2' : 'claude';
+    return { classic: 'classic', dawn: 'sunrise', dusk: 'sunrise', terminal: 'terminal', eclipse: 'eclipse', aurora: 'aurora', mono: 'mono', void: 'void', prism: 'prism' }[skin] || null;
+  }
+  const hex = c => '#' + c.slice(0, 3).map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
+  // The look's own mark: its approved palette (the board's), with Classic taking your accent. Blends 1.2 s between works.
+  function paintMark(el, o, t, now, still) {
+    if (!o.w || !sizeCheck || still) { o.mw = el.clientWidth; o.mh = el.clientHeight; }
+    const w = o.mw, h = o.mh, dpr = Math.min(3, window.devicePixelRatio || 1);
+    if (!w || !h) return;
+    if (o.w !== w || o.h !== h || o.dpr !== dpr) { o.cv.width = Math.round(w * dpr); o.cv.height = Math.round(h * dpr); o.w = w; o.h = h; o.dpr = dpr; o.drawn = ''; }
+    const key = markKey(), L = MARK_LIB.LOOKS[key]; if (!L) return;
+    const act = el.dataset.act || 'think';
+    if (act !== o.mAct) { o.mFrom = still || !o.mAct ? null : o.mAct; o.mT0 = now; o.mAct = act; }
+    const k = o.mFrom ? MARK_LIB.ease((now - o.mT0) / 1200) : 1;
+    if (k >= 1) o.mFrom = null;
+    if (still) { const sig = act + key + root.dataset.scheme + w + h; if (o.drawn === sig) return; o.drawn = sig; }
+    const dark = root.dataset.scheme === 'dark', [bg, fg, mu, ac0, ac2] = MARK_LIB.PALS[key][dark ? 0 : 1];
+    const ac = key === 'classic' ? hex(rgba('var(--accent)')) : ac0;
+    const pal = { bg: key === 'classic' ? hex(rgba('var(--bg)')) : bg, fg, mu, ac, ac2, wn: hex(rgba('var(--warn)')) };
+    let P = L.forms(act, t);
+    if (o.mFrom) P = MARK_LIB.mix(L.forms(o.mFrom, t), P, k, L.ang);
+    const ctx = o.ctx, s = Math.min(w, h) / 2 * .86;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+    ctx.save(); ctx.translate(w / 2, h / 2); ctx.lineCap = 'round'; L.draw(ctx, P, s, pal, act, t); ctx.restore(); ctx.globalAlpha = 1;
   }
   // The appearance's dressing: colours from its own tokens, a drawing style, and timing.
   function getDress() {
@@ -12219,14 +12763,14 @@ var Orbs = (() => {
   function frame(now) {
     raf = 0;
     if (document.hidden) return;
-    const orbsMode = mode() === 'orbs', still = stillMotion();
+    const md = mode(), orbsMode = md !== 'legacy', still = stillMotion();
     // 30 frames a second: at 26 px it reads as smooth, for half the drawing (a 60 Hz loop cost ~4% of a core).
     if (last && !still && now - last < 30) { raf = requestAnimationFrame(frame); return; }
     const dt = last ? Math.min(100, now - last) : 0; last = now;
     sizeCheck = (sizeCheck + 1) % 15;                               // a mark's size is read twice a second, not every frame
-    if (root.dataset.state !== 'paused') clock += dt / 1000 * (dress ? dress.speed : 1);
+    if (root.dataset.state !== 'paused') clock += dt / 1000 * (dress && md === 'orbs' ? dress.speed : 1);   // the marks keep their own pace
     let t = still ? .4 : clock, live = false;
-    if (dress && dress.steps && !still) t = Math.floor(t * dress.steps) / dress.steps;   // Terminal moves in steps
+    if (md === 'orbs' && dress && dress.steps && !still) t = Math.floor(t * dress.steps) / dress.steps;   // Terminal's orbs move in steps
     if (orbsMode) getDress();
     for (const el of marks) {
       if (!orbsMode) { if (el._orb) release(el); continue; }
@@ -12236,8 +12780,8 @@ var Orbs = (() => {
       }
       const o = el._orb || prepare(el), hold = still || el.dataset.still === '1';   // oneMover: another mark moves
       o.seen = true;
-      paint(el, o, hold ? .4 : t, now, hold);
-      live = live || !hold || !!o.from;
+      if (md === 'marks') paintMark(el, o, hold ? 1.1 : t, now, hold); else paint(el, o, hold ? .4 : t, now, hold);
+      live = live || !hold || !!o.from || !!o.mFrom;
     }
     if (live) raf = requestAnimationFrame(frame); else last = 0;
   }
@@ -12245,14 +12789,14 @@ var Orbs = (() => {
   // A cheap check a few times a second while asleep: a mark that has just appeared starts the loop.
   function idleCheck() {
     if (raf || document.hidden) return;
-    for (const el of marks) if ((el._orb ? true : mode() === 'orbs') && shown(el)) { wake(); return; }
+    for (const el of marks) if ((el._orb ? true : mode() !== 'legacy') && shown(el)) { wake(); return; }
     if (mode() === 'legacy') for (const el of marks) if (el._orb) release(el);
   }
   wakeT = setInterval(idleCheck, 300);
   document.addEventListener('visibilitychange', () => { last = 0; if (!document.hidden) wake(); });
   document.addEventListener('appmotionchange', () => { dressKey = ''; wake(); });
   return {
-    on: () => mode() === 'orbs',
+    on: () => mode() !== 'legacy',
     wake,
     sync() { dressKey = ''; for (const el of marks) if (el._orb) el._orb.drawn = ''; wake(); idleCheck(); },   // the theme or the setting changed
     mode,
@@ -15066,9 +15610,9 @@ function renderAppearance() {
       <div class="row${dis(op)}"><div class="row-text"><b>Reply font</b><small>${op ? `${opName} uses sans throughout for density.` : 'Serif reads like a letter; sans is more compact.'}</small></div>${seg([['serif', 'Serif'], ['sans', 'Sans']], s.chat_font || 'serif', "(v=>saveSettings({chat_font:v}).then(renderAppearance))")}</div>
       <div class="row${dis(op)}"><div class="row-text"><b>Density</b><small>${op ? `${opName} is already compact.` : 'Compact fits more on smaller screens.'}</small></div>${seg([['comfortable', 'Comfortable'], ['compact', 'Compact']], s.layout || 'comfortable', "(v=>saveSettings({layout:v}).then(renderAppearance))")}</div>
       ${rowHtml('Idle screen', 'A calm screen with the time when nothing happens. Any key brings it back.', seg([['off', 'Off'], ['5', '5 min'], ['10', '10 min'], ['30', '30 min']], String(s.ambient_idle ?? '10'), "(v=>saveSettings({ambient_idle:v}).then(renderAppearance))"))}
-      <div class="row tm-row"><div class="row-text"><b>Thinking mark</b><small>What moves while it works. Orbs fly into a new pattern for each kind of work. Auto: orbs (turning nodes in the Claude look), while ChatGPT, Grok and Gemini keep their own mark. Legacy: each appearance's mark from before.</small>
+      ${fam === 'clay' ? `<div class="row tm-row"><div class="row-text"><b>Claude's thinking mark</b><small>Regular: four clay orbs in 3D - one falls away and a new one lands, while time slows around it. Liquid: soft clay that flows into each shape.</small>
         <span class="tm-preview" aria-hidden="true"><span class="think" data-act="think"><i></i><i></i><i></i><i></i><i></i></span><span class="tm-act">Thinking</span></span></div>
-        ${seg([['auto', 'Auto'], ['orbs', 'Orbs'], ['legacy', 'Legacy']], ['orbs', 'legacy'].includes(s.think_mark) ? s.think_mark : 'auto', "(v=>saveSettings({think_mark:v}).then(()=>{Orbs.sync();renderAppearance()}))")}</div>
+        ${seg([['regular', 'Regular'], ['liquid', 'Liquid']], s.claude_mark === 'liquid' ? 'liquid' : 'regular', "(v=>saveSettings({claude_mark:v}).then(()=>{Orbs.sync();renderAppearance()}))")}</div>` : ''}
     </div>
     <div class="set-group"><div class="gt">Motion and reading <small>· this window only</small></div>
       ${rowHtml('Motion', `Reduced keeps only what shows progress; Off stops it all.${matchMedia('(prefers-reduced-motion: reduce)').matches ? ' Windows asks for reduced motion, so Full acts as Reduced.' : ''}`, seg([['full', 'Full'], ['reduced', 'Reduced'], ['off', 'Off']], store.get('motion', 'full'), "(v=>{store.set('motion',v);applyAppearance();renderAppearance()})"))}
@@ -15085,9 +15629,11 @@ function renderAppearance() {
       ${accents.map(([c, n, show]) => `<button class="swatch ${(s.accent || '') === c ? 'on' : ''}" style="background:${show || c}" title="${n}" aria-label="${n}" onclick="saveSettings({accent:'${c}'}).then(renderAppearance)"></button>`).join('')}
       <input type="color" value="${esc(s.accent || '#e5a830')}" onchange="saveSettings({accent:this.value}).then(renderAppearance)" style="width:32px;height:32px;border:0;background:none;padding:0;cursor:pointer" title="Custom color" aria-label="Custom accent color">
     </div></div>
-    <details class="set-more"${layout === 'overlay' ? ' open' : ''}><summary>Extras <small>· the older interface, Terminal's phosphor, the fade-in, the Overlay panels</small></summary>
+    <details class="set-more"${layout === 'overlay' ? ' open' : ''}><summary>Extras <small>· the older interface, the original AI looks and marks, Terminal's phosphor, the fade-in, the Overlay panels</small></summary>
     <div class="set-group">
       ${rowHtml('Interface', 'New: the calmer 2026 design - one Customize menu, waiting items on Home, new type. Legacy: everything as it was.', seg([['new', 'New'], ['legacy', 'Legacy']], s.ui_style === 'legacy' ? 'legacy' : 'new', "(v=>changeAppearance({ui_style:v}).then(()=>{buildNewNav();renderAppearance()}))"))}
+      ${rowHtml('AI looks', 'New: Claude, ChatGPT, Grok and Gemini redrawn from their public design files (1.4.6). Original: the looks as they were before.', seg([['new', 'New'], ['original', 'Original']], s.ai_looks === 'original' ? 'original' : 'new', "(v=>changeAppearance({ai_looks:v}).then(renderAppearance))"))}
+      ${rowHtml('Thinking mark', 'New: each look\'s own mark for each kind of work. Orbs: the orbs from 1.4.3 in every look. Legacy: each look\'s mark from before.', seg([['auto', 'New'], ['orbs', 'Orbs'], ['legacy', 'Legacy']], ['orbs', 'legacy'].includes(s.think_mark) ? s.think_mark : 'auto', "(v=>saveSettings({think_mark:v}).then(()=>{Orbs.sync();renderAppearance()}))"))}
       ${rowHtml('Write replies in', 'Each new word fades in with the theme.', sw(store.get('animateReplies', true) !== false, `store.set('animateReplies', ${store.get('animateReplies', true) === false});renderAppearance()`))}
       ${fam === 'terminal' ? rowHtml('Phosphor at night', 'Bright green on black, with scanlines.', sw(!!s.terminal_phosphor, `saveSettings({terminal_phosphor:${!s.terminal_phosphor}, appearance:'terminal'}).then(renderAppearance)`)) : ''}
     </div>
