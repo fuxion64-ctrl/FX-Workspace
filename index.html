@@ -4306,7 +4306,21 @@ select.input { padding-right: 6px; height: 30px; font-size: 12.5px; flex: 0 0 au
 /* Effort sliders - each in its own idiom */
 /* ChatGPT-like: a thin rounded track that fills blue, a round white ball; Max goes indigo, Ultra purple. */
 :root[data-skin="mono"] .lv { --lv-handle: 20px; --mono-fill: #0285ff; }
-/* ---- The AI looks from their public design files (1.4.6, approved 4 Nov) ------------------------------------------
+/* ---- Eclipse, way 1 (decided 3 Nov, built 1.4.6): its own night, a light wide greeting, the corona dark at rest and
+   lit only while it works, and quiet outlined chrome - so it no longer reads as Classic dark with a glow.
+   Extras > Looks redrawn in 1.4.6: Original brings back the Eclipse from before. */
+:root[data-skin="eclipse"]:not([data-tone="light"]):not([data-ai-classic]) {
+  --bg: #0b0814; --bg-sidebar: #110d1c; --surface: #161124; --surface-2: #1c1630; --surface-3: #261e3d;
+  --border: #2a2140; --border-strong: #3d3159; --user-bubble: #1c1630;
+  --shadow: none; --shadow-lg: 0 24px 60px -24px rgba(0, 0, 0, .7), 0 0 0 1px #3d3159;
+}
+:root[data-skin="eclipse"]:not([data-tone="light"]):not([data-ai-classic]) .greeting { font-family: var(--sans); font-weight: 300; letter-spacing: .04em; font-stretch: 112%; }
+:root[data-skin="eclipse"]:not([data-tone="light"]):not([data-ai-classic]) .halo { opacity: .07; }
+:root[data-skin="eclipse"]:not([data-tone="light"]):not([data-ai-classic])[data-state="working"] .halo { opacity: .85; }
+:root[data-skin="eclipse"]:not([data-tone="light"]):not([data-ai-classic]) :is(.composer, .composer:focus-within) { border-color: color-mix(in srgb, var(--glow) 26%, var(--border)); box-shadow: none; transform: none; }
+:root[data-skin="eclipse"]:not([data-tone="light"]):not([data-ai-classic]) :is(.list-box, .home-card, .card, .sugg, .section, .steps, .sidebar, .msg-user, .send-btn, .btn.primary) { box-shadow: none; }
+:root[data-skin="eclipse"]:not([data-tone="light"]):not([data-ai-classic]) .chip { background: transparent; border: 1px solid color-mix(in srgb, var(--glow) 24%, var(--border)); }
+:root[data-skin="eclipse"]:not([data-tone="light"]):not([data-ai-classic]) .chip-ic { color: var(--accent); background: transparent; }/* ---- The AI looks from their public design files (1.4.6, approved 4 Nov) ------------------------------------------
    Claude: awesome-design-md's claude file; ChatGPT: design-skills' openai; Grok: awesome-design-md's x.ai; Gemini: a
    community DESIGN.md. Each file's own scheme only (Grok's is dark-only; the others are light). Settings > Appearance >
    Extras > AI looks: Original brings back the looks from before (data-ai-classic). No logos, no company fonts. */
@@ -15629,10 +15643,10 @@ function renderAppearance() {
       ${accents.map(([c, n, show]) => `<button class="swatch ${(s.accent || '') === c ? 'on' : ''}" style="background:${show || c}" title="${n}" aria-label="${n}" onclick="saveSettings({accent:'${c}'}).then(renderAppearance)"></button>`).join('')}
       <input type="color" value="${esc(s.accent || '#e5a830')}" onchange="saveSettings({accent:this.value}).then(renderAppearance)" style="width:32px;height:32px;border:0;background:none;padding:0;cursor:pointer" title="Custom color" aria-label="Custom accent color">
     </div></div>
-    <details class="set-more"${layout === 'overlay' ? ' open' : ''}><summary>Extras <small>· the older interface, the original AI looks and marks, Terminal's phosphor, the fade-in, the Overlay panels</small></summary>
+    <details class="set-more"${layout === 'overlay' ? ' open' : ''}><summary>Extras <small>· the older interface, the original looks and marks, Terminal's phosphor, the fade-in, the Overlay panels</small></summary>
     <div class="set-group">
       ${rowHtml('Interface', 'New: the calmer 2026 design - one Customize menu, waiting items on Home, new type. Legacy: everything as it was.', seg([['new', 'New'], ['legacy', 'Legacy']], s.ui_style === 'legacy' ? 'legacy' : 'new', "(v=>changeAppearance({ui_style:v}).then(()=>{buildNewNav();renderAppearance()}))"))}
-      ${rowHtml('AI looks', 'New: Claude, ChatGPT, Grok and Gemini redrawn from their public design files (1.4.6). Original: the looks as they were before.', seg([['new', 'New'], ['original', 'Original']], s.ai_looks === 'original' ? 'original' : 'new', "(v=>changeAppearance({ai_looks:v}).then(renderAppearance))"))}
+      ${rowHtml('Looks redrawn in 1.4.6', 'New: Claude, ChatGPT, Grok and Gemini from their public design files, and Eclipse with its own night. Original: these looks as they were before.', seg([['new', 'New'], ['original', 'Original']], s.ai_looks === 'original' ? 'original' : 'new', "(v=>changeAppearance({ai_looks:v}).then(renderAppearance))"))}
       ${rowHtml('Thinking mark', 'New: each look\'s own mark for each kind of work. Orbs: the orbs from 1.4.3 in every look. Legacy: each look\'s mark from before.', seg([['auto', 'New'], ['orbs', 'Orbs'], ['legacy', 'Legacy']], ['orbs', 'legacy'].includes(s.think_mark) ? s.think_mark : 'auto', "(v=>saveSettings({think_mark:v}).then(()=>{Orbs.sync();renderAppearance()}))"))}
       ${rowHtml('Write replies in', 'Each new word fades in with the theme.', sw(store.get('animateReplies', true) !== false, `store.set('animateReplies', ${store.get('animateReplies', true) === false});renderAppearance()`))}
       ${fam === 'terminal' ? rowHtml('Phosphor at night', 'Bright green on black, with scanlines.', sw(!!s.terminal_phosphor, `saveSettings({terminal_phosphor:${!s.terminal_phosphor}, appearance:'terminal'}).then(renderAppearance)`)) : ''}

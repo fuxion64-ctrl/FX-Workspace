@@ -17,7 +17,8 @@ class AiLooksTests(unittest.TestCase):
         self.assertIn("if (s.ai_looks === 'original') root.dataset.aiClassic = '1'; else delete root.dataset.aiClassic;", PAGE)
         extras = PAGE[PAGE.index("<summary>Extras <small>"):]
         extras = extras[:extras.index("</details>`;")]
-        self.assertIn("rowHtml('AI looks',", extras)
+        self.assertIn("rowHtml('Looks redrawn in 1.4.6',", extras)
+        self.assertIn(':root[data-skin="eclipse"]:not([data-tone="light"]):not([data-ai-classic]) {', PAGE)                    # Eclipse way 1
         self.assertIn("seg([['auto', 'New'], ['orbs', 'Orbs'], ['legacy', 'Legacy']]", extras)   # the marks from before
 
     def test_each_new_look_steps_aside_for_the_original(self):
