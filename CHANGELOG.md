@@ -4,6 +4,16 @@ What changed in each version of FX Workspace, newest first. Each version links t
 
 Parts marked **Beta** work, but are still being finished.
 
+## 1.4.6 - 2026-11-04
+
+[Full notes](docs/releases/1.4.6.md)
+
+- **Fixed:** chat rename, the mouse's Back button, the System panel's numbers, harmless chats being locked, three marks moving at once.
+- **Faster:** "write me a function" answers in the chat; quick PC questions about 3× faster on Auto; downloads over several connections; Tune speed pauses for your chats.
+- **Settings in nine pages**, Hide my IP up front and a Tor tag in the top bar; updates offered on Home.
+- **The looks redrawn:** Claude, ChatGPT, Grok and Gemini from their design write-ups, Eclipse with its own night, and each look's own thinking mark. Extras brings the old ones back.
+- **License:** AGPL-3.0 or a commercial license (1.4.5 and older stay Apache-2.0).
+
 ## 1.4.5 - 2026-10-29
 
 [Full notes](docs/releases/1.4.5.md)
