@@ -1,6 +1,6 @@
 # Third-party software and models
 
-FX Workspace's own code is Apache-2.0 (see `LICENSE` and `NOTICE`). Apart from the two fonts under "Included in
+FX Workspace's own code is AGPL-3.0, or a commercial license (see `LICENSE`, `COMMERCIAL.md` and `NOTICE`). Apart from the two fonts under "Included in
 the app", nothing below is stored in this repository: the installer or a feature's setup downloads it from its publisher, and checks it by SHA-256 where
 the publisher gives one. Each keeps its own license - read it before you use a model commercially.
 

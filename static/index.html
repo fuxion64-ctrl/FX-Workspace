@@ -1108,10 +1108,20 @@ html.fx-desktop .sb-quit:hover { background: var(--hover); color: var(--danger-t
 .update-card { margin-top: 10px; padding: 12px 14px; border: 1px solid var(--accent); border-radius: var(--radius); background: var(--accent-soft); font-size: 13.5px; }
 .update-card .cfg-actions { justify-content: flex-start; margin-top: 8px; }
 /* 1.4.6: Home's update offer - one line above the greeting, from the update check that runs by itself. */
-.update-banner { width: 100%; margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px 10px 14px; }
+/* Home's update line: quiet chrome - a hairline row, one small accent dot, one primary action. */
+.update-banner { align-self: center; width: auto; max-width: 100%; margin: 0; display: flex; flex-wrap: wrap; align-items: center;
+  gap: 4px 12px; padding: 4px 4px 4px 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface, transparent); font-size: 13px; }
 .update-banner[hidden] { display: none; }
-.update-banner .ub-text { flex: 1; min-width: 200px; }
-.update-banner .ub-text small { display: block; color: var(--text-2); font-size: 12.5px; margin-top: 2px; }
+.update-banner .ub-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; }
+.update-banner .ub-text { color: var(--text); }
+.update-banner .ub-text small { color: var(--text-3, var(--text-2)); font-size: 13px; }
+.update-banner .ub-link { color: var(--text-2); text-decoration: none; font-size: 13px; }
+.update-banner .ub-link:hover { color: var(--text); }
+.update-banner .btn.sm { border-radius: 999px; }
+.update-banner .ub-x { width: 28px; height: 28px; display: grid; place-items: center; border: 0; background: none; color: var(--text-3, var(--text-2)); border-radius: 50%; cursor: pointer; }
+.update-banner .ub-x:hover { color: var(--text); background: var(--hover, rgba(127,127,127,.12)); }
+.update-banner .ub-x svg { width: 14px; height: 14px; }
+.update-banner .update-progress { padding: 0 10px 4px 0; }
 .update-banner .update-progress { flex: 1 1 100%; }
 .update-banner .update-progress:empty { display: none; }
 .update-banner .update-progress .set-note { margin: 0; }
@@ -14883,11 +14893,11 @@ const UpdateBanner = (() => {
     if (!d || !d.newer || !d.latest || d.latest === skip || S.settings.update_check === false) { el.hidden = true; return; }
     if (el.dataset.v === d.latest && !el.hidden) return;              // already showing (and maybe installing)
     el.dataset.v = d.latest;
-    el.innerHTML = `${icon('i-download', 'sm')}<span class="ub-text"><b>FX Workspace ${esc(d.latest)} is out</b><small>You have ${esc(d.current)}. Your chats, settings and models stay as they are.</small></span>
-      ${d.can_install ? `<button type="button" class="btn sm primary" onclick="installUpdate(this)">Update now</button>`
+    el.innerHTML = `<span class="ub-dot" aria-hidden="true"></span><span class="ub-text">Version ${esc(d.latest)} is ready <small>· your chats and models are kept</small></span>
+      <a class="ub-link" href="${esc(d.url)}" target="_blank" rel="noopener">What's new</a>
+      ${d.can_install ? `<button type="button" class="btn sm primary" onclick="installUpdate(this)">Update</button>`
         : d.installer ? `<a class="btn sm primary" href="${esc(d.installer)}" target="_blank" rel="noopener">Download</a>` : ''}
-      <a class="btn sm" href="${esc(d.url)}" target="_blank" rel="noopener">What's new</a>
-      <button type="button" class="btn sm ghost" onclick="UpdateBanner.later()">Not now</button>
+      <button type="button" class="ub-x" onclick="UpdateBanner.later()" aria-label="Not now" title="Not now">${icon('i-x', 'sm')}</button>
       <div class="update-progress" aria-live="polite"></div>`;
     el.hidden = false;
   }
@@ -14918,7 +14928,8 @@ function renderAbout() {
       ${CONTRIBUTORS.map(c => rowHtml(esc(c.name), esc(c.for), `<a class="btn sm" href="${esc(c.url)}" target="_blank" rel="noopener">GitHub</a>`)).join('')}
       <p class="set-note">Want to help? Pull requests are welcome on <a href="https://github.com/fuxion64-ctrl/FX-Workspace" target="_blank" rel="noopener">GitHub</a>.</p></div>
     <div class="set-group"><div class="gt">Licenses</div>
-      ${rowHtml('This app', 'Apache License 2.0 - see LICENSE and NOTICE in the app folder.', '')}
+      ${rowHtml('This app', 'GNU AGPL-3.0, free for everyone - see LICENSE and NOTICE in the app folder.', '')}
+      ${rowHtml('Using it commercially', 'Companies and commercial use can get a commercial license instead of the AGPL - see COMMERCIAL.md.', '<a class="btn sm" href="mailto:fuxion64@gmail.com?subject=FX%20Workspace%20commercial%20license">Ask</a>')}
       ${rowHtml('Engines and models', 'llama.cpp, whisper.cpp, stable-diffusion.cpp, Kokoro, Parakeet, the image, video and sound models: each has its own license, listed in THIRD_PARTY.md. Some model weights are for non-commercial use only.', '')}</div>`;
 }
 function settingsSearch(q) {

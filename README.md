@@ -129,7 +129,13 @@ what was sent where.
 
 ## License and credits
 
-The app's code is licensed under the **Apache License 2.0** (see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE)).
+FX Workspace is **dual-licensed**:
+- **GNU AGPL-3.0** ([`LICENSE`](LICENSE)), free for everyone. If you share a changed version, or run one for other
+  people over a network, publish your changes under the AGPL too.
+- **A commercial license** for companies and commercial use that don't want the AGPL's terms. See
+  [`COMMERCIAL.md`](COMMERCIAL.md).
+
+Versions up to 1.4.5 were released under the Apache License 2.0 and stay under it. See [`NOTICE`](NOTICE).
 The engines and models it downloads have their own licenses, listed in [`THIRD_PARTY.md`](THIRD_PARTY.md). Some
 of them (for example the MMAudio weights) are for non-commercial use only.
 
@@ -142,4 +148,5 @@ Created by **Fuxion** - fuxion64@gmail.com. If you want to support the project o
   stale tests and making the open-folder button fail cleanly
   ([#1](https://github.com/fuxion64-ctrl/FX-Workspace/pull/1)).
 
-Pull requests are welcome.
+Pull requests are welcome. By sending one, you agree it can be released under the AGPL-3.0 and the commercial
+license (see [`COMMERCIAL.md`](COMMERCIAL.md)).

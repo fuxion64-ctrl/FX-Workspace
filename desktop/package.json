@@ -4,7 +4,7 @@
   "version": "1.4.5",
   "description": "FX Workspace - a private, local-first AI assistant",
   "author": "Fuxion <fuxion64@gmail.com>",
-  "license": "Apache-2.0",
+  "license": "SEE LICENSE IN ../NOTICE",
   "private": true,
   "main": "main.js",
   "scripts": {
