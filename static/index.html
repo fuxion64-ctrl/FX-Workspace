@@ -2813,7 +2813,34 @@ body.resizing .sidebar { transition: none; }
 .leak-row.unk > .icon { color: var(--muted); }
 .leak-row b { min-width: 104px; color: var(--text); }
 .leak-list { margin-top: 4px; }
-.sm-cards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }   /* the five modes in one row (1.4.6) */
+/* Settings > Storage (1.4.6): one bar per drive, the app's parts in their colours. */
+.sg-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; font-size: 14px; }
+.sg-head b { font-size: 16px; font-weight: 600; }
+.sg-low { color: var(--warn-text); font-weight: 500; }
+.sg-bar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--border); }
+.sg-seg { display: block; height: 100%; min-width: 0; }
+.sg-seg + .sg-seg { box-shadow: -1px 0 0 var(--surface); }
+.sg-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0 6px; font-size: 12.5px; color: var(--muted); }
+.sg-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sg-dot { width: 10px; height: 10px; border-radius: 3px; flex: none; display: inline-block; }
+.k-chat { background: var(--accent); } .k-unused { background: var(--warn); } .k-media { background: var(--info); }
+.k-engine { background: color-mix(in srgb, var(--text) 55%, var(--surface)); } .k-made { background: var(--ok); }
+.k-app { background: color-mix(in srgb, var(--text) 30%, var(--surface)); }
+.k-app-all { background: var(--accent); }
+.k-other { background: color-mix(in srgb, var(--text) 14%, var(--surface-2)); } .k-free { background: var(--surface-2); border: 1px solid var(--border-strong); }
+.sg-rows { display: flex; flex-direction: column; }
+.sg-row { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--border); }
+.sg-more { display: block; padding: 0; }
+.sg-more > summary { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto 16px; align-items: center; gap: 12px; padding: 9px 0; cursor: pointer; list-style: none; }
+.sg-more > summary::-webkit-details-marker { display: none; }
+.sg-more[open] > summary .chev { transform: rotate(90deg); }
+.sg-name { min-width: 0; display: flex; flex-direction: column; }
+.sg-name b { font-weight: 500; font-size: 13.5px; }
+.sg-name small { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sg-size { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--text-2); }
+.sg-items { list-style: none; margin: 0 0 10px 22px; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; }
+.sg-items li { display: flex; justify-content: space-between; gap: 12px; color: var(--text-2); }
+.sg-items li span:last-child { font-variant-numeric: tabular-nums; color: var(--muted); }.sm-cards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }   /* the five modes in one row (1.4.6) */
 .sm-card { text-align: left; gap: 6px; }
 /* Settings sliders and checkboxes wear the theme's accent, not the browser's blue (D49). */
 #settings :is(input[type="range"], input[type="checkbox"]) { accent-color: var(--accent); }
@@ -15078,7 +15105,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeSetti
 const SETTINGS_TABS = [['appearance', 'Appearance', 'i-brush'], ['models', 'Models', 'i-cpu'], ['proactive', 'Proactive help', 'i-bulb'],
   ['agent', 'Agent and web search', 'i-bolt'], ['memory', 'Memory and your profile', 'i-bookmark'], ['skills', 'Skills', 'i-sparkle'],
   ['knowledge', 'Knowledge - your files', 'i-book'], ['connections', 'Connections - connectors, MCP servers, Discord, Slack, webhook', 'i-plug'],
-  ['permissions', 'Permissions', 'i-shield'], ['privacy', 'Privacy', 'i-lock'], ['data', 'Data and files - storage, open folders, clear chats', 'i-folder'],
+  ['permissions', 'Permissions', 'i-shield'], ['privacy', 'Privacy', 'i-lock'], ['data', 'Data and files - open folders, clear chats', 'i-folder'], ['storage', 'Storage - each drive and what the app keeps on it', 'i-disk'],
   ['webnet', 'Web search and network - privacy modes, proxy, Tor, VPN, leak test', 'i-globe'], ['voice', 'Voice - talk to it', 'i-mic'], ['images', 'Images - made on this PC', 'i-image'],
   ['diagnostics', 'Diagnostics - speed and problems', 'i-activity'], ['remote', 'Phone access - use it from your phone', 'i-globe']];
 const Palette = (() => {
@@ -15297,6 +15324,7 @@ const SETTINGS_PAGES = [
   ['webnet', [['webnet', 'Search and network'], ['privacy', 'Privacy']]],
   ['connections', [['connections', 'Connectors'], ['remote', 'Phone access']]],
   ['data', [['data', 'Data and files']]],
+  ['storage', [['storage', 'Storage']]],
   ['diagnostics', [['diagnostics', 'Diagnostics']]],
   ['about', [['about', 'About']]],
 ];
@@ -15350,7 +15378,7 @@ function settingsTabNow(tab) {
   const r = { appearance: renderAppearance, models: renderModelsTab, agent: renderAgent, systemmessage: renderSystemMessage,
               proactive: renderProactive, memory: renderMemory, permissions: renderPermissions, privacy: renderPrivacy,
               diagnostics: renderDiagnostics, voice: renderVoice, images: renderImages, about: renderAbout, skills: renderSkills,
-              knowledge: renderKnowledge, remote: renderRemote, data: renderDataFiles,
+              knowledge: renderKnowledge, remote: renderRemote, data: renderDataFiles, storage: renderStorage,
               connections: () => renderStack('connections'), webnet: () => renderStack('webnet') }[tab];
   const body = $('settings-body');
   if (body.dataset.tab !== tab) { body.dataset.tab = tab; body.classList.remove('tab-in'); void body.offsetWidth; body.classList.add('tab-in'); body.scrollTop = 0; }
@@ -15389,6 +15417,7 @@ function searchHighlight(q, tries = 8) {
 }
 // What is on each page, so searching "dark", "seed" or "proxy" finds the right one.
 const SETTINGS_WORDS = {
+  storage: 'storage drives disk partitions space free full models gguf gigabytes size where c: e: volume',
   appearance: 'appearance theme dark light look studio focus operator command classic sunrise terminal eclipse aurora claude chatgpt grok gemini accent color font serif sans density compact idle motion animation reduced text size larger contrast notifications sound focus assist do not disturb name window thinking mark orbs legacy tray start with windows mini window extras overlay panels phosphor interface new legacy fade',
   voice: 'voice talk speak microphone mic listen hands-free speed language hebrew russian whisper piper',
   systemmessage: 'system message instructions prompt variant presets compact detailed original custom assistant name',
@@ -16987,7 +17016,46 @@ async function quitApp() {
   try { await api('/api/shell/quit', {}); toast('Closing FX Workspace - the server and the model stop too.'); }
   catch (e) { toast(`Couldn't quit: ${e.message}`); }
 }
-async function renderDataFiles() {
+// Settings > Storage (1.4.6): each drive the app keeps something on - how full it is, and what of the app's is on it
+// (base/storage_map.py). Read-only. One bar per drive: the app's parts in their colours, then the rest of the drive, then
+// what's free. Measured in the background (it walks the model folders), so the page shows the last measure at once.
+const SG_KIND = id => /^chat/.test(id) ? 'chat' : /^unused/.test(id) ? 'unused' : /^(pictures|videos|music|audio|voice)/.test(id) ? 'media'
+  : /^llama/.test(id) ? 'engine' : /^made/.test(id) ? 'made' : 'app';
+let sgTimer = 0;
+// A long path as its drive and last two folders (E:\…\ClankerLocalCpp\Clankers); the whole path is in the tooltip.
+const sgShort = p => { const s = String(p || '').split(/[\\/]/).filter(Boolean); return s.length > 4 ? `${s[0]}\\…\\${s.slice(-2).join('\\')}` : s.join('\\'); };
+async function renderStorage(force = false) {
+  const body = setBody('storage');
+  let d;
+  try { d = await api('/api/storage/map' + (force ? '?force=true' : '')); }
+  catch (e) { body.innerHTML = `<h3>Storage</h3><p class="lead" role="alert">Couldn't measure the drives: ${esc(e.message)}</p>`; return; }
+  if (!setShowing('storage')) return;
+  clearTimeout(sgTimer);
+  if (d.measuring) sgTimer = setTimeout(() => { if (setShowing('storage')) renderStorage(); }, 2500);
+  if (!d.ok) { body.innerHTML = `<h3>Storage</h3><p class="lead" role="alert">${esc(d.message || '')}</p>`; return; }
+  const pct = (n, of) => `${Math.max(0, n / of * 100).toFixed(2)}%`;
+  const drive = v => {
+    const low = v.free / v.total < .1;
+    const segs = v.parts.map(p => `<i class="sg-seg k-${SG_KIND(p.id)}" style="width:${pct(p.bytes, v.total)}" title="${esc(p.name)} · ${fmtSize(p.bytes)}"></i>`).join('')
+      + `<i class="sg-seg k-other" style="width:${pct(v.other, v.total)}" title="Everything else on ${esc(v.drive)} · ${fmtSize(v.other)}"></i>`;
+    const rows = v.parts.map(p => {
+      const inner = (p.items || []).map(m => `<li><span class="mono">${esc(m.name)}</span><span>${fmtSize(m.bytes)}</span></li>`).join('');
+      const row = `<span class="sg-dot k-${SG_KIND(p.id)}" aria-hidden="true"></span><span class="sg-name"><b>${esc(p.name)}</b><small>${esc(p.what)}${p.what ? ' · ' : ''}<span class="mono" title="${esc(p.path)}">${esc(sgShort(p.path))}</span></small></span><span class="sg-size">${fmtSize(p.bytes)}</span>`;
+      return inner ? `<details class="sg-row sg-more"><summary>${row}${icon('i-chev', 'sm chev')}</summary><ul class="sg-items">${inner}</ul></details>` : `<div class="sg-row">${row}</div>`;
+    }).join('');
+    return `<div class="set-group sg-drive"><div class="sg-head"><b>${esc(v.drive)}</b>${v.label ? `<span class="muted">${esc(v.label)}</span>` : ''}<span class="grow"></span>
+        <span class="${low ? 'sg-low' : 'muted'}">${low ? 'Only ' : ''}${fmtSize(v.free)} free of ${fmtSize(v.total)}</span></div>
+      <div class="sg-bar" role="img" aria-label="${esc(v.drive)}: this app ${fmtSize(v.app)}, everything else ${fmtSize(v.other)}, free ${fmtSize(v.free)}">${segs}</div>
+      <div class="sg-legend"><span><i class="sg-dot k-app-all"></i>This app ${fmtSize(v.app)}</span><span><i class="sg-dot k-other"></i>Everything else ${fmtSize(v.other)}</span><span><i class="sg-dot k-free"></i>Free ${fmtSize(v.free)}</span></div>
+      <div class="sg-rows">${rows}</div></div>`;
+  };
+  const all = d.drives.reduce((n, v) => n + v.app, 0);
+  body.innerHTML = `<h3>Storage</h3><p class="lead">Where the local AI lives on this PC: each drive it uses, and what of this app's is on it - ${fmtSize(all)} in all. Only the app's own files are listed; the rest of a drive is "Everything else".</p>
+    <div class="dg-actions"><button class="btn" ${d.measuring ? 'disabled' : ''} onclick="renderStorage(true)">${d.measuring ? '<span class="spinner"></span>Measuring…' : `${icon('i-retry', 'xs')}Measure again`}</button>
+      <small class="muted">${d.at ? `Measured ${esc(fmtAgo(d.at))}` : 'Measuring the model folders - this takes a moment the first time.'}</small></div>
+    ${d.drives.map(drive).join('') || (d.measuring ? SKELETON_TEXT : '<p class="lead">Nothing measured yet.</p>')}
+    <p class="set-note">"Model files not in models.ini" are in a models folder, but no model uses them - often old downloads. Settings › Models and the feature pages can move models to another drive; nothing here deletes anything.</p>`;
+}async function renderDataFiles() {
   const body = $('settings-body');
   let d;
   try { d = await api('/api/data-files'); }
@@ -21038,7 +21106,7 @@ setTimeout(loadWaiting, 3000); setInterval(() => { if (S.view === 'home' && !doc
 // 1.4.6: the nine pages (SETTINGS_PAGES), and under the open one its parts - 18 entries in three groups before.
 const NEW_NAV = [['appearance', 'Appearance', 'i-brush'], ['models', 'Models', 'i-cpu'], ['agent', 'Assistant', 'i-bolt'],
   ['memory', 'Memory', 'i-bookmark'], ['webnet', 'Web and privacy', 'i-globe'], ['connections', 'Connections', 'i-plug'],
-  ['data', 'Data and files', 'i-folder'], ['diagnostics', 'Diagnostics', 'i-activity'], ['about', 'About', 'i-help']];
+  ['data', 'Data and files', 'i-folder'], ['storage', 'Storage', 'i-disk'], ['diagnostics', 'Diagnostics', 'i-activity'], ['about', 'About', 'i-help']];
 function buildNewNav() {
   const nav = document.querySelector('.modal-nav'); if (!nav) return;
   let box = nav.querySelector('.nav-new');

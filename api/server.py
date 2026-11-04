@@ -3129,6 +3129,16 @@ def _tree_size(path: str) -> tuple[int, int]:
     return total, files
 
 
+@app.get("/api/storage/map")
+def storage_map_view(force: bool = False):
+    """Settings › Storage (1.4.6): each drive, how full it is, and what of this app's is on it. Read-only."""
+    import storage_map
+    try:
+        return storage_map.snapshot(force=force)
+    except Exception as e:
+        return {"ok": False, "message": f"Couldn't measure the drives: {str(e)[:200]}"}
+
+
 @app.get("/api/storage")
 def storage():
     """Settings › Diagnostics › Storage: what this app keeps on disk, and how full the drives are. Read-only."""
