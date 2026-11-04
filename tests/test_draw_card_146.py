@@ -60,5 +60,24 @@ class Feedback4Nov(unittest.TestCase):
         self.assertIn("function setTp(el, text)", HTML)
 
 
+class Feedback4NovLate(unittest.TestCase):
+    def test_box_does_not_flip_back_and_forth(self):
+        i = HTML.index("function autoGrow()")
+        body = HTML[i:i + 1800]
+        self.assertIn("box._openLen * 0.9", body)             # closes only when clearly shorter
+        self.assertIn("if (el !== promptEl) ro.observe(el)", HTML)   # the field's own fitting doesn't re-trigger it
+
+    def test_finish_plays_out_before_the_card_goes(self):
+        self.assertIn("el._target = 1.15", HTML)
+        self.assertIn("Math.min(1.15, o.shown)", HTML)
+        self.assertIn(".draw-card.dc-out", HTML)
+
+    def test_tour_after_the_welcome(self):
+        self.assertIn("const Tour = (() => {", HTML)
+        for at in ("'.sb-user'", "'.sb-quit'", "'.brand'"):
+            self.assertIn(at, HTML[HTML.index("const Tour = (() => {"):][:900])
+        self.assertIn("Tour.start(again)", HTML)
+
+
 if __name__ == "__main__":
     unittest.main()

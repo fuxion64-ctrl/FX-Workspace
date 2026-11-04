@@ -251,6 +251,18 @@ a { color: var(--accent-text); }
 .fr-look.on { border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 1px var(--accent); }
 .fr-foot { display: flex; align-items: center; gap: 10px; margin-top: 18px; }
 .fr-foot .fr-next { margin-left: auto; min-width: 110px; }
+/* The look around after the welcome (Tour): the control lit through a dimmed page, a small card beside it. */
+.tour { position: fixed; inset: 0; z-index: 9000; }
+.tour.closing { opacity: 0; transition: opacity .2s ease; }
+.tour-hole { position: fixed; border-radius: 12px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, .55); outline: 2px solid color-mix(in srgb, var(--text) 70%, transparent); outline-offset: 0;
+  transition: left .3s var(--ease-out), top .3s var(--ease-out), width .3s var(--ease-out), height .3s var(--ease-out); pointer-events: none; }
+.tour-card { position: fixed; padding: 14px 16px 12px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); box-shadow: 0 12px 32px rgba(0, 0, 0, .25);
+  transition: left .3s var(--ease-out), top .3s var(--ease-out); }
+.tour-card .tour-n { display: block; font-size: 11.5px; color: var(--faint); margin-bottom: 4px; }
+.tour-card b { font-size: 15px; font-weight: 600; }
+.tour-card p { margin: 6px 0 12px; font-size: 13px; line-height: 1.45; color: var(--muted); }
+.tour-foot { display: flex; justify-content: space-between; gap: 8px; }
+:root:is([data-motion="off"], [data-motion="reduced"]) :is(.tour-hole, .tour-card) { transition: none; }
 .fr-dots { display: flex; gap: 6px; margin: 0 auto; }
 .fr-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--border-strong); transition: background .2s, width .2s; }
 .fr-dots i.on { width: 16px; border-radius: 3px; background: var(--accent); }
@@ -3407,6 +3419,8 @@ span.tier.input { padding: 0; border: 0; width: 8px; height: 8px; min-height: 0;
 .draw-card .dc-model { display: inline-flex; align-items: center; gap: 2px; padding: 1px 4px; margin: 0 -4px; border: 0; border-radius: 6px; background: none; color: inherit; font: inherit; cursor: pointer; }
 .draw-card .dc-model:hover, .draw-card .dc-model:focus-visible { background: var(--surface-2); color: var(--text); }
 .draw-card .dc-stop { width: 22px; height: 22px; opacity: .7; }
+.draw-card { transition: opacity .25s ease, transform .25s ease; }
+.draw-card.dc-out { opacity: 0; transform: scale(.98); }
 .draw-card .dc-stop:hover { opacity: 1; }
 .draw-card .dc-menu { position: absolute; top: calc(100% + 4px); z-index: 30; min-width: 200px; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); box-shadow: 0 8px 24px rgba(0, 0, 0, .18); }
 .draw-card .dc-menu-h { padding: 4px 8px; font-size: 11px; color: var(--faint); }
@@ -7066,7 +7080,17 @@ const ImagesView = (() => {
   // step and time left, and Stop. It goes when the picture is done - the picture itself comes with the reply.
   function paintChatDraw(s) {
     const turn = S.turn, j = (s && s.job) || {};
-    if (!turn || !j.stage) { if (turn && turn.drawEl) { turn.drawEl.remove(); turn.drawEl = null; } return; }
+    if (!turn || !j.stage) {
+      // 4 Nov: the picture is done - let the animation reach its end (ChatGPT's ripple, the reveal's last part)
+      // for a moment, then fade the card out, instead of cutting it off mid-way.
+      const el = turn && turn.drawEl;
+      if (el && !el._closing) {
+        el._closing = true; el._target = 1.15; turn.drawEl = null;
+        const meta = el.querySelector('.dc-meta'); if (meta) meta.textContent = 'Done';
+        setTimeout(() => { el.classList.add('dc-out'); setTimeout(() => el.remove(), 260); }, motionStill() ? 0 : 1100);
+      }
+      return;
+    }
     if (!turn.drawEl) {
       turn.drawEl = document.createElement('div');
       turn.drawEl.className = 'draw-card rise';
@@ -7092,7 +7116,7 @@ const ImagesView = (() => {
       : j.stage === 'warming' && j.total ? `${(j.done / 1073741824).toFixed(1)}/${(j.total / 1073741824).toFixed(1)} GB` : stage;
     const left = j.left != null && j.stage === 'drawing' ? `${Math.max(1, Math.round(j.left))} s left` : '';
     // The reveal follows the drawing itself: still before the first step, whole once it is finishing.
-    turn.drawEl._target = j.stage === 'drawing' ? (j.progress || 0) : ['finishing', 'saving'].includes(j.stage) ? 1 : 0;
+    turn.drawEl._target = j.stage === 'drawing' ? (j.progress || 0) : ['finishing', 'saving'].includes(j.stage) ? 1.15 : 0;
     turn.drawEl.querySelector('.dc-prog').style.transform = `scaleX(${Math.max(0.02, Math.min(1, pct)).toFixed(3)})`;
     const title = `${stage}${j.width ? ` · ${j.width}×${j.height}` : ''}${j.stage === 'warming' ? ' · only the first picture after a restart' : ''}`;
     setHtmlIfChanged(turn.drawEl.querySelector('.dc-meta'), `<span class="mono" title="${esc(title)}">${esc(count)}</span>${left ? `<span class="dc-dot">·</span><span class="mono">${left}</span>` : ''}${j.model ? `<span class="dc-dot">·</span><button type="button" class="dc-model" onclick="ImagesView.pickModel(this)" aria-haspopup="menu" title="The model for your next pictures">${esc(j.model)}${icon('i-chev', 'xs')}</button>` : ''}<span class="grow"></span><button type="button" class="icon-btn dc-stop" onclick="ImagesView.stop()" aria-label="Stop drawing" title="Stop">${icon('i-stop', 'xs')}</button>`);
@@ -9677,8 +9701,17 @@ function autoGrow() {
   // It closes again only once the message fits on one line of the wider row, or it would flip back and forth.
   const box = $('composer'), lh = parseFloat(getComputedStyle(promptEl).lineHeight) || 22;
   if (!box) return;
-  const open = box.classList.contains('multiline');
-  const multi = promptEl.value.includes('\n') || promptEl.scrollHeight > (open ? lh * 1.5 : lh * 1.8) + 16 || composerCrowded(box);
+  const open = box.classList.contains('multiline'), v = promptEl.value;
+  // 4 Nov: at some lengths the text wrapped in the one-line form but fit in the wider two-row form, so the box
+  // flipped every frame. Once the text opened it, it closes only when the text is clearly shorter than it was then.
+  let textMulti;
+  if (v.includes('\n')) textMulti = true;
+  else if (open && box._openLen) textMulti = v.length >= box._openLen * 0.9;
+  else if (open) textMulti = promptEl.scrollHeight > lh * 1.5 + 16;       // opened for room: measured in the wide row
+  else textMulti = promptEl.scrollHeight > lh * 1.8 + 16;
+  const multi = textMulti || composerCrowded(box);
+  if (!open && textMulti && !v.includes('\n')) box._openLen = v.length;
+  if (!multi) box._openLen = 0;
   if (open !== multi) { box.classList.toggle('multiline', multi); fitPrompt(); }
 }
 // 1.4.6: a one-line box with many controls (context ring, model, effort, style, Pause and Stop while it works) used
@@ -9700,7 +9733,7 @@ function updateSend() { renderRunControls(); requestAnimationFrame(autoGrow); }
 if (typeof ResizeObserver === 'function') {
   // The box, and the controls whose width changes (a model name loading, Stop replacing Send).
   const ro = new ResizeObserver(() => requestAnimationFrame(autoGrow));
-  const watch = () => { const b = $('composer'); if (!b) return; ro.observe(b); b.querySelectorAll('.composer-row > *').forEach(el => ro.observe(el)); };
+  const watch = () => { const b = $('composer'); if (!b) return; ro.observe(b); b.querySelectorAll('.composer-row > *').forEach(el => { if (el !== promptEl) ro.observe(el); }); };   // not the field: its own fitting would set this off again
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watch); else watch();
 }
 
@@ -12490,7 +12523,8 @@ function frame(cv, p, t) {
   if (fx.key !== key) { fx.key = key; fx.dotTurn = null; }
   const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, w, h);
   c.fillStyle = BG[key]; c.fillRect(0, 0, w, h);
-  fx.p = p; c.save(); fx[key](c, p, ease(p), t); c.restore(); c.globalAlpha = 1;
+  fx.p = p; const q = Math.min(1, p);                 // fx.p may run past 1 (the finish); each look draws 0-1
+  c.save(); fx[key](c, q, ease(q), t); c.restore(); c.globalAlpha = 1;
 }
 // Play in a card until it leaves the page; the shown progress eases toward the real one, so a jump never snaps.
 function play(card) {
@@ -12502,8 +12536,10 @@ function play(card) {
     const cv = card.querySelector('canvas.dc-fx');                 // looked up each frame: Images redraws its card
     if (!cv || document.hidden || now - o.last < 33) return;
     const still = ['off', 'reduced'].includes(document.documentElement.dataset.motion);
-    o.last = now; o.shown += ((card._target || 0) - o.shown) * (still ? 1 : .12);
-    frame(cv, Math.max(0, Math.min(1, o.shown)), still ? 1.5 : now / 1000);
+    // Past 1 is the finish (up to 1.15: ChatGPT's ripple); it eases a little faster so it shows before the card goes.
+    const goal = card._target || 0;
+    o.last = now; o.shown += (goal - o.shown) * (still ? 1 : goal > 1 ? .2 : .12);
+    frame(cv, Math.max(0, Math.min(1.15, o.shown)), still ? 1.5 : now / 1000);
   };
   requestAnimationFrame(loop);
 }
@@ -21577,7 +21613,7 @@ function markNewNav(tab, built) {
 // this PC. Skippable at every step, shown once (this browser remembers); Settings > About shows it again. Nothing
 // goes to the network until the model's download is clicked (model_finder.starter needs none).
 const FirstRun = (() => {
-  let el = null, step = 0, starter = null, poll = 0;
+  let el = null, step = 0, starter = null, poll = 0, again = false;
   const STEPS = ['A chat model', 'A look', 'What stays here'];
   const gb = n => `${(+n).toFixed(1)} GB`;
   function modelStep() {
@@ -21651,10 +21687,10 @@ const FirstRun = (() => {
       watch();
     }, 1000);
   }
-  function done() { store.set('welcomed', true); const e = el; el = null; e.classList.add('closing'); setTimeout(() => e.remove(), 200); promptEl.focus(); }
-  function show(again = false) {
-    if (el || (!again && store.get('welcomed', false)) || Overlay.hud) return;
-    step = 0;
+  function done() { store.set('welcomed', true); const e = el; el = null; e.classList.add('closing'); setTimeout(() => { e.remove(); Tour.start(again); }, 200); promptEl.focus(); }
+  function show(replay = false) {
+    if (el || (!replay && store.get('welcomed', false)) || Overlay.hud) return;
+    step = 0; again = replay;
     el = document.createElement('div');
     el.className = 'first-run'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'Welcome to FX Workspace');
     el.innerHTML = '<div class="fr-card rise"></div>';
@@ -21665,6 +21701,56 @@ const FirstRun = (() => {
     api('/api/model-finder/starter').then(r => { starter = r && r.ok ? r : { pick: null, hardware: {} }; if (el && step === 0) paint(); }).catch(() => {});
   }
   return { show, paint };
+})();
+// A short look around after the welcome (1.4.6): where Settings are, how to turn it all off, and Labs. Each step
+// lights up the real control with a small card beside it; a step whose control isn't on screen is skipped. Once.
+const Tour = (() => {
+  const STEPS = [
+    { at: '.sb-user', title: 'Settings', text: 'Models, looks, privacy, the phone and everything else. Its search finds any setting.' },
+    { at: '.sb-quit', title: 'Turn it off', text: 'Closing the window keeps it running in the tray. This stops the server and the model and closes the app.' },
+    { at: '.brand', title: 'Labs', text: 'Click the name to switch between Workspace and Labs - train, fine-tune and test your own models.' },
+  ];
+  let el = null, steps = [], i = 0;
+  const shown = s => { const t = document.querySelector(s.at); const r = t && t.getBoundingClientRect(); return r && r.width > 0 && r.height > 0 ? t : null; };
+  function paint() {
+    const s = steps[i], t = shown(s);
+    if (!t) { next(); return; }
+    const r = t.getBoundingClientRect(), pad = 6;
+    const hole = el.querySelector('.tour-hole'), card = el.querySelector('.tour-card');
+    Object.assign(hole.style, { left: `${r.left - pad}px`, top: `${r.top - pad}px`, width: `${r.width + pad * 2}px`, height: `${r.height + pad * 2}px` });
+    card.innerHTML = `<span class="tour-n">${i + 1} of ${steps.length}</span><b>${esc(s.title)}</b><p>${esc(s.text)}</p>
+      <div class="tour-foot"><button type="button" class="btn ghost sm tour-skip">Skip</button><button type="button" class="btn primary sm tour-next">${i === steps.length - 1 ? 'Done' : 'Next'}</button></div>`;
+    // Beside the control: to its right when there's room (the sidebar), else below it.
+    const w = 280, right = r.right + 16 + w < innerWidth;
+    card.style.width = `${w}px`;                      // its real width first, so its height is measured right
+    const h = card.offsetHeight;
+    const left = right ? r.right + 16 : Math.min(innerWidth - w - 16, Math.max(16, r.left));
+    const top = right ? r.top + r.height / 2 - h / 2 : r.bottom + 14;
+    Object.assign(card.style, { left: `${left}px`, top: `${Math.max(16, Math.min(top, innerHeight - h - 16))}px` });
+    card.querySelector('.tour-next').onclick = next;
+    card.querySelector('.tour-skip').onclick = end;
+    card.querySelector('.tour-next').focus();
+  }
+  function next() { if (++i >= steps.length) end(); else paint(); }
+  function end() {
+    store.set('toured', true);
+    if (!el) return;
+    const e = el; el = null; e.classList.add('closing'); setTimeout(() => e.remove(), 200);
+    removeEventListener('resize', paint); promptEl.focus();
+  }
+  function start(again = false) {
+    if (el || (!again && store.get('toured', false)) || Overlay.hud) return;
+    steps = STEPS.filter(shown); i = 0;
+    if (!steps.length) return;
+    el = document.createElement('div');
+    el.className = 'tour'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'A quick look around');
+    el.innerHTML = '<div class="tour-hole"></div><div class="tour-card rise" role="document"></div>';
+    document.body.appendChild(el);
+    el.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); end(); } });
+    addEventListener('resize', paint);
+    paint();
+  }
+  return { start };
 })();
 // After an update (1.4.3): the new version's release notes, once, from the notes it ships (app_version.notes). A
 // first install has nothing to compare - the welcome shows instead. This browser remembers the version it last saw;
