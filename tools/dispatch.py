@@ -679,7 +679,7 @@ def execute_tool(tool_name: str, args: dict) -> dict:
             if res.get("ok"):                          # shown under the reply (agent/tasks._with_images)
                 made = res.get("images") or [res["image"]]
                 shared.app_state.setdefault("turn_images", []).extend(made)
-                # ...and in the chat at once (1.4.6): the page draws them from this event, without waiting for the
+                # ...and in the chat at once (1.4.7): the page draws them from this event, without waiting for the
                 # chat model to load back onto the GPU and reply.
                 event_log.emit_event("image", "Picture ready" if len(made) == 1 else f"{len(made)} pictures ready",
                                      status="done", images=[{k: m.get(k) for k in ("url", "model", "seed", "width", "height")}

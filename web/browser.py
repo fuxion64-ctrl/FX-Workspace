@@ -492,7 +492,7 @@ class AgentBrowser:
                     self._cdp = None
             if self._route is None and self._alive() and not self.close_leftover():
                 # Someone else's browser (or another program) has the control port: never touch it - ours moves to
-                # a free port instead of refusing to start (1.4.6).
+                # a free port instead of refusing to start (1.4.7).
                 import ports
                 self.port = ports.pick(self.port + 1, avoid=(TEMP_PORT,) if self.port != TEMP_PORT else ())
                 ports.note("browser" if self.port != TEMP_PORT else "browser_temp", self.port, "moved")

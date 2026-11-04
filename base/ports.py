@@ -1,5 +1,5 @@
 """
-ports.py - which local ports this app's parts listen on (1.4.6 reliability).
+ports.py - which local ports this app's parts listen on (1.4.7 reliability).
 
 In 1.4.5 every part had a fixed port - the app 8000, llama-server 8090, sd-server 8095, whisper 8092, the agent's
 browser 9333, the music engine 8011 - and another program on one of them broke that part: the server didn't start

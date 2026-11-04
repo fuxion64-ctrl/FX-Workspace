@@ -1,5 +1,5 @@
 """
-load_failure.py - why a local model really failed to load (1.4.6 reliability).
+load_failure.py - why a local model really failed to load (1.4.7 reliability).
 
 llama-server's router answers every failed load with the same 500, "model name=X failed to load". The page read that
 as "most often it doesn't fit in the GPU's free memory" and offered Run on RAM too - but on this PC (4 Nov 2026) the

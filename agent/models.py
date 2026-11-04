@@ -557,7 +557,7 @@ def _queued_wait():
 def call_local(messages, requires_vision: bool, model_name: str = None):
     reported = llama_local.server_models(force=True)
     if reported is None:
-        # Down (crashed, closed, hung): start it again and carry on, instead of a dead end (1.4.6).
+        # Down (crashed, closed, hung): start it again and carry on, instead of a dead end (1.4.7).
         ev = shared.app_state.get("running_model_event")
         if isinstance(ev, dict) and ev.get("status") == "running":
             event_log.update_event(ev, phase="loading", loading="llama-server", loading_since=time.time())
@@ -628,7 +628,7 @@ def call_local(messages, requires_vision: bool, model_name: str = None):
         raise RunStopped("user")          # Stop while the model was writing: nothing it wrote is used
     except Exception as e:
         if _connection_lost(e) and llama_local.server_models(force=True) is None:
-            # It died under the reply (1.4.6): start it again now, so Try again works straight away.
+            # It died under the reply (1.4.7): start it again now, so Try again works straight away.
             back = llama_builds.ensure_running("it stopped during a reply")
             if back["ok"]:
                 raise RuntimeError("llama-server stopped in the middle of the reply and was started again - "
@@ -648,7 +648,7 @@ def call_local(messages, requires_vision: bool, model_name: str = None):
                                f"exceeds the available context size{f' ({window} tokens)' if window else ''} even after "
                                "older messages were dropped. Compress the chat "
                                "(the ring beside the message box), start a new one, or pick a model with a bigger window.")
-        why = load_failure.explain(model_name, e)          # the real cause, from the router's log (1.4.6)
+        why = load_failure.explain(model_name, e)          # the real cause, from the router's log (1.4.7)
         if why:
             raise RuntimeError(why)
         raise RuntimeError(f"Local model '{model_name}' failed: {str(e)[:250]}" + llama_local.load_hint(model_name))
@@ -677,7 +677,7 @@ def _drop_oversized_request(window: int) -> int:
 
 
 def _router_ready() -> bool:
-    """A fresh look (never the 20 s cache) before a helper call, and a restart when it's down or hung (1.4.6).
+    """A fresh look (never the 20 s cache) before a helper call, and a restart when it's down or hung (1.4.7).
     On the cached answer, a router that had stopped answering made the prompt-prep and planner calls each wait their
     full 120 s timeout before the reply itself began - 329 s for "hi" in the live test (4 Nov 2026)."""
     if llama_local.server_models(force=True) is not None:

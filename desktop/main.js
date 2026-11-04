@@ -16,7 +16,7 @@ const http = require('http');
 const { spawn } = require('child_process');
 
 // The server's address. 8000 unless another program holds it - then the launcher picks a free port and writes it to
-// data/run/ports.json, and this follows it (1.4.6).
+// data/run/ports.json, and this follows it (1.4.7).
 let APP_URL = 'http://127.0.0.1:8000';
 const TITLE = 'FX Workspace';
 const IS_WIN = process.platform === 'win32';
@@ -74,7 +74,7 @@ const asset = name => path.join(__dirname, 'assets', name);
 // ---- the server ----------------------------------------------------------------------------------------
 const sameDir = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
 
-// This install's server answers at url: /api/whoami names its folder (1.4.6). Another program on the port - or
+// This install's server answers at url: /api/whoami names its folder (1.4.7). Another program on the port - or
 // another copy of FX Workspace - doesn't count: before, any 200 from /api/settings did, and the app opened that.
 function pingAt(url, root) {
   return new Promise(resolve => {
@@ -146,7 +146,7 @@ async function startServer() {
   return { ok: false, message: `The server didn't answer within ${START_TIMEOUT_MS / 1000} s.\n\nDetails: ${path.join(root, 'data', 'logs', 'server.log')}` };
 }
 
-// The server stopped while the app runs (1.4.6): it is started again and the page reloads, instead of every
+// The server stopped while the app runs (1.4.7): it is started again and the page reloads, instead of every
 // message saying "Couldn't reach the local server" until the app was restarted by hand. Only when its process is
 // really gone (or, for one this app didn't start, after ~15 s without an answer) - a busy server is never killed.
 let serverExited = false, watchFails = 0, restarting = false;

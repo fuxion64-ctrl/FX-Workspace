@@ -387,7 +387,7 @@ class EngineTests(unittest.TestCase):
         self.assertNotIn("ref_images", self.posts[0][1])                         # only with edit: true
         self.assertEqual(set(ok["image"]), {"id", "url", "model", "seed", "width", "height", "seconds"})
         self.assertEqual(len(ok["images"]), 1)
-        self.assertIn("ALREADY SHOWN to the user", ok["message"])          # 1.4.6: never go looking for it
+        self.assertIn("ALREADY SHOWN to the user", ok["message"])          # 1.4.7: never go looking for it
         self.assertIn("Do NOT search for, open, read or save the file", ok["message"])
         bad = image_gen.generate_image_tool({"prompt": ""})
         self.assertEqual((bad["ok"], bad["status"], bad["code"]), (False, "permanent_failure", "empty"))

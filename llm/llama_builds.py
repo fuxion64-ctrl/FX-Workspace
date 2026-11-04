@@ -297,7 +297,7 @@ def switch(kind: str, run: dict | None = None) -> None:
                            "See data/logs/llama-server.log, or set Settings › Models › llama.cpp build to the other build.")
 
 
-# ---- keeping the router up (1.4.6) ---------------------------------------------------------------------------
+# ---- keeping the router up (1.4.7) ---------------------------------------------------------------------------
 # When llama-server died (a crash in a model load, closed by hand, killed by Windows for memory) or stopped answering,
 # nothing started it again: every later message said "Couldn't reach the local server. Is run.bat still running?"
 # until the whole app was restarted. Now a reply that finds it down starts it first (models.call_local), and a

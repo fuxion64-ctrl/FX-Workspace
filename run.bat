@@ -118,7 +118,7 @@ if not exist "keys.local.bat" (
 )
 call "keys.local.bat"
 
-REM ---- Ports (1.4.6) -------------------------------------------------------
+REM ---- Ports (1.4.7) -------------------------------------------------------
 REM 8000 for the app and 8090 for llama-server, unless another program holds them: then the
 REM next free port (base\ports.py). A llama-server of this app that already answers is kept.
 set "APP_PORT=8000"

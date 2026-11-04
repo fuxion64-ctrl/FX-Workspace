@@ -120,7 +120,7 @@ def _start(progress) -> None:
     stop()
     global PORT, BASE
     import ports
-    if not ports.is_free(PORT):           # another program there would be asked for our songs (1.4.6)
+    if not ports.is_free(PORT):           # another program there would be asked for our songs (1.4.7)
         PORT = ports.pick(PORT + 1, avoid=(int(os.environ.get("AGENTIC_PORT") or 8000),))
         BASE = f"http://127.0.0.1:{PORT}"
         ports.note("music", PORT, "moved")

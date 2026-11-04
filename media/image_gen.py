@@ -533,7 +533,7 @@ def stop() -> None:
 
 
 def _claim_port() -> None:
-    """A free port for the next sd-server (1.4.6). Another program on 8095 - or a second copy of this app - made the
+    """A free port for the next sd-server (1.4.7). Another program on 8095 - or a second copy of this app - made the
     new engine fail to listen, or worse, answered the readiness check as if it were ours and drew with ITS model.
     A leftover sd-server of this app (a crash) is stopped; anything else keeps its port and ours moves up."""
     global PORT, BASE
@@ -1696,7 +1696,7 @@ def generate_image_tool(args: dict, ref_image: bytes | None = None, should_cance
     keep = ("id", "url", "model", "seed", "width", "height", "seconds")
     n = len(made)
     return {"ok": True, "image": {k: img[k] for k in keep}, "images": [{k: x[k] for k in keep} for x in made],
-            # Plainly, 1.4.6: a small model that read "the app puts it under your reply" still went looking for the
+            # Plainly, 1.4.7: a small model that read "the app puts it under your reply" still went looking for the
             # file on disk (8 searches, then the chat overflowed). It is shown; there is nothing to find or open.
             "message": (f"Done - {'the picture is' if n == 1 else f'the {n} pictures are'} ALREADY SHOWN to the user in "
                         f"the chat ({img['model']}, {img['width']}x{img['height']}, {img['seconds']} s, seed {img['seed']}). "

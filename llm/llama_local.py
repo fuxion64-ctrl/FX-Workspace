@@ -57,7 +57,7 @@ _MODELS_URL = f"{LLAMA_SERVER_BASE.rstrip('/')}/models"
 
 
 def set_port(port: int) -> None:
-    """Move the app to a router on another port (1.4.6: another program held 8090, llama_builds.ensure_running
+    """Move the app to a router on another port (1.4.7: another program held 8090, llama_builds.ensure_running
     started ours on a free one). Every caller reads these names at call time - config.LLAMA_SERVER_BASE too."""
     global LLAMA_PORT, LLAMA_SERVER_BASE, _MODELS_URL
     LLAMA_PORT = int(port)
@@ -627,7 +627,7 @@ def force_load(model_id: str, timeout: float = 180.0, back: bool = True) -> floa
         resp.raise_for_status()
     except requests.HTTPError as e:
         # The router's own words ("model name=X failed to load") are in the body, not in requests' "500 Server
-        # Error" line - load_failure.explain needs them to find the real cause (1.4.6).
+        # Error" line - load_failure.explain needs them to find the real cause (1.4.7).
         body = (resp.text or "").strip()[:300]
         text, hint = f"{e}{f' - {body}' if body else ''}", load_hint(model_id)
         if hint:
@@ -669,7 +669,7 @@ def cheapest_other_model(exclude: str, candidates: list[str]) -> str | None:
 
 
 def unreachable_message(restarted: str = "") -> str:
-    """Kept parseable: the page matches "llama-server is not answering". No run.bat in it (1.4.6) - the installed
+    """Kept parseable: the page matches "llama-server is not answering". No run.bat in it (1.4.7) - the installed
     app has none; the app restarts llama-server itself (llama_builds.ensure_running)."""
     tail = f" {restarted}" if restarted else (" The app tried to start it again and couldn't - see Settings › "
                                              "Diagnostics, or switch the mode selector to Cloud.")

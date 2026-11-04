@@ -36,7 +36,7 @@ IS_WIN = os.name == "nt"
 VENV_PY = os.path.join(BASE, ".venv", "Scripts", "python.exe") if IS_WIN else os.path.join(BASE, ".venv", "bin", "python")
 LLAMA_EXE = "llama-server.exe" if IS_WIN else "llama-server"
 TITLE = "FX Workspace"
-APP_PORT = 8000                       # preferred; another program there moves the app up (choose_ports, 1.4.6)
+APP_PORT = 8000                       # preferred; another program there moves the app up (choose_ports, 1.4.7)
 APP_URL = f"http://127.0.0.1:{APP_PORT}"
 CLOSE_GRACE = 4.0                     # seconds without the app window before the server stops (a reload is quicker)
 
@@ -102,7 +102,7 @@ def find_running() -> int | None:
 
 
 def choose_ports() -> None:
-    """The app's port and llama-server's (1.4.6). The preferred one when it's free; a crashed run's leftover of this
+    """The app's port and llama-server's (1.4.7). The preferred one when it's free; a crashed run's leftover of this
     app is stopped and its port taken back; another program keeps its port and ours moves to a free one - the desktop
     app, a second start and the page follow it through data/run/ports.json. In 1.4.5 another program on 8000 meant
     "FX Workspace could not start (is port 8000 taken?)"."""
@@ -432,7 +432,7 @@ def main() -> int:
     llama = start_llama()
     try:
         import llama_builds
-        llama_builds.adopt(llama)          # watched and restarted if it stops (1.4.6), stopped with the app
+        llama_builds.adopt(llama)          # watched and restarted if it stops (1.4.7), stopped with the app
     except Exception:
         pass
     try:

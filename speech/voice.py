@@ -422,7 +422,7 @@ class _Whisper:
             if not exe or not path:
                 raise RuntimeError("Voice isn't set up yet - Settings > Voice > Set up voice.")
             self.gpu = gpu
-            # Another program (or a second copy of the app) on the port answered "/" as if it were ours (1.4.6).
+            # Another program (or a second copy of the app) on the port answered "/" as if it were ours (1.4.7).
             global WHISPER_PORT
             import ports
             if not ports.is_free(WHISPER_PORT):

@@ -194,7 +194,7 @@ class BrowserPolicyTests(unittest.TestCase):
         self.assertIsNone(self.b._watch_stop)
 
     def test_unknown_browser_is_neither_reused_nor_closed(self):
-        # 1.4.6: an unknown browser on the control port is still never reused or closed - ours now starts on a free
+        # 1.4.7: an unknown browser on the control port is still never reused or closed - ours now starts on a free
         # port instead of refusing to start at all.
         self.vpn["active"] = True
         taken = self.b.port

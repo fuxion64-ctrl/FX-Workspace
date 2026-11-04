@@ -1,4 +1,4 @@
-"""1.4.6 reliability - the core runtime's failure paths, each with its fallback (docs/plans/1.4.6-reliability.md):
+"""1.4.7 reliability - the core runtime's failure paths, each with its fallback (docs/plans/1.4.7.md):
 a failed model load says its real cause (from the router's own log), Run on RAM too really works, llama-server is
 started again when it dies or hangs, the parts move off ports another program holds, and a picture is the answer
 on its own - shown at once, never searched for. Temporary folders and dummy listeners only; nothing real is touched."""

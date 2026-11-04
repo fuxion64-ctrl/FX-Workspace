@@ -896,7 +896,7 @@ def _with_images(result):
     if not made or not isinstance(result, dict) or not result.get("message"):
         return result
     if result.get("status") in ("error", "stopped"):
-        # The picture was made, then the reply failed or was stopped (1.4.6: "This chat is too long" after a toaster
+        # The picture was made, then the reply failed or was stopped (1.4.7: "This chat is too long" after a toaster
         # picture): the picture stays in the chat - it was lost with the failed reply - and the problem is said under it.
         note = str(result.get("partial") or "").strip()
         why = str(result["message"]).strip()

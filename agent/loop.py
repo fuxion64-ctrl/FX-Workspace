@@ -133,7 +133,7 @@ def _append_observation(text: str):
         "[OBSERVATION from the host] " + untrusted.frame("machine state (window titles)", text, found))})
 
 
-# ---- a picture is the answer (1.4.6) -------------------------------------------------------------------------
+# ---- a picture is the answer (1.4.7) -------------------------------------------------------------------------
 # "Make an image of a toaster": after generate_image the loop used to ask the text model for a reply. That meant
 # waiting for it to load back onto the GPU the image engine had just used (Ornith 9B timed out), and a small model
 # that couldn't see the picture went looking for it - eight file searches in a fresh chat, then "This chat is too

@@ -13688,7 +13688,7 @@ const BrowserPanel = (() => {
 const ERROR_KINDS = [
   [/too long for|exceeds the available context size|exceed_context_size/i, 'This chat is too long for the model',
    'The model can only read so much at once. Compress the chat to keep going here, or start a new chat.', ['compress', 'new', 'retry']],
-  // The causes llm/load_failure.py reads from llama-server's log (1.4.6) - each says what it is, with the action
+  // The causes llm/load_failure.py reads from llama-server's log (1.4.7) - each says what it is, with the action
   // that helps. A failed load used to be "most often it doesn't fit in the GPU" whatever it was (a moved file, RAM).
   [/model file isn.t there|image projector \(mmproj\) file isn.t there/i, 'The model’s file is missing',
    'It was moved, renamed or deleted. Pick another model, or scan for models in Settings › Models.', ['models']],
@@ -14281,7 +14281,7 @@ function updateTurn(events) {
     if (!turn.researchEl) { turn.researchEl = document.createElement('div'); turn.researchEl.className = 'research-progress'; turn.modelEl.after(turn.researchEl); }
     paintResearch(turn.researchEl, rp.research || {});
   }
-  // A picture shows the moment it's made (1.4.6), from generate_image's event - not after the chat model has loaded
+  // A picture shows the moment it's made (1.4.7), from generate_image's event - not after the chat model has loaded
   // back onto the GPU and replied. The finished reply carries the same pictures, and replaces this with the turn.
   const pics = sortedEvents(turn.events).filter(e => e.kind === 'image' && Array.isArray(e.images)).flatMap(e => e.images).filter(p => p && p.url);
   if (pics.length && (!turn.picsEl || turn.picsEl.dataset.n !== String(pics.length))) {

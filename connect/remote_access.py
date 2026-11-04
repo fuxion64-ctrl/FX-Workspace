@@ -44,7 +44,7 @@ PHONE_BLOCKED = (("POST", "/api/settings"), ("POST", "/api/keys"), ("*", "/api/r
                  ("POST", "/api/version/install"), ("POST", "/api/shell"), ("POST", "/api/notify/quiet/open"),
                  ("*", "/api/data-files"), ("POST", "/api/images/models"),
                  ("POST", "/api/local-models/ram-split"),   # 1.4.6: it rewrites models.ini
-                 ("GET", "/api/whoami"))                    # 1.4.6: the install folder and process - for this PC only
+                 ("GET", "/api/whoami"))                    # 1.4.7: the install folder and process - for this PC only
 
 _lock = threading.RLock()
 _fails: dict = {}                     # ip -> [failure times]
@@ -267,7 +267,7 @@ def sync(settings: dict | None = None) -> dict:
         import uvicorn
         from api.server import app
         asked = want
-        # Another program on the phone port (1.4.6): the listener died silently and the page still showed its
+        # Another program on the phone port (1.4.7): the listener died silently and the page still showed its
         # address. Now it takes the next free port and says so; the address shown is the one it really listens on.
         if not ports.is_free(want[1], want[0]):
             held = ports.describe(ports.holder(want[1]))

@@ -1456,7 +1456,7 @@ def force_load_model(body: ForceLoadRequest):
                 "model": resolved, "pinned": bool(body.pin)}
     except Exception as e:
         import load_failure
-        why = load_failure.explain(body.model, e)          # the real cause, not a bare 500 (1.4.6)
+        why = load_failure.explain(body.model, e)          # the real cause, not a bare 500 (1.4.7)
         return {"status": "error", "message": why or f"Force-load failed: {str(e)[:600]}"}
     finally:
         shared.app_state["model_loading"] = None
@@ -1546,7 +1546,7 @@ def _start_background_services():
         netlayer.install()
     netlayer.apply_env()
     threading.Thread(target=netlayer.start_builtin_tor, daemon=True, name="tor-start").start()   # when a route uses it
-    # llama-server that stops or hangs is started again by itself (1.4.6) - it used to stay down until a restart.
+    # llama-server that stops or hangs is started again by itself (1.4.7) - it used to stay down until a restart.
     llama_builds.start_watchdog()
     try:
         import ports
@@ -3153,7 +3153,7 @@ def gpu_apps_view():
 
 @app.get("/api/whoami")
 def whoami():
-    """Which app answers on this port (1.4.6): the desktop app, launcher.pyw and run.bat ask before they reuse a
+    """Which app answers on this port (1.4.7): the desktop app, launcher.pyw and run.bat ask before they reuse a
     server - another program on 8000 answered /api/settings with 404 and the app then failed to bind the port."""
     import app_version
     return {"app": "fx-workspace", "root": os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -3182,7 +3182,7 @@ def ram_split(body: RamSplitRequest):
     cfg = next((c for c in llama_local.list_model_configs() if c["name"] == model), {})
     path = cfg.get("model_path") or ""
     if not path or not os.path.exists(path):
-        # Not a memory problem at all (1.4.6: Gemma-4-E4B-Tools' file had been moved) - RAM can't help.
+        # Not a memory problem at all (1.4.7: Gemma-4-E4B-Tools' file had been moved) - RAM can't help.
         return {"ok": False, "message": f"{model}'s model file isn't there ({path or 'no path'}) - RAM won't help. "
                                         "Pick another model, or Scan for models in Settings › Models."}
     # Hybrid models (Qwen 3.5) crawl when their layers are split (diagnostics.keeps_whole): they stay whole on the GPU
