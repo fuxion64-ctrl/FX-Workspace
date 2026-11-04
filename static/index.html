@@ -5551,6 +5551,10 @@ html.voice-on .idle-screen { display: none !important; }
 :root[data-ui][data-skin="mono"] .engine-btn { border-radius: 999px; height: 36px; color: var(--muted); }
 :root[data-ui][data-skin="mono"] .send-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--text); color: var(--bg); }
 :root[data-ui][data-skin="mono"] .send-btn:disabled { background: var(--gpt-voice); color: #fff; opacity: 1; }
+/* Dictate (empty box): the solid round button, as ChatGPT shows it; while it listens the composer says so. */
+:root[data-ui][data-skin="mono"] .send-btn.dictate { background: var(--text); color: var(--bg); opacity: 1; filter: none; }
+:root[data-ui][data-skin="mono"] .composer[data-dictate="listening"] { box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 35%, transparent); }
+:root[data-ui][data-skin="mono"] .composer[data-dictate="listening"] #prompt::placeholder { color: var(--text); }
 :root[data-ui][data-skin="mono"] .msg-user { border-radius: 18px; background: var(--user-bubble); border: 0; padding: 10px 16px; }
 :root[data-ui][data-skin="mono"] .sidebar { border-right: 0; }
 :root[data-ui][data-skin="mono"] .sb-item { border-radius: 10px; font-size: 14px; }
@@ -5749,6 +5753,7 @@ html.voice-on .idle-screen { display: none !important; }
     <symbol id="i-expand" viewBox="0 0 24 24"><path class="ip-nw" d="M4 9V4h5"/><path class="ip-ne" d="M20 9V4h-5"/><path class="ip-sw" d="M4 15v5h5"/><path class="ip-se" d="M20 15v5h-5"/></symbol>
     <!-- MossadGPT's mark: crosshairs around a small star of David. -->
     <symbol id="i-reticle" viewBox="0 0 24 24"><g class="ip-turn"><circle cx="12" cy="12" r="8.5"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/></g><g class="ip-pins"><path d="M12 8.6l2.94 5.1H9.06z"/><path d="M12 15.4l-2.94-5.1h5.88z"/></g></symbol>
+    <symbol id="i-dictate" viewBox="0 0 24 24"><path d="M4 10v4M20 10v4"/><path class="ip-wave" d="M8 6v12M12 3v18M16 7v10"/></symbol>
     <symbol id="i-mic" viewBox="0 0 24 24"><rect class="ip-capsule" x="9" y="3" width="6" height="11" rx="3"/><path class="ip-wave" d="M5 11a7 7 0 0014 0"/><path d="M12 18v3"/></symbol>
     <symbol id="i-mic-off" viewBox="0 0 24 24"><path d="M9 9V6a3 3 0 015.9-.8M15 11v0a3 3 0 01-4.6 2.5"/><path d="M5 11a7 7 0 0011.3 5.5M19 11a7 7 0 01-.4 2.3M12 18v3"/><path class="ip-tick1" pathLength="1" d="M3 3l18 18"/></symbol>
     <symbol id="i-trend" viewBox="0 0 24 24"><path class="ip-draw" pathLength="1" d="M3 17l6-6 4 4 8-8"/><path class="ip-out" d="M15 7h6v6"/></symbol>
@@ -6615,6 +6620,8 @@ function applySkinNav(skin) {
   else { delete root.dataset.skinNav; root.style.removeProperty('--sb-list-head'); }
 }
 function applyAppearance() {
+  // The send button's empty-box form depends on the look (Dictate): redraw it once the look is set.
+  setTimeout(() => { if ($('send-btn') && typeof renderRunControls === 'function') renderRunControls(); }, 0);
   const s = S.settings, root = document.documentElement;
   const look = LOOKS.includes(s.look) ? s.look : 'studio';
   const lookChanged = root.dataset.look !== look;
@@ -9746,14 +9753,22 @@ function renderRunControls() {
   const send = $('send-btn'), pause = $('pause-btn');
   const running = S.busy;
   const stopping = S.run === 'stopping';
-  const sig = [running, S.run, !!promptEl.value.trim()].join('|');
+  const dict = !running && typeof Dictate !== 'undefined' && Dictate.wanted() ? Dictate.state : '';   // the ChatGPT look, box empty
+  const sig = [running, S.run, !!promptEl.value.trim(), dict].join('|');
   if (send.dataset.sig === sig) return;   // called on every poll; only redraw on change
   send.dataset.sig = sig;
   send.classList.toggle('stop', running);
+  send.classList.toggle('dictate', !!dict);
+  if (dict) {
+    send.innerHTML = dict === 'listening' ? icon('i-check', '') : dict === 'transcribing' ? '<span class="spinner"></span>' : icon('i-dictate', '');
+    const what = dict === 'listening' ? 'Done - put the words in the box' : dict === 'transcribing' ? 'Writing it down…' : 'Dictate - speak your message';
+    send.setAttribute('aria-label', what); send.title = what; send.disabled = dict === 'transcribing';
+  } else {
   send.innerHTML = running ? (stopping ? '<span class="spinner"></span>' : icon('i-stop', '')) : icon('i-arrow-up', '');
   send.setAttribute('aria-label', running ? (stopping ? 'Stopping' : 'Stop') : 'Send');
   send.title = running ? (stopping ? 'Stopping after the current step…' : 'Stop - nothing more runs after the current step') : 'Send';
   send.disabled = running ? stopping : !promptEl.value.trim();
+  }
   pause.classList.toggle('hidden', !running || stopping);
   const paused = S.run === 'paused';
   pause.setAttribute('aria-pressed', String(paused));
@@ -9765,7 +9780,57 @@ function renderRunControls() {
   Thinking.paint();
   if (t.stepsEl) t.stepsEl.querySelector('.steps-summary').innerHTML = stepsSummary(sortedEvents(t.events), true);
 }
-function sendOrStop() { if (S.busy) stopRun(); else sendPrompt(); }
+function sendOrStop() { if (S.busy) stopRun(); else if (Dictate.wanted()) Dictate.toggle(); else sendPrompt(); }
+/* Dictation (1.4.6, the ChatGPT look): with the box empty, the send button speaks a message into it - you talk,
+   it's transcribed on this PC (the same recognizer as Voice mode) and lands in the box for you to read and send.
+   Not Voice mode (the mic beside it), which answers out loud. Click again (or Enter) to finish, Esc to drop it. */
+const Dictate = (() => {
+  let state = 'off', stream = null, ctx = null, proc = null, chunks = [];
+  const look = () => document.documentElement.dataset.skin === 'mono' && !document.documentElement.dataset.aiClassic;
+  function wanted() { return state !== 'off' || (look() && !promptEl.value.trim()); }
+  function paint() { renderRunControls(); const box = $('composer'); if (box) box.dataset.dictate = state === 'off' ? '' : state; }
+  async function start() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
+    } catch (_) { toast('The microphone is off or in use - allow it in Windows › Privacy › Microphone.'); return; }
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = ctx.createMediaStreamSource(stream), sink = ctx.createGain(); sink.gain.value = 0;
+    proc = ctx.createScriptProcessor(2048, 1, 1); chunks = [];
+    proc.onaudioprocess = e => { if (state === 'listening') chunks.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
+    src.connect(proc); proc.connect(sink); sink.connect(ctx.destination);
+    state = 'listening'; promptEl.dataset.ph = promptEl.placeholder; promptEl.placeholder = 'Listening… click ✓ when you’re done';
+    paint();
+  }
+  function release() {
+    try { proc && proc.disconnect(); } catch (_) {}
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    if (ctx) ctx.close().catch(() => {});
+    stream = ctx = proc = null;
+    if (promptEl.dataset.ph != null) { promptEl.placeholder = promptEl.dataset.ph; delete promptEl.dataset.ph; }
+  }
+  async function finish() {
+    const rate = ctx ? ctx.sampleRate : 48000, got = chunks; chunks = [];
+    release(); state = 'transcribing'; paint();
+    try {
+      if (got.reduce((n, c) => n + c.length, 0) < rate * 0.3) throw new Error('Nothing was heard.');
+      const res = await fetch('/api/voice/transcribe', { method: 'POST', headers: { 'Content-Type': 'audio/wav' }, body: Voice.wav16k(got, rate) });
+      const d = await res.json();
+      if (!d.ok) throw new Error(d.message || 'The recognizer failed - Settings › Voice sets it up.');
+      const text = (d.text || '').trim();
+      if (text) { promptEl.value = (promptEl.value ? promptEl.value.trimEnd() + ' ' : '') + text; autoGrow(); }
+      else toast('Nothing was heard.');
+    } catch (e) { toast(e.message); }
+    state = 'off'; paint(); promptEl.focus();
+  }
+  function cancel() { if (state !== 'listening') return; chunks = []; release(); state = 'off'; paint(); }
+  function toggle() { if (state === 'off') start(); else if (state === 'listening') finish(); }
+  document.addEventListener('keydown', e => {
+    if (state !== 'listening') return;
+    if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+    else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.stopPropagation(); finish(); }
+  }, true);
+  return { wanted, toggle, cancel, get state() { return state; } };
+})();
 async function stopRun() {
   if (!S.busy || S.run === 'stopping') return;
   S.run = 'stopping'; S.stopRequested = true; renderRunControls(); renderLive();
@@ -19153,7 +19218,7 @@ const Voice = (() => {
       if (english()) enqueue('I need your go-ahead in the chat.');
     } else if (!on && (state === 'thinking' || (state === 'listening' && !turnDone))) setState('thinking');
   }
-  return { open, close, feed, finish, beginTurn, waiting, approval, setup: setupNow, tap, redock: applyDock, get active() { return !!stage && !stage.hidden; }, get state() { return state; },
+  return { open, close, feed, finish, beginTurn, waiting, approval, setup: setupNow, tap, redock: applyDock, wav16k, get active() { return !!stage && !stage.hidden; }, get state() { return state; },
     // What a reply would be split into (tests and debugging): no audio is made.
     _test: { speechText, wav16k, command, get timings() { return voiceTiming; }, heard: (text, barged = false) => ask && heardAnswer(text, barged), drainOf(text, final = true) {
       const save = [feedText, spoken, spokenChars, skipRest, queue];

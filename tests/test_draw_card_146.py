@@ -60,6 +60,18 @@ class Feedback4Nov(unittest.TestCase):
         self.assertIn("function setTp(el, text)", HTML)
 
 
+class Dictation(unittest.TestCase):
+    def test_empty_send_dictates_in_the_chatgpt_look(self):
+        i = HTML.index("const Dictate = (() => {")
+        body = HTML[i:i + 4000]
+        self.assertIn("dataset.skin === 'mono'", body)                      # the ChatGPT look only
+        self.assertIn("'/api/voice/transcribe'", body)                      # transcribed on this PC
+        self.assertIn("promptEl.value = ", body)                            # into the box, not sent
+        self.assertIn("else if (Dictate.wanted()) Dictate.toggle();", HTML)
+        self.assertIn('<symbol id="i-dictate"', HTML)
+        self.assertIn("redock: applyDock, wav16k,", HTML)
+
+
 class Feedback4NovLate(unittest.TestCase):
     def test_box_does_not_flip_back_and_forth(self):
         i = HTML.index("function autoGrow()")
