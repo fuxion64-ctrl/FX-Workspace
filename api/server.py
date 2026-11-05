@@ -397,6 +397,11 @@ def get_local_models():
         configured = [cfg["name"] for cfg in llama_local.list_model_configs()]
     except Exception:
         configured = []
+    # The router's presets come from models.ini, which it reads when it starts: an entry just removed (1.4.7) is still
+    # in its list until then. models.ini is the truth when it lists models.
+    if configured:
+        keep = {llama_local.normalize_name(n) for n in configured}
+        reported = [r for r in reported if llama_local.normalize_name(r) in keep]
     ids = list(reported)
     seen = {llama_local.normalize_name(name) for name in ids}
     for name in configured:
@@ -410,7 +415,9 @@ def get_local_models():
         is_vision = llama_local.is_vision_model(m)
         favs = fav_vision if is_vision else fav_text
         is_fav = m in favs or llama_local.normalize_name(m) in {llama_local.normalize_name(f) for f in favs}
-        models.append({"id": m, "vision": is_vision, "favorite": is_fav})
+        gone = llama_local.file_missing(m)         # 1.4.7: marked in the picker, with Find / Remove
+        models.append({"id": m, "vision": is_vision, "favorite": is_fav,
+                       **({"missing": gone["what"], "missing_path": gone["path"]} if gone else {})})
     models.sort(key=lambda m: (m["vision"], not m["favorite"], m["id"].lower()))
     return {
         "models": models,
@@ -1534,6 +1541,31 @@ def _connect_mcp_servers():
         event_log.log_action(f"MCP: {len(connected)} of {len(shared.mcp_hub.servers)} server(s) connected.")
 
 
+_crash_file = {"f": None}
+
+
+def _crash_log() -> None:
+    """A hard crash (a native library, a stack overflow) ends the process without a Python traceback, so server.log
+    just stops - the "Couldn't reach the server" of 4 Nov left no trace of why (1.4.7). faulthandler writes every
+    thread's stack to data/logs/crash.log when that happens; a run that ends normally adds nothing but its start line."""
+    import faulthandler
+    if _crash_file["f"] is not None:
+        return
+    try:
+        logs = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "logs")
+        os.makedirs(logs, exist_ok=True)
+        path = os.path.join(logs, "crash.log")
+        if os.path.exists(path) and os.path.getsize(path) > 2 * 2 ** 20:
+            os.replace(path, path + ".old")
+        f = open(path, "a", encoding="utf-8")
+        f.write(f"\n---- {time.strftime('%Y-%m-%d %H:%M:%S')} - FX Workspace started (process {os.getpid()}) ----\n")
+        f.flush()
+        faulthandler.enable(file=f, all_threads=True)
+        _crash_file["f"] = f
+    except Exception as e:
+        print(f"[WARNING] crash log: {e}", flush=True)
+
+
 @app.on_event("startup")
 def _start_background_services():
     # A fresh install: models.ini from models.example.ini, and whatever is already in local\models added to it.
@@ -1546,6 +1578,7 @@ def _start_background_services():
         netlayer.install()
     netlayer.apply_env()
     threading.Thread(target=netlayer.start_builtin_tor, daemon=True, name="tor-start").start()   # when a route uses it
+    _crash_log()
     # llama-server that stops or hangs is started again by itself (1.4.7) - it used to stay down until a restart.
     llama_builds.start_watchdog()
     try:
@@ -3149,6 +3182,70 @@ def gpu_apps_view():
         return gpu_apps.snapshot()
     except Exception as e:
         return {"ok": False, "message": f"Couldn't read the GPU: {str(e)[:200]}"}
+
+
+class ModelEntryRequest(BaseModel):
+    model: str
+
+
+def _model_entry_changed() -> None:
+    """The router reads models.ini when it starts: restart it so the change shows (when it runs and is idle)."""
+    llama_local.invalidate_cache()
+    try:
+        model_scan.restart_router()
+    except Exception as e:
+        event_log.log_action(f"models.ini changed; llama-server picks it up at its next start ({str(e)[:120]}).")
+
+
+@app.post("/api/local-models/find-file")
+def find_model_file(body: ModelEntryRequest):
+    """A model whose file is gone (1.4.7): look for the same file elsewhere on this PC and point the model at it. A
+    missing image projector (mmproj) is looked for the same way; not found, the model can still read text without it."""
+    gone = llama_local.file_missing(body.model)
+    if not gone:
+        return {"ok": True, "message": f"{body.model}'s files are all there."}
+    if tasks.turns.running() or _model_loading():
+        return {"ok": False, "message": "Busy - wait for the current task to finish."}
+    found = model_scan.find_file(body.model, shared.app_state.get("settings"))
+    if not found:
+        if gone["what"] == "mmproj":
+            return {"ok": False, "found": False, "message": f"Its image projector isn't anywhere in the model folders "
+                    f"({os.path.basename(gone['path'])}). Remove it, and {body.model} reads text only."}
+        return {"ok": False, "found": False, "message": f"{os.path.basename(gone['path'])} isn't in the model folders. "
+                "If it's on another drive, add that folder in Settings › Models; or remove the entry."}
+    try:
+        if gone["what"] == "model":
+            llama_local.set_model_files(body.model, model=found)
+        else:
+            llama_local.set_model_files(body.model, mmproj=found)
+    except (KeyError, OSError) as e:
+        return {"ok": False, "message": f"Couldn't change models.ini: {e}"}
+    event_log.log_action(f"{body.model}: its {gone['what']} file was found at {found}.")
+    _model_entry_changed()
+    return {"ok": True, "found": found, "message": f"Found it: {found}. {body.model} uses it now."}
+
+
+@app.post("/api/local-models/remove")
+def remove_model_entry(body: ModelEntryRequest):
+    """Take a model out of models.ini - the entry only; no file is touched (1.4.7). A missing mmproj alone is dropped
+    from the entry instead, so the model stays for text. The old models.ini is kept as a backup beside it."""
+    if tasks.turns.running() or _model_loading():
+        return {"ok": False, "message": "Busy - wait for the current task to finish."}
+    gone = llama_local.file_missing(body.model)
+    try:
+        if gone and gone["what"] == "mmproj":
+            llama_local.set_model_files(body.model, mmproj=None)
+            message = f"{body.model} reads text only now (its image projector is gone)."
+        else:
+            llama_local.remove_model(body.model)
+            message = f"{body.model} is off the list. Its file wasn't touched; models.ini's old copy is kept as a backup."
+            if shared.app_state.get("local_model") == body.model:
+                shared.app_state["local_model"] = None
+    except KeyError as e:
+        return {"ok": False, "message": str(e)}
+    event_log.log_action(message)
+    _model_entry_changed()
+    return {"ok": True, "message": message}
 
 
 @app.get("/api/whoami")

@@ -492,5 +492,118 @@ class PictureTests(unittest.TestCase):
         self.assertIn("2 pictures", agent_loop.picture_reply("", [1, 2]))
 
 
+class MissingFileTests(TempIni):
+    """Suggestion 1 (approved 5 Nov): a model whose file is gone is marked, never picked by Auto, and can be found or
+    removed - the entry only, never a file."""
+
+    def setUp(self):
+        super().setUp()
+        llama_local._sizes.clear()
+        self.addCleanup(llama_local._sizes.clear)
+
+    def test_it_is_told_apart(self):
+        self.assertEqual(llama_local.file_missing("Gone")["what"], "model")
+        self.assertIsNone(llama_local.file_missing("M"))
+        with open(self.ini, "a", encoding="utf-8") as f:
+            f.write(f"\n[Eyes]\nmodel = {self.gguf}\nmmproj = {os.path.join(self.tmp, 'no-mmproj.gguf')}\n")
+        llama_local._ini_cache.update(key=None, configs=None)
+        self.assertEqual(llama_local.file_missing("Eyes")["what"], "mmproj")
+
+    def test_auto_passes_over_it(self):
+        with patch.object(llama_local, "server_models", return_value=["M", "Gone"]):
+            usable, skipped = llama_local.resolve_candidates(["Gone", "M"])
+        self.assertEqual(usable, ["M"])
+        self.assertIn("Gone", skipped)
+
+    def test_the_list_marks_it(self):
+        from api import server
+        with patch.object(llama_local, "server_models", return_value=[]):
+            models = {m["id"]: m for m in server.get_local_models()["models"]}
+        self.assertEqual(models["Gone"]["missing"], "model")
+        self.assertNotIn("missing", models["M"])
+
+    def test_find_points_it_at_the_moved_file(self):
+        from api import server
+        moved = os.path.join(self.tmp, "elsewhere")
+        os.makedirs(moved)
+        target = os.path.join(moved, "moved-away.gguf")
+        with open(target, "wb") as f:
+            f.write(b"GGUF")
+        with patch("paths.model_dirs", return_value=[self.tmp]), patch.object(server.tasks.turns, "running", return_value=False), \
+                patch.object(server, "_model_entry_changed"):
+            r = server.find_model_file(server.ModelEntryRequest(model="Gone"))
+        self.assertTrue(r["ok"], r)
+        self.assertEqual(os.path.normcase(llama_local.model_own_options("Gone")["model"]), os.path.normcase(target))
+
+    def test_remove_takes_only_the_entry(self):
+        from api import server
+        with patch.object(server.tasks.turns, "running", return_value=False), patch.object(server, "_model_entry_changed"):
+            r = server.remove_model_entry(server.ModelEntryRequest(model="M"))
+        self.assertTrue(r["ok"], r)
+        self.assertNotIn("M", [c["name"] for c in llama_local.list_model_configs()])
+        self.assertTrue(os.path.exists(self.gguf))                       # the file stays
+        self.assertTrue(any(n.startswith("models.ini.bak-") for n in os.listdir(self.tmp)))
+
+    def test_the_picker_shows_it_with_find_and_remove(self):
+        self.assertIn("if (m.missing) {", PAGE)
+        self.assertIn("fixModelEntry('find', ", PAGE)
+        self.assertIn("fixModelEntry('remove', ", PAGE)
+        from connect import remote_access
+        self.assertIn(("POST", "/api/local-models/remove"), remote_access.PHONE_BLOCKED)
+        self.assertIn(("POST", "/api/local-models/find-file"), remote_access.PHONE_BLOCKED)
+
+
+class ApprovedSuggestionTests(TempIni):
+    """Suggestions 2-7 (approved 5 Nov)."""
+
+    def test_short_of_ram_it_loads_from_disk_instead_once(self):
+        import agent.models as models
+        llama_local.set_model_options({"Big-35B": {"load-mode": "none"}}, backup=False)
+        with patch("llama_local.unload_all"):
+            self.assertTrue(models._load_from_disk_instead("Big-35B", {"kind": "ram"}))
+            self.assertNotIn("load-mode", llama_local.model_own_options("Big-35B"))
+            self.assertFalse(models._load_from_disk_instead("Big-35B", {"kind": "ram"}))     # once: then it says why
+        self.assertFalse(models._load_from_disk_instead("M", {"kind": "vram"}))
+
+    def test_a_hard_crash_leaves_a_crash_log(self):
+        from api import server
+        self.assertIn("faulthandler.enable(file=f, all_threads=True)", open(os.path.join(HERE, "api", "server.py"), encoding="utf-8").read())
+        self.assertIn("    _crash_log()\n", open(os.path.join(HERE, "api", "server.py"), encoding="utf-8").read())
+        self.assertTrue(callable(server._crash_log))
+
+    def test_text_output_of_windows_commands_never_crashes_its_reader(self):
+        import importlib.machinery
+        import importlib.util
+        import subprocess
+        loader = importlib.machinery.SourceFileLoader("launcher_rel", os.path.join(HERE, "launcher.pyw"))
+        launcher = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+        loader.exec_module(launcher)
+        seen = []
+        original = subprocess.Popen.__init__
+        self.addCleanup(setattr, subprocess.Popen, "__init__", original)
+        subprocess.Popen.__init__ = lambda self, *a, **k: seen.append(k)
+        with patch.object(launcher, "IS_WIN", True):
+            launcher.quiet_children()
+        subprocess.Popen(["x"], text=True)
+        subprocess.Popen(["x"], text=True, errors="strict")
+        subprocess.Popen(["x"])
+        self.assertEqual([k.get("errors") for k in seen], ["replace", "strict", None])
+        self.assertIn("sherpa_onnx", launcher.REPAIR_IMPORTS)
+        self.assertEqual(launcher.missing_packages(), [])            # this environment has them all
+
+    def test_voice_setup_says_what_to_do_without_run_bat(self):
+        self.assertNotIn("run run.bat once", PAGE)
+        self.assertIn("it installs missing packages as it starts", PAGE)
+
+    def test_a_spilled_model_is_offered_the_split_once(self):
+        self.assertIn("offerSpillFix(S.placement);", PAGE)
+        self.assertIn("action: 'Run on RAM too'", PAGE)
+        self.assertIn("spillOffered.add(p.model);", PAGE)
+
+    def test_test_bonsai_never_switches_a_real_router(self):
+        src = open(os.path.join(HERE, "tests", "test_bonsai.py"), encoding="utf-8").read()
+        self.assertIn('patch.object(llama_builds, "ensure_for", return_value=None)', src)
+
+
 if __name__ == "__main__":
     unittest.main()

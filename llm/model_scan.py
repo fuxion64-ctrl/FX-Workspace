@@ -174,3 +174,30 @@ def restart_router() -> bool:
             return False
         llama_builds.switch(run.get("kind") or "latest", run)
         return True
+
+def find_file(name: str, settings: dict | None = None, max_depth: int = 3) -> str | None:
+    """A moved model file, by its name (1.4.7): the model folders, the older install folders and the folders the other
+    presets' files are in, a few levels deep. None when it isn't on this PC - then the entry can be removed."""
+    missing = llama_local.file_missing(name)
+    if not missing or not missing.get("path"):
+        return None
+    want = os.path.basename(missing["path"]).lower()
+    roots = list(paths.model_dirs(settings)) + [r for r in paths.LEGACY_ROOTS if os.path.isdir(r)]
+    for c in llama_local.list_model_configs():
+        for p in (c.get("model_path"), c.get("mmproj_path")):
+            if p and os.path.isfile(p):
+                roots.append(os.path.dirname(p))
+    seen = set()
+    for root in roots:
+        root = os.path.normcase(os.path.abspath(root))
+        if root in seen or not os.path.isdir(root):
+            continue
+        seen.add(root)
+        base_depth = root.count(os.sep)
+        for folder, dirs, files in os.walk(root):
+            if folder.count(os.sep) - base_depth >= max_depth:
+                dirs[:] = []
+            for f in files:
+                if f.lower() == want:
+                    return os.path.join(folder, f)
+    return None

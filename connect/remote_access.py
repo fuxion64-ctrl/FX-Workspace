@@ -44,7 +44,8 @@ PHONE_BLOCKED = (("POST", "/api/settings"), ("POST", "/api/keys"), ("*", "/api/r
                  ("POST", "/api/version/install"), ("POST", "/api/shell"), ("POST", "/api/notify/quiet/open"),
                  ("*", "/api/data-files"), ("POST", "/api/images/models"),
                  ("POST", "/api/local-models/ram-split"),   # 1.4.6: it rewrites models.ini
-                 ("GET", "/api/whoami"))                    # 1.4.7: the install folder and process - for this PC only
+                 ("GET", "/api/whoami"),
+                 ("POST", "/api/local-models/find-file"), ("POST", "/api/local-models/remove"))   # 1.4.7: models.ini                    # 1.4.7: the install folder and process - for this PC only
 
 _lock = threading.RLock()
 _fails: dict = {}                     # ip -> [failure times]

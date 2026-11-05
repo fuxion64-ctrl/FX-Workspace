@@ -123,6 +123,24 @@ def choose_ports() -> None:
                      "app_note": app.get("held_by") or "", "llama_note": llama.get("held_by") or ""})
 
 
+REPAIR_IMPORTS = ("sherpa_onnx", "uvicorn", "fastapi", "httpx", "psutil")
+
+
+def missing_packages() -> list:
+    """Packages from requirements.txt that should be importable and aren't (1.4.7): a sync only ran when the file
+    changed, so a package that failed to install once - sherpa-onnx for the natural voice - stayed missing, and the
+    voice page told installed users to "run run.bat once", which they don't have."""
+    import importlib.util
+    out = []
+    for name in REPAIR_IMPORTS:
+        try:
+            if importlib.util.find_spec(name) is None:
+                out.append(name)
+        except (ImportError, ValueError):
+            out.append(name)
+    return out
+
+
 def sync_dependencies(log) -> bool:
     """pip install -r requirements.txt, as run.bat does - but only when requirements.txt changed since the last sync."""
     req = os.path.join(BASE, "requirements.txt")
@@ -131,7 +149,7 @@ def sync_dependencies(log) -> bool:
         digest = hashlib.sha256(f.read()).hexdigest()
     try:
         with open(stamp, encoding="ascii") as f:
-            if f.read().strip() == digest:
+            if f.read().strip() == digest and not missing_packages():
                 return True
     except OSError:
         pass
@@ -340,6 +358,12 @@ def quiet_children() -> None:
     def init(self, *args, **kwargs):
         if len(args) <= 13 and not kwargs.get("creationflags", 0) & own:          # creationflags is the 14th
             kwargs["creationflags"] = kwargs.get("creationflags", 0) | NO_WINDOW
+        # The desktop app runs Python in UTF-8 mode (PYTHONUTF8=1): a Windows command whose output is in the console's
+        # code page (an accented letter, a translated message) then crashed its reader thread - "'utf-8' codec can't
+        # decode byte 0xfa", about six a minute in server.log - and the reading it was taking was lost (1.4.7).
+        # Text output now has the odd character replaced instead.
+        if (kwargs.get("text") or kwargs.get("universal_newlines") or kwargs.get("encoding")) and kwargs.get("errors") is None:
+            kwargs["errors"] = "replace"
         original(self, *args, **kwargs)
 
     subprocess.Popen.__init__ = init

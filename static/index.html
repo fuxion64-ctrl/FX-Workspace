@@ -11019,6 +11019,15 @@ async function openEngineMenu(anchor) {
   html += row('', 'Auto', 'Picks from your favorites; switches to vision only when a screenshot needs it', '');
   if (!S.localModels.length) html += `<div class="pop-desc">llama-server reported no models. Settings › Models scans for them; Diagnostics shows whether llama-server runs.</div>`;
   S.localModels.forEach(m => {
+    // A file the model needs is gone (1.4.7): say so here, with Find and Remove, instead of a load that can only fail.
+    if (m.missing) {
+      const what = m.missing === 'mmproj' ? 'image projector missing' : 'file missing';
+      const sub = m.missing === 'mmproj' ? 'Its image projector isn’t there - it can still read text once removed' : 'Its file isn’t there - moved or deleted';
+      html += `<div class="model-row missing"><button class="pop-item" disabled title="${esc(m.missing_path || '')}"><span class="pop-main"><span class="pop-line"><span class="mono">${esc(m.id)}</span><span class="pill bad">${what}</span></span><small>${sub}</small></span></button>
+        <button type="button" class="mini-btn" onclick="fixModelEntry('find', '${jsArg(m.id)}')" title="Look for ${esc(m.missing_path ? m.missing_path.split(/[\\/]/).pop() : 'it')} in the model folders">${icon('i-search', 'xs')}Find</button>
+        <button type="button" class="mini-btn" onclick="fixModelEntry('remove', '${jsArg(m.id)}')" title="${m.missing === 'mmproj' ? 'Drop the image projector from its entry' : 'Take it off the list - no file is deleted'}">${icon('i-x', 'xs')}Remove</button></div>`;
+      return;
+    }
     const badges = (m.vision ? '<span class="pill vision">vision</span>' : '') + (S.engaged === m.id ? '<span class="pill loaded">loaded</span>' + placementPill(m.id, true) : '') + (m.favorite ? '<span class="pill">favorite</span>' : '');
     html += row(m.id, m.id, m.vision ? 'Reads screenshots' : 'Text', badges, m);
   });
@@ -11036,6 +11045,13 @@ async function menuLoad(id) {
   redrawEngineMenu();
   await done;
   redrawEngineMenu();
+}
+async function fixModelEntry(action, id) {
+  if (S.busy) { toast('Wait for the current task to finish.'); return; }
+  let r; try { r = await api(action === 'find' ? '/api/local-models/find-file' : '/api/local-models/remove', { model: id }); } catch (e) { r = { ok: false, message: e.message }; }
+  toast(r.message || (r.ok ? 'Done.' : 'That didn’t work.'));
+  if (r.ok && action === 'remove' && S.pinned === id) pinModel('');
+  if (r.ok) { await fetchLocalModels(); redrawEngineMenu(); }
 }
 function pinModel(id) { S.pinned = id; store.set('pinned', id); renderModelLabel(); closePopover(); refreshEffort(); if (id) toast(`Pinned ${id}. It loads on your next message.`); }
 function renderModelLabel() {
@@ -13446,6 +13462,18 @@ const PLACE = {
   partial: p => ['warn', `~${Math.round(p.cpu_share * 100)}% on the CPU`, `It doesn't fit in VRAM: about ${Math.round(p.cpu_share * 100)}% of its layers run on the CPU, which is slower. Settings > Diagnostics can shrink its context so more of it fits.`],
   spilled: p => ['bad', `${(p.spilled_mb / 1024).toFixed(1)} GB in system RAM`, `It overflowed VRAM: Windows lent ${(p.spilled_mb / 1024).toFixed(1)} GB of system RAM to the GPU, several times slower than VRAM. Settings > Diagnostics can make it fit.`],
 };
+// A model too big for the GPU doesn't fail on this PC: the driver lends it system RAM and it crawls (1.4.7 - a 7B at
+// 131k tokens loaded "fine" at several times slower). The first time a model spills, once per model and session, offer
+// the planned split instead - the same Run on RAM too as the error card - once no reply is running.
+const spillOffered = new Set();
+function offerSpillFix(p) {
+  if (!p || p.state !== 'spilled' || !p.model || spillOffered.has(p.model) || S.busy || (p.spilled_mb || 0) < 512) return;
+  spillOffered.add(p.model);
+  toast(`${p.model} overflowed the GPU (${(p.spilled_mb / 1024).toFixed(1)} GB in system RAM) and runs slowly.`, { action: 'Run on RAM too', ms: 12000, run: () => {
+    if (S.busy) { toast('Wait for the current task to finish.'); return; }
+    api('/api/local-models/ram-split', { model: p.model }).then(r => toast(r.message || (r.ok ? 'Done.' : 'That didn’t work.'))).catch(e => toast(e.message));
+  } });
+}
 function placementPill(model, compact) {
   const p = S.placement;
   if (!p || !model || p.model !== model || !PLACE[p.state]) return '';
@@ -15435,7 +15463,7 @@ async function poll() {
     renderContext(S.awareness, S.roblox, d.active_window);
     renderPlan(d.plan);
     renderMetrics(d.metrics, d);
-    S.placement = d.placement || null; syncDiagnostics(d.diagnostics);
+    S.placement = d.placement || null; syncDiagnostics(d.diagnostics); offerSpillFix(S.placement);
     if (d.net) { NetIndicator.banner(d.net.blocked); torTag(d.net); }
     // The assistant changed a setting (app_appearance: light, dark, the appearance) - take it on now.
     const at = d.settings_at || null;
@@ -17517,7 +17545,7 @@ async function renderVoice() {
     <div class="set-group"><div class="gt">Setup <small>· ${esc(using)}</small></div>
       ${rowHtml(ready ? 'Everything you chose is installed' : `${needMb} MB to download`, running ? `Downloading ${esc(d.setup.part)} - ${d.setup.done_mb.toFixed(0)} of ${d.setup.total_mb.toFixed(0)} MB` : d.setup.state === 'error' ? `The last download stopped: ${esc(d.setup.error)}` : need.length ? need.map(p => `${esc(p.label)} (${Math.round(p.mb)} MB)`).join(' · ') : 'From GitHub and Hugging Face, through your network route, into data\\voice.',
         running ? '<span class="spinner"></span>' : `<button class="btn${ready ? '' : ' primary'}" onclick="api('/api/voice/setup',{}).then(()=>{toast('Downloading…');setTimeout(renderVoice,600)}).catch(e=>toast(e.message))" ${need.length ? '' : 'disabled'}>${icon('i-download', 'xs')}${need.length ? 'Download and set up' : 'Up to date'}</button>`)}
-      ${d.sherpa ? '' : `<p class="lead" role="alert">The natural voice and the accurate listener need sherpa-onnx - run run.bat once. Until then: the fast voice and Whisper.</p>`}
+      ${d.sherpa ? '' : `<p class="lead" role="alert">The natural voice and the accurate listener need the sherpa-onnx package, which isn’t installed. Close FX Workspace (Quit) and open it again - it installs missing packages as it starts. Until then: the fast voice and Whisper.</p>`}
     </div>
     <div class="set-group"><div class="gt">How it sounds</div>
       ${rowHtml('Voice engine', 'Natural sounds warm; Fast answers instantly but flatter.', seg([['natural', 'Natural'], ['fast', 'Fast']], s.voice_engine || 'natural', "(v=>saveSettings({voice_engine:v}).then(renderVoice))"))}

@@ -583,6 +583,7 @@ def call_local(messages, requires_vision: bool, model_name: str = None):
     event_log.log_action(f"Local model: {model_name}")
     _ensure_build(model_name)
     load_watch = _watch_load(model_name)        # "Loading <model>" in the chat while the router loads it
+    retry_from_disk = False
     try:
         # nvidia-smi cannot reliably expose per-process VRAM on Windows/WDDM.
         # Capture the system-only floor before llama-server loads its first
@@ -648,13 +649,42 @@ def call_local(messages, requires_vision: bool, model_name: str = None):
                                f"exceeds the available context size{f' ({window} tokens)' if window else ''} even after "
                                "older messages were dropped. Compress the chat "
                                "(the ring beside the message box), start a new one, or pick a model with a bigger window.")
-        why = load_failure.explain(model_name, e)          # the real cause, from the router's log (1.4.7)
-        if why:
-            raise RuntimeError(why)
-        raise RuntimeError(f"Local model '{model_name}' failed: {str(e)[:250]}" + llama_local.load_hint(model_name))
+        if load_failure.is_load_failure(str(e)) and _load_from_disk_instead(model_name, load_failure.diagnose(model_name, str(e))):
+            retry_from_disk = True                         # once: the next try reads it memory-mapped (below)
+        else:
+            why = load_failure.explain(model_name, e)      # the real cause, from the router's log (1.4.7)
+            if why:
+                raise RuntimeError(why)
+            raise RuntimeError(f"Local model '{model_name}' failed: {str(e)[:250]}" + llama_local.load_hint(model_name))
     finally:
         if load_watch:
             load_watch.set()
+    if retry_from_disk:
+        return call_local(messages, requires_vision, model_name)
+    raise RuntimeError(f"Local model '{model_name}' failed." + llama_local.load_hint(model_name))   # not reached
+
+
+def _load_from_disk_instead(model_name: str, diag: dict) -> bool:
+    """Not enough free RAM to read a model into memory up front (load-mode = none - Ornith-1.5-35B needed 17.5 GB, 4 Nov):
+    load it memory-mapped instead - its experts are read from disk as they are used, so the first reply is slower, but it
+    loads. Once per model: True when the change was made and the load should be tried again (1.4.7)."""
+    if diag.get("kind") != "ram":
+        return False
+    own = llama_local.model_own_options(model_name)
+    if str(own.get("load-mode", "")).lower() != "none":
+        return False
+    try:
+        llama_local.set_model_options({model_name: {"load-mode": None}})
+    except (KeyError, ValueError, OSError):
+        return False
+    event_log.log_action(f"{model_name}: not enough free RAM to read it in up front - loading it from disk instead "
+                         "(memory-mapped: the first reply is slower). Settings › Diagnostics can set it back.")
+    event_log.emit_event("note", f"Not enough free RAM for {model_name} - loading it from disk instead (slower first reply)")
+    try:
+        llama_local.unload_all()
+    except Exception:
+        pass
+    return True
 
 
 def _drop_oversized_request(window: int) -> int:

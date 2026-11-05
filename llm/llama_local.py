@@ -194,6 +194,62 @@ def model_file_size(name: str) -> int | None:
     return total
 
 
+def file_missing(name: str) -> dict | None:
+    """{"what": "model"|"mmproj", "path"} when a file the model's preset names isn't on disk (1.4.7: Gemma-4-E4B-Tools'
+    GGUF had been moved away and it still sat in the picker, then failed to load), else None. Unknown presets: None."""
+    cfg = _config_for(name)
+    if not cfg:
+        return None
+    for what, path in (("model", cfg["model_path"]), ("mmproj", cfg["mmproj_path"])):
+        if path and _file_size(path) is None:
+            return {"what": what, "path": path}
+    if not cfg["model_path"]:
+        return {"what": "model", "path": ""}
+    return None
+
+
+@serialized_ini
+def remove_model(name: str) -> str | None:
+    """Take a model out of models.ini - only the entry, never the file (1.4.7). The file as it was is kept as
+    models.ini.bak-<time>; returns that path. KeyError when there is no such model."""
+    path = _ini_path()
+    cp = _load_ini(path)
+    if name not in cp.sections():
+        raise KeyError(f"No model named '{name}' in {path}")
+    cp.remove_section(name)
+    return _write_ini(cp, path)
+
+
+@serialized_ini
+def set_model_files(name: str, model: str | None = None, mmproj: str | None = "keep") -> str | None:
+    """Point a preset at its model file (found elsewhere), and/or change its mmproj: a path, None to drop it (the model
+    then reads text only), or "keep". Returns the backup's path."""
+    path = _ini_path()
+    cp = _load_ini(path)
+    if name not in cp.sections():
+        raise KeyError(f"No model named '{name}' in {path}")
+    if model:
+        cp.set(name, "model", model)
+    if mmproj is None:
+        cp.remove_option(name, "mmproj")
+    elif mmproj != "keep":
+        cp.set(name, "mmproj", mmproj)
+    return _write_ini(cp, path)
+
+
+def _write_ini(cp, path: str) -> str | None:
+    backup = f"{path}.bak-{time.strftime('%Y%m%d-%H%M%S')}"
+    if os.path.exists(path) and not os.path.exists(backup):
+        shutil.copy2(path, backup)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        cp.write(f)
+    atomic_io.replace(tmp, path)
+    _ini_cache.update(key=None, configs=None)
+    _sizes.clear()
+    return backup if os.path.exists(backup) else None
+
+
 def server_models(force: bool = False) -> list[str] | None:
     now = time.time()
     if not force and _cache["ids"] is not None and now - _cache["at"] < _CACHE_TTL:
@@ -350,8 +406,12 @@ def resolve_candidates(configured: list[str], kind: str = None) -> tuple[list[st
 
     by_key = {_normalize(i): i for i in ids}
     usable, skipped = [], []
+    # A model whose file is gone can only fail to load (1.4.7): Auto passes over it instead of trying.
+    ids = [i for i in ids if not (file_missing(i) or {}).get("what") == "model"]
     for name in configured:
         exact = name if name in ids else by_key.get(_normalize(name))
+        if exact and exact not in ids:
+            exact = None
         if exact:
             if exact not in usable:
                 usable.append(exact)

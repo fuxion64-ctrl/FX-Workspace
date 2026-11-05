@@ -65,6 +65,13 @@ class PrismDetectionTests(unittest.TestCase):
         resp = requests.Response()
         resp.status_code = 500
         resp.url = "http://127.0.0.1:8090/v1/chat/completions"
+        # force_load first moves the router to the build the model needs (llama_builds.ensure_for): unpatched, this test
+        # really restarted a running llama-server on PrismML's build, left one on 8090 and kept the run from exiting
+        # (1.4.7). The switch has its own tests (test_llama_builds); here only the message is checked.
+        import llama_builds
+        stub = patch.object(llama_builds, "ensure_for", return_value=None)
+        stub.start()
+        self.addCleanup(stub.stop)
         with patch.object(llama_local.requests, "post", return_value=resp):
             with self.assertRaises(RuntimeError) as cm:
                 llama_local.force_load("Ternary-Bonsai-2-27B", timeout=1)
