@@ -89,6 +89,9 @@ DEFAULT_SETTINGS = {
     # picker, which is already a stronger, explicit override.
     "favorite_local_text_models": [],
     "favorite_local_vision_models": [],
+    # Your own names for models (1.4.7): {"text:<model id>" | "image:<quality key>": "name"}. Shown wherever a model is
+    # named; Settings shows the full name under yours. Empty = the models' own names.
+    "model_names": {},
     "favorite_cloud_text_models": [],
     "favorite_cloud_vision_models": [],
     # Appearance: a family and a light/dark mode (the top bar's button flips the mode).
@@ -330,11 +333,27 @@ def clean_privacy_settings(s: dict) -> dict:
     out.update(image_gen.clean_settings(s))
     out.update(video_gen.clean_settings(s))
     out.update(music_gen.clean_settings(s))
+    out["model_names"] = clean_model_names(s.get("model_names"))
     out["research_depth"] = s.get("research_depth") if s.get("research_depth") in RESEARCH_DEPTHS else "auto"
     out["llama_build"] = s.get("llama_build") if s.get("llama_build") in llama_builds.CHOICES else "auto"
     contact = re.sub(r"[\r\n\t]", " ", str(s.get("sec_contact") or "")).strip()[:120]
     # SEC wants "Name email@domain"; anything else is dropped rather than sent.
     out["sec_contact"] = contact if re.fullmatch(r"[\w .,'&()-]{1,80}\s+[\w.+-]+@[\w-]+(\.[\w-]+)+", contact) else ""
+    return out
+
+
+def clean_model_names(value) -> dict:
+    """{"text:<id>" | "image:<key>": name}: at most 300 of them, names one line of up to 60 characters; an empty
+    name means "use the model's own" and is dropped."""
+    out = {}
+    if not isinstance(value, dict):
+        return out
+    for key, name in list(value.items())[:300]:
+        if not isinstance(key, str) or not re.fullmatch(r"(text|image):[^\x00-\x1f]{1,200}", key):
+            continue
+        name = re.sub(r"\s+", " ", str(name or "")).strip()[:60]
+        if name:
+            out[key] = name
     return out
 
 

@@ -1489,7 +1489,13 @@ html.fx-desktop .sb-quit:hover { background: var(--hover); color: var(--danger-t
 .ov-b.fav { color: #f2c14e; }
 .iv-fav { position: absolute; left: 7px; top: 7px; color: #f2c14e; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
 .iv-fav .icon { fill: currentColor; }
-.iv-tag { position: absolute; left: 6px; bottom: 6px; font: 10.5px var(--mono); color: #ffffff; background: rgba(20, 20, 19, .66); padding: 2px 6px; border-radius: 5px; pointer-events: none; opacity: 0; transition: opacity .15s; }
+/* What a picture is (1.4.7): its model and styles, always shown along the bottom; the size tag moved to the right. */
+.iv-tags { position: absolute; left: 6px; right: 6px; bottom: 6px; display: flex; flex-wrap: wrap; gap: 3px; pointer-events: none; }
+.iv-chip { font-size: 10.5px; line-height: 1.5; color: #ffffff; background: rgba(20, 20, 19, .62); padding: 0 6px; border-radius: 5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.iv-chip.model { font-weight: 600; }
+.iv-tile:has(.iv-tag) .iv-tags { right: 64px; }
+.iv-insp-tags { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 2px; }
+.iv-tag { position: absolute; right: 6px; bottom: 6px; font: 10.5px var(--mono); color: #ffffff; background: rgba(20, 20, 19, .66); padding: 2px 6px; border-radius: 5px; pointer-events: none; opacity: 0; transition: opacity .15s; }
 :hover > .iv-tag, :focus-visible > .iv-tag { opacity: 1; }            /* the size tag on hover only (1.4.6 unslop) */
 .iv-neg .af-link { text-decoration: none; color: var(--muted); }
 .iv-neg .af-link:hover { color: var(--text); }
@@ -3569,6 +3575,19 @@ span.tier.input { padding: 0; border: 0; width: 8px; height: 8px; min-height: 0;
 .model-item > summary::-webkit-details-marker { display: none; }
 .model-item > summary .chev { color: var(--muted); transition: transform .15s; }
 .model-item[open] > summary .chev { transform: rotate(180deg); }
+/* Your own name for a model (1.4.7): yours first, the full name beside it in the list and under the box. */
+.model-nick { font-weight: 600; }
+.model-full { color: var(--muted); font-size: 12px; margin-left: 6px; }
+.model-rename { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px 2px; }
+.model-rename label { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+.model-rename label > span { flex: none; }
+.model-rename .input { max-width: 320px; }
+.model-rename small { color: var(--muted); font-size: 12px; }
+.img-model-wrap { min-width: 0; }
+.img-model-wrap .model-rename { padding: 8px 2px 0; min-width: 0; }
+.img-model-wrap .model-rename label { flex-direction: column; align-items: stretch; gap: 3px; font-size: 12px; }
+.img-model-wrap .model-rename .input { max-width: none; width: 100%; min-width: 0; box-sizing: border-box; }
+.img-model-wrap .model-rename small { overflow-wrap: anywhere; }
 .model-cfg { padding: 0 13px 13px 13px; }
 .model-cfg .cfg-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
 .fav { font-size: 12px; display: flex; gap: 5px; align-items: center; cursor: pointer; color: var(--muted); }
@@ -7044,6 +7063,19 @@ const IMAGE_STYLES = [
   ['sketch', 'Sketch', 'pencil sketch, cross-hatching, on paper'],
   ['logo', 'Logo', 'flat vector logo, simple shapes, centered, plain background'],
 ];
+// What a picture is (1.4.7): the model that made it and the styles in its prompt - the style buttons add their words
+// to the prompt, and a picture asked for in a chat says it in its own words, so both are read from the saved prompt.
+const STYLE_TAGS = [
+  ['Photo', /\b(photo|photos|photograph\w*|photo-?real\w*|35 ?mm|dslr)\b/i], ['Anime', /\b(anime|manga|cel[- ]shad\w*)\b/i],
+  ['3D render', /\b(3d|3-d)\b|\brender(ed|ing)?\b|\b(octane|unreal engine|blender)\b/i], ['Pixel art', /\bpixel[- ]art\b|\b(8|16)-bit\b/i],
+  ['Oil painting', /\boil paint\w*/i], ['Watercolor', /\bwatercolou?r/i], ['Sketch', /\b(sketch\w*|pencil drawing|charcoal)\b/i],
+  ['Logo', /\blogo\b/i]];
+function imageTags(i) {
+  const known = IMAGE_QUALITIES.find(q => q[0] === i.quality);
+  const model = i.quality ? modelName('image', i.quality, known ? known[1] : i.model) : (i.model || '');
+  const prompt = String(i.prompt || '');
+  return { model, full: i.model || '', styles: STYLE_TAGS.filter(([, re]) => re.test(prompt)).map(([label]) => label).slice(0, 3) };
+}
 const IMAGE_SIZES = [['square', 'Square', 12, 12], ['portrait', 'Portrait', 10, 14], ['landscape', 'Landscape', 14, 10], ['wide', 'Wide', 16, 9], ['tall', 'Tall', 9, 16]];
 const IMAGE_QUALITIES = [['fast', 'Fast', 'FLUX.2 klein 4B'], ['balanced', 'Balanced', 'Z-Image-Turbo'], ['best', 'Best', 'Krea 2 Turbo'], ['dreamshaper8', 'DreamShaper 8', 'DreamShaper 8'], ['anythingv5', 'Anything V5', 'Anything V5'], ['animagine4', 'Animagine XL 4', 'Animagine XL 4.0'], ['pony6', 'Pony V6', 'Pony Diffusion V6 XL'], ['pony6_anime', 'Pony anime clean', 'Pony V6 · Anime clean (Animagine-like)'], ['pony6_warm', 'Pony anime warm', 'Pony V6 · Anime warm (backlit glow)']];
 const PONY_KEYS = ['pony6', 'pony6_anime', 'pony6_warm'];      // image_plan.PONY_KEYS: Think first and sequences
@@ -7064,7 +7096,11 @@ const ImagesView = (() => {
   const models = () => (st.status || {}).models || [];
   const installedModel = id => !models().length || models().some(m => m.quality === id && m.installed);
   const choices = () => [...IMAGE_QUALITIES.filter(([id]) => installedModel(id)),
-    ...models().filter(m => m.custom && m.installed).map(m => [m.quality, m.name, `${m.name} · ${m.about}`])];
+    ...models().filter(m => m.custom && m.installed).map(m => [m.quality, m.name, `${m.name} · ${m.about}`])]
+    .map(([id, label, model]) => [id, modelName('image', id, label), model]);        // your names (1.4.7)
+  // The gallery's filter chips (1.4.7): the models on this PC, not the whole original pack - and none until the
+  // engine's status says which those are.
+  const filterChoices = () => models().length ? choices().filter(([id]) => !imageFamilyOf(id) || IMAGE_FAMILIES[id]) : [];
   const quality = () => {
     if (st.ref) return 'fast';
     const want = st.quality || (S.settings || {}).image_quality || 'balanced';
@@ -7167,7 +7203,7 @@ const ImagesView = (() => {
   async function load() {
     const p = new URLSearchParams({ limit: '240' });
     if (st.q) p.set('q', st.q);
-    if (IMAGE_QUALITIES.some(([id]) => id === st.filter)) p.set('quality', st.filter);
+    if (!['all', 'fav', 'trash'].includes(st.filter)) p.set('quality', st.filter);       // a model chip (yours included)
     if (st.filter === 'fav') p.set('fav', 'true');
     if (st.filter === 'trash') p.set('trash', 'true');
     else p.set('group', 'true');                     // a sequence (Angles/Frames) is one tile, opened like a folder
@@ -7273,13 +7309,29 @@ const ImagesView = (() => {
     let html = '';
     if (j.stage || st.busy) {
       const pct = j.stage === 'warming' && j.total ? j.done / j.total : j.progress || 0;
-      const step = j.stage === 'drawing' && j.steps ? `<span class="mono">${j.images > 1 ? `${j.image}/${j.images} · ` : ''}${j.step}/${j.steps}${j.left != null ? ` · ~${Math.round(j.left)} s` : ''}</span>` : '';
+      const step = j.stage === 'drawing' && j.steps ? `${j.images > 1 ? `${j.image}/${j.images} · ` : ''}${j.step}/${j.steps}${j.left != null ? ` · ~${Math.round(j.left)} s` : ''}` : '';
       el._target = j.stage === 'drawing' ? (j.progress || 0) : ['finishing', 'saving'].includes(j.stage) ? 1 : 0;   // DRAW_FX
-      html = `<div class="iv-job">${j.stage === 'warming' ? icon('i-disk', '') : '<span class="iv-job-thumb"><canvas class="dc-fx" aria-hidden="true"></canvas></span>'}<div class="grow"><b>${esc(j.text || (st.busy ? 'Starting…' : 'Working…'))}</b><div class="bar"><i style="width:${Math.round(Math.max(0.03, pct) * 100)}%"></i></div></div>${step}<button type="button" class="btn sm ghost" onclick="ImagesView.stop()">${icon('i-stop', 'xs')}Stop</button></div>`
-        + (s.waiting ? `<div class="iv-next">${icon('i-clock', 'xs')}${s.waiting} more waiting for the GPU</div>` : '');
+      // The card is built once per shape and then updated in place (1.4.7): rebuilt on every poll, its canvas was
+      // replaced by a blank one each time the step count or "~N s" changed, and the animation blinked out for a frame.
+      const shape = `${j.stage === 'warming' ? 'warm' : 'draw'}|${s.waiting ? 1 : 0}|${st.error && !j.stage && !st.busy ? 1 : 0}`;
+      const job = el.querySelector(':scope > .iv-job');
+      if (job && el.dataset.shape === shape) {
+        const b = job.querySelector('.grow > b'), bar = job.querySelector('.bar > i'), sp = job.querySelector('.iv-step'), next = el.querySelector('.iv-next');
+        const text = j.text || (st.busy ? 'Starting…' : 'Working…'), width = `${Math.round(Math.max(0.03, pct) * 100)}%`;
+        if (b && b.textContent !== text) b.textContent = text;
+        if (bar && bar.style.width !== width) bar.style.width = width;
+        if (sp && sp.textContent !== step) sp.textContent = step;
+        if (next) { const n = `${s.waiting} more waiting for the GPU`; if (next.lastChild && next.lastChild.textContent !== n) next.lastChild.textContent = n; }
+        if (job.querySelector('canvas.dc-fx')) DRAW_FX.play(el);
+        return;
+      }
+      el.dataset.shape = shape;
+      html = `<div class="iv-job">${j.stage === 'warming' ? icon('i-disk', '') : '<span class="iv-job-thumb"><canvas class="dc-fx" aria-hidden="true"></canvas></span>'}<div class="grow"><b>${esc(j.text || (st.busy ? 'Starting…' : 'Working…'))}</b><div class="bar"><i style="width:${Math.round(Math.max(0.03, pct) * 100)}%"></i></div></div><span class="mono iv-step">${esc(step)}</span><button type="button" class="btn sm ghost" onclick="ImagesView.stop()">${icon('i-stop', 'xs')}Stop</button></div>`
+        + (s.waiting ? `<div class="iv-next">${icon('i-clock', 'xs')}<span>${s.waiting} more waiting for the GPU</span></div>` : '');
     } else if (w) {
       html = `<div class="iv-job quiet">${icon('i-disk', '')}<div class="grow"><b>Getting ${esc(w.key || '')} ready - reading it from disk</b><div class="bar"><i style="width:${Math.round((w.done / (w.total || 1)) * 100)}%"></i></div></div></div>`;
     }
+    if (!(j.stage || st.busy)) el.dataset.shape = '';                 // not a job card: the next job builds its own
     if (st.error && !j.stage && !st.busy) html += errorCard(st.error);
     setHtmlIfChanged(el, html);
     if (el.querySelector('canvas.dc-fx')) DRAW_FX.play(el);            // the look's own Creating image (1.4.6)
@@ -7296,6 +7348,12 @@ const ImagesView = (() => {
     const [tone, ic, title, acts] = kinds[e.code] || ['danger', 'i-alert', "That didn't work", `<button class="btn sm" onclick="ImagesView.make()">Try again</button>`];
     return `<div class="state-card ${tone}" role="alert"><span class="sc-ico">${icon(ic, 'sm')}</span><div class="grow"><b>${esc(title)}</b><p>${esc(e.message)}</p>${acts ? `<div class="sc-acts">${acts}</div>` : ''}</div><button type="button" class="icon-btn" onclick="ImagesView.dismiss()" aria-label="Dismiss">${icon('i-x', 'sm')}</button></div>`;
   }
+  // The tags on a tile (1.4.7): the model, then the styles its prompt asked for.
+  function tagsHtml(i) {
+    const t = imageTags(i);
+    if (!t.model && !t.styles.length) return '';
+    return `<span class="iv-tags">${t.model ? `<span class="iv-chip model" title="${esc(t.full)}">${esc(t.model)}</span>` : ''}${t.styles.map(s => `<span class="iv-chip">${esc(s)}</span>`).join('')}</span>`;
+  }
   function paintGallery() {
     const head = $('iv-gal-head'), grid = $('iv-grid'); if (!head || !grid) return;
     const f = (id, label) => `<button type="button" class="${st.filter === id ? 'on' : ''}" aria-pressed="${st.filter === id}" onclick="ImagesView.filterBy('${id}')">${label}</button>`;
@@ -7304,7 +7362,7 @@ const ImagesView = (() => {
       ? `<button type="button" class="btn sm ghost iv-back" onclick="ImagesView.closeSeq()">${icon('i-arrow-left', 'xs')}All pictures</button>
         <h2>${folder.mode === 'frames' ? 'Frames' : 'Angles'} <span class="muted">${st.list.length}</span></h2><p class="iv-folder-req">${esc(folder.request || '')}</p>`
       : `<h2>${st.filter === 'trash' ? 'Trash' : 'Your pictures'}${st.list ? ` <span class="muted">${st.list.length}</span>` : ''}</h2>
-      <div class="seg iv-filter" role="group" aria-label="Show">${f('all', 'All')}${f('fav', `${icon('i-star', 'xs')}Favourites`)}${IMAGE_QUALITIES.filter(([id]) => !imageFamilyOf(id) || IMAGE_FAMILIES[id]).map(([id, label]) => f(id, label)).join('')}${f('trash', `${icon('i-trash', 'xs')}Trash`)}</div>
+      <div class="seg iv-filter" role="group" aria-label="Show">${f('all', 'All')}${f('fav', `${icon('i-star', 'xs')}Favourites`)}${filterChoices().map(([id, label]) => f(id, esc(label))).join('')}${f('trash', `${icon('i-trash', 'xs')}Trash`)}</div>
       <span class="grow"></span>${st.filter === 'trash' && st.list && st.list.length ? `<button type="button" class="btn sm ghost danger" onclick="ImagesView.emptyTrash()">${icon('i-trash', 'xs')}Empty trash</button>` : ''}<label class="iv-search">${icon('i-search', 'sm')}<input type="search" placeholder="Search prompts" aria-label="Search prompts" value="${esc(st.q)}" oninput="ImagesView.search(this.value)"></label>`);
     if (st.listErr) { setHtmlIfChanged(grid, `<div class="place-empty" role="alert"><b>Couldn't load your pictures</b><p>${esc(st.listErr)}</p><button class="btn" onclick="ImagesView.reload()">Retry</button></div>`); return; }
     if (!st.list) { setHtmlIfChanged(grid, `<div class="iv-skel">${'<i class="shimmer"></i>'.repeat(10)}</div>`); return; }
@@ -7326,6 +7384,7 @@ const ImagesView = (() => {
         <div class="iv-ov">${i.trashed ? `<button type="button" class="ov-b" onclick="ImagesView.restore('${jsArg(i.id)}')" title="Restore" aria-label="Restore">${icon('i-undo', 'sm')}</button><button type="button" class="ov-b" onclick="ImagesView.purge('${jsArg(i.id)}')" title="Delete forever" aria-label="Delete forever">${icon('i-trash', 'sm')}</button>`
           : `<button type="button" class="ov-b" onclick="ImagesView.again('${jsArg(i.id)}')" title="Again - a new seed (R)" aria-label="Make again">${icon('i-retry', 'sm')}</button><button type="button" class="ov-b" onclick="ImagesView.edit('${jsArg(i.id)}')" title="Edit (E)" aria-label="Edit">${icon('i-edit', 'sm')}</button><button type="button" class="ov-b${i.fav ? ' fav' : ''}" onclick="ImagesView.fav('${jsArg(i.id)}')" title="${i.fav ? 'Favourite' : 'Add to favourites'} (F)" aria-label="${i.fav ? 'Remove from favourites' : 'Add to favourites'}" aria-pressed="${!!i.fav}">${icon('i-star', 'sm')}</button>`}</div>
         ${i.fav ? `<span class="iv-fav">${icon('i-star', 'xs')}</span>` : ''}${i.seq ? `<span class="iv-tag" title="${esc(i.seq.label)}">${i.seq.mode === 'frames' ? 'frame' : 'angle'} ${i.seq.index + 1}/${i.seq.count}</span>` : tall ? '<span class="iv-tag">portrait</span>' : wide ? '<span class="iv-tag">wide</span>' : ''}
+        ${tagsHtml(i)}
       </div>`;
     }).join(''));
   }
@@ -7334,7 +7393,9 @@ const ImagesView = (() => {
     const i = st.sel && find(st.sel);
     if (!i) { setHtmlIfChanged(el, `<div class="iv-insp-empty">${icon('i-image')}<p>Pick a picture to see its prompt, seed and what you can do with it.</p></div>`); return; }
     const made = new Date((i.created || 0) * 1000);
+    const tg = imageTags(i);
     setHtmlIfChanged(el, `<button type="button" class="iv-big" onclick="ImagesView.view('${jsArg(i.id)}')" title="Open full size (Space)" aria-label="Open full size"><img src="${esc(i.url)}" alt="${esc(i.prompt.slice(0, 120))}"></button>
+      <div class="iv-insp-tags">${tg.model ? `<span class="pill" title="${esc(tg.full)}">${esc(tg.model)}</span>` : ''}${tg.styles.map(s => `<span class="pill">${esc(s)}</span>`).join('')}</div>
       ${i.plan ? `<p class="iv-prompt-text"><b>You asked:</b> ${esc(i.plan.request || '')}</p>` : i.seq ? `<p class="iv-prompt-text"><b>You asked:</b> ${esc(i.seq.request || '')}</p>` : ''}
       ${i.seq ? (() => { const sibs = seqSibs(i), inside = st.openSeq === i.seq.id;
         return `<div class="iv-seq"><b>${i.seq.mode === 'frames' ? 'Frame' : 'Angle'} ${i.seq.index + 1} of ${i.seq.count} · ${esc(i.seq.label)}</b><div class="iv-seq-strip">${sibs.map(x => `<button type="button" class="${x.id === i.id ? 'on' : ''}" onclick="${inside ? `ImagesView.select('${jsArg(x.id)}')` : `ImagesView.openSeq('${jsArg(i.seq.id)}','${jsArg(x.id)}')`}" title="${esc(x.seq.label)}" aria-label="${esc(x.seq.label)}"><img src="${esc(x.thumb || x.url)}" alt=""></button>`).join('')}</div></div>`; })() : ''}
@@ -7559,6 +7620,7 @@ const ImagesView = (() => {
   async function unload() { try { await api('/api/images/unload', {}); toast('The image engine let go of its memory.'); } catch (e) { toast(e.message); } poll(); }
   return { render, poll, load, reload: load, make, again, edit, expandOpen, expandSet, expandGo, clearRef, pickRef, improve, fav, trash, restore, purge, emptyTrash, copy, useSeed, toChat, select, view, filterBy, search, stop, unload, set, pickModel,
     openSeq, closeSeq, variants,
+    refresh: () => { if (S.view === 'images') { paintGen(); paintGallery(); paintInspector(); } },   // a model renamed (1.4.7)
     style: id => { st.styles.has(id) ? st.styles.delete(id) : st.styles.add(id); paintGen(); },
     toggleNeg: () => { st.showNeg = !st.showNeg; paintGen(); if (st.showNeg) setTimeout(() => $('iv-negative') && $('iv-negative').focus(), 0); },
     setNeg: v => { st.negative = v; }, setSeed: v => { st.seed = v.replace(/[^\d]/g, ''); },
@@ -11023,13 +11085,14 @@ async function openEngineMenu(anchor) {
     if (m.missing) {
       const what = m.missing === 'mmproj' ? 'image projector missing' : 'file missing';
       const sub = m.missing === 'mmproj' ? 'Its image projector isn’t there - it can still read text once removed' : 'Its file isn’t there - moved or deleted';
-      html += `<div class="model-row missing"><button class="pop-item" disabled title="${esc(m.missing_path || '')}"><span class="pop-main"><span class="pop-line"><span class="mono">${esc(m.id)}</span><span class="pill bad">${what}</span></span><small>${sub}</small></span></button>
+      html += `<div class="model-row missing"><button class="pop-item" disabled title="${esc(m.missing_path || '')}"><span class="pop-main"><span class="pop-line"><span class="mono">${esc(m.id)}</span><span class="pill missing">${what}</span></span><small>${sub}</small></span></button>
         <button type="button" class="mini-btn" onclick="fixModelEntry('find', '${jsArg(m.id)}')" title="Look for ${esc(m.missing_path ? m.missing_path.split(/[\\/]/).pop() : 'it')} in the model folders">${icon('i-search', 'xs')}Find</button>
         <button type="button" class="mini-btn" onclick="fixModelEntry('remove', '${jsArg(m.id)}')" title="${m.missing === 'mmproj' ? 'Drop the image projector from its entry' : 'Take it off the list - no file is deleted'}">${icon('i-x', 'xs')}Remove</button></div>`;
       return;
     }
     const badges = (m.vision ? '<span class="pill vision">vision</span>' : '') + (S.engaged === m.id ? '<span class="pill loaded">loaded</span>' + placementPill(m.id, true) : '') + (m.favorite ? '<span class="pill">favorite</span>' : '');
-    html += row(m.id, m.id, m.vision ? 'Reads screenshots' : 'Text', badges, m);
+    const nick = modelName('text', m.id, '');
+    html += row(m.id, nick || m.id, (nick ? `<span class="mono">${esc(m.id)}</span> · ` : '') + (m.vision ? 'Reads screenshots' : 'Text'), badges, m);
   });
   html += `<div class="pop-sep"></div><button class="pop-item" onclick="closePopover();openSettings('models')">${icon('i-gear')}<span>Manage models…<small>Favorites, GPU layers, context size</small></span></button>`;
   const scroll = popEl.scrollTop;
@@ -11046,6 +11109,31 @@ async function menuLoad(id) {
   await done;
   redrawEngineMenu();
 }
+// Your own names for models (1.4.7, settings.model_names): "text:<id>" / "image:<quality key>". Every place that
+// names a model uses modelName(); Settings shows the full name under yours.
+function modelName(kind, id, fallback) {
+  const n = ((S.settings || {}).model_names || {})[`${kind}:${id}`];
+  return n || fallback || id;
+}
+async function renameModel(kind, id, name) {
+  const key = `${kind}:${id}`, clean = String(name || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  if (clean === (((S.settings || {}).model_names || {})[key] || '')) return;
+  const merged = { ...((S.settings || {}).model_names || {}) };
+  if (clean) merged[key] = clean; else delete merged[key];
+  await saveSettings({ model_names: merged });
+  toast(clean ? `Renamed to ${clean}.` : 'Back to its own name.');
+  renderModelLabel(); redrawEngineMenu();
+  if (typeof ImagesView !== 'undefined' && ImagesView.refresh) ImagesView.refresh();
+  if (S.settingsTab === 'models') renderModelsCached(); else if (S.settingsTab === 'images') renderImages();
+}
+// The name box in Settings: Enter or leaving it saves, Esc puts it back; empty = the model's own name.
+function nameField(kind, id, full, shown = full) {
+  const k = jsArg(id), cur = ((S.settings || {}).model_names || {})[`${kind}:${id}`] || '';
+  return `<div class="model-rename"><label><span>Your name for it</span><input class="input" maxlength="60" value="${esc(cur)}" placeholder="${esc(shown)}"
+      onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}else if(event.key==='Escape'){this.value=this.defaultValue;this.blur()}"
+      onchange="renameModel('${kind}','${k}',this.value)" aria-label="Your name for ${esc(full)}"></label>
+    <small>Full name: <span class="mono">${esc(full)}</span>${cur ? ` · <button type="button" class="af-link" onclick="renameModel('${kind}','${k}','')">Use its own name</button>` : ''}</small></div>`;
+}
 async function fixModelEntry(action, id) {
   if (S.busy) { toast('Wait for the current task to finish.'); return; }
   let r; try { r = await api(action === 'find' ? '/api/local-models/find-file' : '/api/local-models/remove', { model: id }); } catch (e) { r = { ok: false, message: e.message }; }
@@ -11055,7 +11143,7 @@ async function fixModelEntry(action, id) {
 }
 function pinModel(id) { S.pinned = id; store.set('pinned', id); renderModelLabel(); closePopover(); refreshEffort(); if (id) toast(`Pinned ${id}. It loads on your next message.`); }
 function renderModelLabel() {
-  const model = S.mode === 'cloud' ? (shortModel(S.cloudModel) || 'Cloud') : (S.pinned || (S.engaged ? `Auto (${S.engaged})` : 'Auto'));
+  const model = S.mode === 'cloud' ? (shortModel(S.cloudModel) || 'Cloud') : (S.pinned ? modelName('text', S.pinned) : (S.engaged ? `Auto (${modelName('text', S.engaged)})` : 'Auto'));
   const label = `${MODES[S.mode].label} · ${model}`;
   $('engine-label').textContent = label;
   $('engine-btn').title = `${label} - change where it runs or which model`;
@@ -15498,7 +15586,7 @@ async function poll() {
 const placeWord = m => { const p = S.placement; return !p || p.model !== m ? '' : p.state === 'gpu' ? ' · GPU' : p.state === 'partial' ? ' · partly on the CPU' : p.state === 'spilled' ? ' · spilling into RAM' : ''; };
 function paintModelRow(d) {
   const cloud = S.mode === 'cloud', up = !!d.local_up, model = d.local_engaged || S.pinned || '';
-  const name = cloud ? (shortModel(S.cloudModel) || 'Cloud models') : model ? shortModel(model) : 'Chat model';
+  const name = cloud ? (shortModel(S.cloudModel) || 'Cloud models') : model ? modelName('text', shortModel(model)) : 'Chat model';
   const sub = cloud ? 'Cloud' : !up ? (S.mode === 'local' ? 'off' : 'Local models off · cloud first')   // short; the tooltip says why (1.4.6)
     : d.local_engaged ? 'Ready' + placeWord(d.local_engaged) : model ? 'Loads when you send' : 'Auto · loads when you send';
   $('llm-name').textContent = name;
@@ -16509,10 +16597,11 @@ function renderModelsCached() {
     const missing = c && c.file_found === false;          // models.ini points at a file that isn't on disk
     const loadTitle = missing ? `title="The model file isn't on disk: ${esc(c.model_path)}"` : S.bench.running ? 'title="A benchmark is running"' : '';
     const va = visionLine(m.id);
-    return { missing, html: `<details class="model-item" data-id="${esc(m.id)}"${wasOpen.has(m.id) ? ' open' : ''}><summary class="list-row"><div class="grow"><span class="mono">${esc(m.id)}</span>${m.vision ? '<span class="pill vision">vision</span>' : ''}${S.engaged === m.id ? '<span class="pill loaded">loaded</span>' : ''}${missing ? '<span class="pill missing">file missing</span>' : ''}<span class="bench-pill">${benchPill(m.id)}</span><small>${missing ? `Not found: ${esc(c.model_path)}` : c ? `GPU layers ${eff(c.ngl, d.ngl)} · context ${eff(c.ctx_size, d.ctx_size)}` : 'Default load settings'}</small>${va}</div>
+    const nick = modelName('text', m.id, '');
+    return { missing, html: `<details class="model-item" data-id="${esc(m.id)}"${wasOpen.has(m.id) ? ' open' : ''}><summary class="list-row"><div class="grow">${nick ? `<b class="model-nick">${esc(nick)}</b> <span class="mono model-full">${esc(m.id)}</span>` : `<span class="mono">${esc(m.id)}</span>`}${m.vision ? '<span class="pill vision">vision</span>' : ''}${S.engaged === m.id ? '<span class="pill loaded">loaded</span>' : ''}${missing ? '<span class="pill missing">file missing</span>' : ''}<span class="bench-pill">${benchPill(m.id)}</span><small>${missing ? `Not found: ${esc(c.model_path)}` : c ? `GPU layers ${eff(c.ngl, d.ngl)} · context ${eff(c.ctx_size, d.ctx_size)}` : 'Default load settings'}</small>${va}</div>
       <label class="fav" onclick="event.stopPropagation()" title="Auto only picks favorites when any are starred"><input type="checkbox" ${m.favorite ? 'checked' : ''} onchange="toggleFav('${favKey}','${k}')">Favorite</label>
       <button class="btn sm" ${S.loading[m.id] || S.bench.running || missing ? 'disabled' : ''} ${loadTitle} onclick="event.preventDefault();forceLoad('${k}')">${S.loading[m.id] ? '<span class="spinner"></span>Loading' : S.engaged === m.id ? 'Reload' : 'Load now'}</button>
-      ${icon('i-chev', 'sm chev')}</summary>${cfgHtml}${benchHtml(m.id)}</details>` };
+      ${icon('i-chev', 'sm chev')}</summary>${nameField('text', m.id, m.id)}${cfgHtml}${benchHtml(m.id)}</details>` };
   });
   // Models whose file is gone fold together at the end, not between the ones you can load (1.4.6 unslop).
   const rows = items.filter(x => !x.missing).map(x => x.html).join('');
@@ -17415,8 +17504,9 @@ async function renderImages(data) {
   const current = st.default || s.image_quality;
   const card = m => { const on = current === m.quality;
     return `<div class="img-model-wrap"><button class="opt-card img-model ${on ? 'on' : ''}" onclick="saveSettings({image_quality:'${m.quality}'}).then(()=>renderImages())" aria-pressed="${on}">
-      <span class="im-top"><b>${esc(QUAL[m.quality] || m.name)}</b><span class="mono">${m.seconds ? secs(m.seconds) : ''}</span></span><span class="im-name">${esc(m.name)}</span><small>${esc(m.about)}</small>
+      <span class="im-top"><b>${esc(modelName('image', m.quality, QUAL[m.quality] || m.name))}</b><span class="mono">${m.seconds ? secs(m.seconds) : ''}</span></span><span class="im-name">${esc(m.name)}</span><small>${esc(m.about)}</small>
       <div class="for">${esc(m.by)} · ${m.steps} steps · ${esc(m.license)}</div></button>
+      ${nameField('image', m.quality, m.name, QUAL[m.quality] || m.name)}
       ${m.custom ? `<button type="button" class="af-link im-remove" onclick="removeImageModel('${m.quality}')" title="${esc(m.file || '')}">Remove from the list</button>` : ''}</div>`; };
   const missing = st.models.filter(m => !m.installed && !m.custom);
   const sizes = Object.keys(st.sizes).map(k => [k, `${k[0].toUpperCase()}${k.slice(1)} <small>${st.sizes[k]}</small>`]);

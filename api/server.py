@@ -453,6 +453,7 @@ class SettingsUpdate(BaseModel):
     proactive_detectors: dict = None
     favorite_local_text_models: list = None
     favorite_local_vision_models: list = None
+    model_names: dict | None = None          # 1.4.7: your own names for text and image models
     favorite_cloud_text_models: list = None
     favorite_cloud_vision_models: list = None
     theme: str = None
@@ -612,7 +613,7 @@ def update_settings(body: SettingsUpdate):
     # wholesale, or every other category/tool the user had already set would
     # silently revert to its default the next time either one changes.
     for nested_key in ("permission_categories", "permission_overrides", "proactive_detectors", "messaging_permissions",
-                       "net_components", "overlay_panels"):
+                       "net_components", "overlay_panels", "model_names"):   # model_names: one rename at a time (1.4.7)
         if nested_key in updates and updates[nested_key] is not None:
             merged = dict(current.get(nested_key) or {})
             merged.update(updates[nested_key])
