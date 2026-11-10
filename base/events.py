@@ -82,6 +82,7 @@ _TOOL_VERBS = {
     "roblox_get_tree": "Read the place tree", "roblox_edit_script": "Edit script",
     "roblox_run_playtest": "Playtest the place", "roblox_batch": "Change in Studio:",
     "web_search": "Search the web for", "web_read": "Read", "fetch_page": "Read", "browser_open": "Open in the browser",
+    "show_web_images": "Show pictures of",
     "browser_read": "Read the browser page", "browser_click": "Click in the browser", "browser_fill": "Fill in a field",
     "mcp_read_resource": "Read an MCP resource",
     "snap_windows": "Tile windows", "top_processes": "Check what's using the PC",

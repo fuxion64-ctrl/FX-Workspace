@@ -708,6 +708,22 @@ def execute_tool(tool_name: str, args: dict) -> dict:
             import osint.tool
             return osint.tool.world_monitor_tool(args)
 
+        elif tool_name == "show_web_images":           # pictures from the web, in the chat (web_images.py, 1.4.7)
+            import web_images
+            settings = shared.app_state["settings"]
+            mode = search_engine.turn_mode(settings)
+            if mode == "max" and search_engine.max_privacy_route_problem():
+                return {"ok": False, "status": "permanent_failure", "message": search_engine.max_privacy_route_problem()}
+            with search_engine.scope(mode):
+                res = web_images.show_web_images_tool(args, settings, should_cancel=run_control.is_stopped,
+                                                      progress=lambda msg: event_log.progress(label=f"Pictures from the web - {msg}"))
+            if res.get("ok"):                          # shown at once, and under the reply (agent/tasks._with_images)
+                shared.app_state.setdefault("turn_images", []).extend(res["images"])
+                event_log.emit_event("image", f"{len(res['images'])} picture{'s' if len(res['images']) != 1 else ''} from the web",
+                                     status="done", images=[{k: m.get(k) for k in ("url", "alt", "domain", "width", "height", "source")}
+                                                            for m in res["images"]])
+            return res
+
         elif tool_name == "web_read":
             mode = search_engine.turn_mode()
             if mode == "disabled":

@@ -889,6 +889,12 @@ def _with_timelines(result):
     return {**result, "message": message}
 
 
+def _alt_text(s: str) -> str:
+    """Text safe inside a Markdown image's [...] (a page's alt text can hold brackets and line breaks)."""
+    import re as _re
+    return _re.sub(r"[\[\]\(\)\r\n]+", " ", str(s or "")).strip()[:120] or "Picture"
+
+
 def _with_images(result):
     """Images made this turn (generate_image, image_gen.py) go under the reply as local image lines - saved with
     the chat, drawn by the page (renderMarkdown), and seen by the model next turn as what was made."""
@@ -904,7 +910,15 @@ def _with_images(result):
                   "message": (note + "\n\n" if note else "") + agent_loop.picture_reply("", made) +
                              f"\n\n*{'Stopped' if result.get('status') == 'stopped' else 'Then this went wrong'}: {why}*"}
         shared.app_state.setdefault("conversation", []).append({"role": "assistant", "content": result["message"]})
-    lines = "\n".join(f"![{img['model']} - seed {img['seed']}]({img['url']})" for img in made)
+    # A picture from the web (web_images.py, 1.4.7) is named by what it shows and where it came from, with the page.
+    lines = "\n".join(f"![{_alt_text(img.get('alt') or 'Picture')} - {img.get('domain') or 'the web'}]({img['url']})"
+                      if img.get("web") else f"![{img['model']} - seed {img['seed']}]({img['url']})" for img in made)
+    pages = list(dict.fromkeys(img["source"] for img in made if img.get("web") and img.get("source")))
+    if pages:
+        from urllib.parse import urlparse
+        import web_images
+        lines += "\n\n" + "Pictures from: " + " · ".join(
+            f"[{_alt_text(urlparse(p).netloc.removeprefix('www.'))}]({web_images.link_safe(p)})" for p in pages)
     message = f"{str(result['message']).rstrip()}\n\n{lines}"
     convo = shared.app_state.get("conversation") or []
     if convo and convo[-1].get("role") == "assistant" and convo[-1].get("content") == result["message"]:

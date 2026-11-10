@@ -82,8 +82,10 @@ HEADERS = {
                "and views, and keep the labels: say what is a reported fact, what is a forecast (ESTIMATE) and what is "
                "a view (OPINION, SPECULATION). Cite figures as [n] with their dates. Don't tell the user to buy, sell or "
                "hold - describe the numbers, the evidence and the trade-offs."),
-    "image": ("IMAGES (made on this PC): to show the user a picture, call generate_image - one call per image asked "
-              "for. Turn the request into a vivid English prompt (subject, setting, style, light, composition; text "
+    "image": ("IMAGES (made on this PC): to make the user a picture, call generate_image - one call per image asked "
+              "for. To show what something REAL looks like (a product, a place, a person, its colours), call "
+              "show_web_images instead - it shows real pictures from the web. For a new picture: "
+              "turn the request into a vivid English prompt (subject, setting, style, light, composition; text "
               "to appear in quotes); keep what the user specified. Pick quality: 'fast' for quick drafts or to edit "
               "an attached image (edit true), 'balanced' by default, 'best' when they ask for the highest quality. "
               "The app shows the image under your reply: don't describe it as if you saw it and don't paste links."),

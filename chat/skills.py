@@ -50,7 +50,7 @@ SKILLS: dict[str, tuple[str, tuple[str, ...]]] = {
               ("run_powershell", "execute_command", "run_python", "run_sequence", "windows_sandbox_run")),
     "web": ("open links and tabs, download files, check URLs, search and read the web, use the assistant's own browser",
             ("open_url", "new_browser_tab", "download_file", "get_url_status", "web_search", "fetch_page", "web_read",
-             "browser_open", "browser_read", "browser_click", "browser_fill")),
+             "show_web_images", "browser_open", "browser_read", "browser_click", "browser_fill")),
     "system": ("processes, services, network, ping and ports, environment variables, CPU/RAM/battery",
                ("list_processes", "top_processes", "kill_process", "list_services", "service_control", "ping_host",
                 "network_info", "port_check", "get_env_var", "set_env_var", "get_system_info")),

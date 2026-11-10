@@ -127,6 +127,8 @@ BENIGN_EXTRA = {
     "roblox_read_script", "roblox_find", "roblox_get_output", "roblox_get_tree",
     # web and the assistant's browser - reading and opening pages
     "web_search", "fetch_page", "web_read", "browser_open", "browser_read",
+    "show_web_images",          # 1.4.7: pictures from pages, into data/web_images, shown in the chat
+
     # a local image into data/images (image_gen.py) - nothing leaves the PC, nothing is changed
     "generate_image",
     # statistics and charts computed by the app, and turning on more read-only tools (stats_tools, auto_tools)

@@ -3575,6 +3575,11 @@ span.tier.input { padding: 0; border: 0; width: 8px; height: 8px; min-height: 0;
 .model-item > summary::-webkit-details-marker { display: none; }
 .model-item > summary .chev { color: var(--muted); transition: transform .15s; }
 .model-item[open] > summary .chev { transform: rotate(180deg); }
+/* Pictures from the web in a reply (1.4.7): a grid of what each shows, with the site under it. */
+.web-pics { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; margin: 10px 0; }
+.web-pic { margin: 0; border-radius: var(--radius, 10px); overflow: hidden; background: var(--surface-2, rgba(127,127,127,.08)); border: 1px solid var(--border); }
+.web-pic img { display: block; width: 100%; height: 180px; object-fit: cover; }
+.web-pic figcaption { font-size: 11.5px; line-height: 1.35; color: var(--muted); padding: 5px 8px 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 /* Your own name for a model (1.4.7): yours first, the full name beside it in the list and under the box. */
 .model-nick { font-weight: 600; }
 .model-full { color: var(--muted); font-size: 12px; margin-left: 6px; }
@@ -3716,8 +3721,14 @@ select.input { padding-right: 6px; height: 30px; font-size: 12.5px; flex: 0 0 au
 .sb-item:hover > .icon, .nav-item:hover > .icon { transform: translateX(1px) scale(1.06); }
 .swatch:hover { transform: scale(1.12); }
 .send-btn:disabled { transform: scale(.92); }
-.switch::after { transition: transform .32s var(--ease-spring), width .2s; }
-.switch:active::after { width: 19px; }
+/* Toggles glide (1.4.7): the knob eases across with a soft settle, the track's colour blends over the same time, and
+   a press stretches the knob toward where it will go (from the right edge when on). */
+.switch { transition: background-color .3s cubic-bezier(.4, 0, .2, 1), box-shadow .3s; }
+.switch::after { transition: transform .38s cubic-bezier(.3, 1.3, .5, 1), width .22s cubic-bezier(.4, 0, .2, 1), left .22s cubic-bezier(.4, 0, .2, 1); will-change: transform; }
+.switch:active::after { width: 20px; }
+.switch.on:active::after { left: -1.5px; }
+@media (prefers-reduced-motion: reduce) { .switch, .switch::after { transition: none; } }
+:root[data-motion="off"] .switch, :root[data-motion="off"] .switch::after { transition: none; }
 .composer { transition: border-color var(--t), box-shadow .3s var(--ease-out), transform .3s var(--ease-out); }
 .composer:focus-within { box-shadow: var(--shadow), 0 0 0 4px var(--accent-soft); }
 
@@ -6492,6 +6503,16 @@ function renderMarkdown(src) {
     // An image made on this PC (image_gen.py): only this app's own /api/images - a reply never loads a remote image.
     const gen = line.match(/^!\[([^\]]*)\]\((\/api\/images\/[\w.-]+\.png)\)\s*$/);
     if (gen) { flushAll(); html += genImage(gen[2], gen[1]); continue; }
+    // A picture from the web (web_images.py, 1.4.7): downloaded by the server through the network layer and served
+    // from this app's own /api/web-images - the page still never loads anything from the web.
+    const web = line.match(/^!\[([^\]]*)\]\((\/api\/web-images\/[0-9a-f]{20}\.(?:jpg|png|webp|gif))\)\s*$/);
+    if (web) {
+      flushPara();
+      const fig = `<figure class="web-pic"><a href="${web[2]}" target="_blank" rel="noopener"><img src="${web[2]}" alt="${web[1]}" loading="lazy" decoding="async"></a><figcaption>${web[1]}</figcaption></figure>`;
+      if (html.endsWith('</figure></div>')) html = html.slice(0, -'</div>'.length) + fig + '</div>';
+      else { flushAll(); html += `<div class="web-pics">${fig}</div>`; }
+      continue;
+    }
     if (/^\s*$/.test(line)) { flushPara(); if (lists.length) blankInList = true; continue; }
 
     const item = line.match(/^(\s*)([-*+•]|\d{1,9}[.)])\s+(.*)$/);
@@ -12104,6 +12125,7 @@ function onStreamEvent(ev) {
   }
   if (ev.kind === 'delta') {
     c.n += Array.from(ev.text || '').length; if (c.tFirst === null) c.tFirst = performance.now(); // Characters survive SSE coalescing; messages are not tokens.
+    if (ev.n) c.tok = (c.tok || 0) + ev.n;          // the server's token count of the merged run (1.4.7): the speed is tok/s
     if (ev.channel === 'content') {
       c.content += ev.text || '';
       if (c.t1 === null && splitThink(c.content).answer.trim()) c.t1 = performance.now();
@@ -13580,10 +13602,13 @@ function modelActivity(turn) {
   else if (c && Object.keys(c.tools).length && !c.ended) what = 'writing a tool call';
   else if (c && c.n && !c.ended) {
     const secs = (now - (c.tFirst || now)) / 1000;
-    rate = secs > .6 ? c.n / secs : 0;
+    // tok/s (1.4.7): the server counts tokens; a stream without counts (a cloud model) is estimated at ~4 characters a
+    // token and marked "~". It said char/s, which read as a much faster model than the tok/s everywhere else.
+    const est = !c.tok;
+    rate = secs > .6 ? (est ? c.n / 4 : c.tok) / secs : 0;
     // The speed only while it writes the answer: during thinking it counted hidden reasoning (1.4.6 feedback).
     const writing = !!splitThink(c.content).answer.trim();
-    what = writing ? `writing${rate ? ` · ${rate < 10 ? rate.toFixed(1) : Math.round(rate)} char/s` : ''}` : 'thinking';
+    what = writing ? `writing${rate ? ` · ${est ? '~' : ''}${rate < 10 ? rate.toFixed(1) : Math.round(rate)} tok/s` : ''}` : 'thinking';
   } else if (ev) what = S.mode === 'cloud' || !c ? 'working' : 'starting';
   else { what = 'done'; busy = false; }
   if (S.run === 'paused') { what = 'paused'; busy = false; }
@@ -14403,7 +14428,9 @@ function updateTurn(events) {
   if (pics.length && (!turn.picsEl || turn.picsEl.dataset.n !== String(pics.length))) {
     if (!turn.picsEl) { turn.picsEl = document.createElement('div'); turn.picsEl.className = 'assistant-body live-pictures'; turn.wrap.appendChild(turn.picsEl); }
     turn.picsEl.dataset.n = String(pics.length);
-    turn.picsEl.innerHTML = renderMarkdown(pics.map(p => `![${p.model || 'Picture'} - seed ${p.seed ?? ''}](${p.url})`).join('\n'));
+    turn.picsEl.innerHTML = renderMarkdown(pics.map(p => p.domain   // a picture from the web (1.4.7): what it shows, and where from
+      ? `![${String(p.alt || 'Picture').replace(/[\[\]()\n]+/g, ' ').slice(0, 120)} - ${p.domain}](${p.url})`
+      : `![${p.model || 'Picture'} - seed ${p.seed ?? ''}](${p.url})`).join('\n'));
     scrollToBottom();
   }
   const web = sortedEvents(turn.events).filter(isWebEvent);
@@ -16276,7 +16303,16 @@ function settingsSearch(q) {
   });
   $('set-q-empty').hidden = any;
 }
-const sw = (on, fn) => `<button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${!!on}" onclick="${fn}"></button>`;
+const sw = (on, fn) => `<button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${!!on}" onclick="flipSwitch(this, () => { ${fn} })"></button>`;
+// A toggle slides where it is, then saves (1.4.7). Most of them save and redraw their whole page, which replaced the
+// switch mid-slide - it jumped instead of gliding. The redraw now waits for the slide (it shows the same state).
+function flipSwitch(el, run) {
+  if (el.dataset.flipping) return;
+  const on = !el.classList.contains('on');
+  el.dataset.flipping = '1';
+  el.classList.toggle('on', on); el.setAttribute('aria-checked', String(on));
+  setTimeout(() => { delete el.dataset.flipping; run(); }, motionStill() ? 0 : 260);
+}
 const seg = (opts, cur, fn) => `<div class="seg">${opts.map(([v, l]) => `<button class="${cur === v ? 'on' : ''}" onclick="${fn}('${v}')">${l}</button>`).join('')}</div>`;
 const rowHtml = (title, desc, control) => `<div class="row"><div class="row-text"><b>${title}</b>${desc ? `<small>${desc}</small>` : ''}</div>${control}</div>`;
 

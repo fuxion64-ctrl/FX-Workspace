@@ -762,7 +762,8 @@ def _local_complete(kwargs: dict, cancel=None, record=True, publish=True):
                 timing["content"] += text
                 _mark_answer_start(timing)
         if call_id is not None:
-            stream_hub.hub.publish("delta", call=call_id, channel=channel, text=text, **extra)
+            # n: one streamed chunk is one token from llama-server - the page's live speed is tok/s, not char/s (1.4.7)
+            stream_hub.hub.publish("delta", call=call_id, channel=channel, text=text, n=1, **extra)
     # A dropped connection BEFORE any output (router swapping models, a brief
     # restart) is retried twice with backoff. Once output has arrived nothing is
     # retried here - that would duplicate text the user already saw.

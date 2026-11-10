@@ -142,6 +142,8 @@ _POLICY = {
     # web_read, the Wayback Machine) when a site refuses a direct request.
     "web_search": dict(isolate=True, timeout_s=90, cooldown_s=1.0, category="web"),      # up to 4 queries
     "web_read": dict(isolate=True, timeout_s=75, category="web"),
+    # A search, then up to 5 pages and their pictures (web_images.py stops itself after 90 s).
+    "show_web_images": dict(isolate=True, timeout_s=120, category="web"),
     # Up to 6 pages in parallel (web_tools.read_pages gives up on them after 45 s).
     "fetch_page": dict(isolate=True, timeout_s=90, category="web"),
     # Reads the local store; a stale feed is refreshed first (CelesTrak's orbit files can take ~100 s cold).

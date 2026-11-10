@@ -412,20 +412,20 @@ class OfferTests(unittest.TestCase):
 
     def test_questions_get_only_the_web_tools(self):
         shared.app_state["settings"] = {**self.settings, "web_auto_search": True, "auto_tools": False}
-        self.assertEqual(self.names(), {"web_search", "fetch_page", "web_read"})
+        self.assertEqual(self.names(), {"web_search", "fetch_page", "web_read", "show_web_images"})   # 1.4.7: pictures from the web
         self.assertTrue(schemas.tool_allowed_current_turn("fetch_page"))
         self.assertFalse(schemas.tool_allowed_current_turn("write_file"))
         self.assertFalse(schemas.tool_allowed_current_turn("browser_open"))
         # With "Turn on helpful tools by itself" on, the one addition is use_tools (auto_tools.py).
         shared.app_state["settings"] = {**self.settings, "web_auto_search": True, "auto_tools": True}
-        self.assertEqual(self.names(), {"web_search", "fetch_page", "web_read", "use_tools"})
+        self.assertEqual(self.names(), {"web_search", "fetch_page", "web_read", "show_web_images", "use_tools"})
 
     def test_the_setting_turns_it_off_and_grounded_turns_it_back_on(self):
         shared.app_state["settings"] = {**self.settings, "web_auto_search": False, "auto_tools": False}
         self.assertEqual(self.names(), set())
         self.assertFalse(schemas.tool_allowed_current_turn("web_search"))
         shared.app_state["turn_tools"] = {"grounded"}
-        self.assertEqual(self.names(), {"web_search", "fetch_page", "web_read"})
+        self.assertEqual(self.names(), {"web_search", "fetch_page", "web_read", "show_web_images"})   # 1.4.7: pictures from the web
 
     def test_design_never_searches(self):
         shared.app_state["settings"] = {**self.settings, "web_auto_search": True}

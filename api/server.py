@@ -3398,6 +3398,20 @@ def images_model_browse():
 _IMAGE_NAME = re.compile(r"\d{8}-\d{6}-[0-9a-f]{6}\.png")
 
 
+@app.get("/api/web-images/{name}")
+def web_image(name: str):
+    """A picture the assistant showed from the web (web_images.py, 1.4.7) - downloaded through the network layer and
+    kept in data/web_images; only names that module writes, never a path."""
+    import web_images
+    path = web_images.path_of(name)
+    if not path:
+        return JSONResponse({"ok": False, "message": "No such picture."}, status_code=404)
+    kind = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp", "gif": "image/gif"}[name.rsplit(".", 1)[1]]
+    return FileResponse(path, media_type=kind, headers={"Cache-Control": "max-age=31536000, immutable",
+                                                        "Content-Security-Policy": "default-src 'none'",
+                                                        "X-Content-Type-Options": "nosniff"})
+
+
 def _image_file(folder: str, name: str):
     """A made image. Only names the app itself writes - never a path."""
     if not _IMAGE_NAME.fullmatch(name):

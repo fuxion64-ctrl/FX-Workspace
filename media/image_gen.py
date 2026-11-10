@@ -1629,8 +1629,21 @@ _WANTS = re.compile(
     r"нарисуй|нарисуйте|сгенерируй (?:изображение|картинку)|картинк\w* с|изображение", re.I)
 
 
+# Real pictures from the web (1.4.7, web_images.py): "show me pictures of the Nothing Phone 4a", "what does X look
+# like" - a real thing to see, not one to draw. Making one stays when the message also says draw/make/generate.
+_WEB_PICTURES = re.compile(
+    r"\b(?:show|find|look up|search(?: for)?|get|fetch|see|pull up)\b[^.?!\n]{0,30}\b(?:images?|pictures?|photos?|pics?)\b"
+    r"|\bwhat (?:does|do|did) .{1,60} look like\b|\b(?:real|actual) (?:photos?|pictures?|images?)\b", re.I)
+_MAKE = re.compile(r"\b(?:draw|paint|sketch|illustrate|render|generate|create|make|design|imagine)\b", re.I)
+
+
+def wants_web_images(message: str) -> bool:
+    text = str(message or "")
+    return bool(_WEB_PICTURES.search(text)) and not _MAKE.search(text)
+
+
 def wants_image(message: str) -> bool:
-    return bool(_WANTS.search(str(message or "")))
+    return bool(_WANTS.search(str(message or ""))) and not wants_web_images(message)
 
 
 def _norm(s: str) -> str:

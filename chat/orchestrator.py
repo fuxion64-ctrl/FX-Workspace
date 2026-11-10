@@ -609,7 +609,7 @@ class AgentOrchestrator:
             routed_only = bool(state.tool_results) and all(r.get("internal") for r in state.tool_results)
             # Pictures that are the answer are judged by looking at them too: a text review only reloaded the chat
             # model after the image engine and kept the user waiting for nothing (1.4.7).
-            pictured = bool(state.tool_results) and all(r.get("tool") == "generate_image" and r.get("ok")
+            pictured = bool(state.tool_results) and all(r.get("tool") in ("generate_image", "show_web_images") and r.get("ok")
                                                         for r in state.tool_results)
             rmode = "off" if bare or routed_only or pictured else reviewer_mode(profile, analysis, mutations)
             if cross_requested and rmode != "off" and result.get("status") == "success" and not result.get("rejected"):

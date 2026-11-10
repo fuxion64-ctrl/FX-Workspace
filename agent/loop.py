@@ -155,6 +155,11 @@ def picture_reply(prose: str, made: list) -> str:
     if text and len(text) <= 500 and not re.search(r"generate_image|tool|I(?:'ll| will) (?:now )?(?:make|create|generate)", text, re.I):
         return text
     n = len(made)
+    web = [m for m in made if isinstance(m, dict) and m.get("web")]
+    if web and len(web) == n:                    # pictures from the web: where they came from, not "your pictures"
+        sites = list(dict.fromkeys(m.get("domain") or "the web" for m in web))
+        where = sites[0] if len(sites) == 1 else ", ".join(sites[:-1]) + " and " + sites[-1]
+        return f"Here {'is a picture' if n == 1 else f'are {n} pictures'} from {where}."
     return ("Here's your picture." if n <= 1 else f"Here are your {n} pictures.") + \
         " Tell me what to change and I'll make another."
 
@@ -838,7 +843,9 @@ def run_agent_loop():
 
         # Pictures that are the whole answer: done now, without another model call (see _MORE_THAN_A_PICTURE).
         made = shared.app_state.get("turn_images") or []
-        if (step_ran and made and all(n == "generate_image" and ok for n, ok in step_ran)
+        # Pictures from the web too (1.4.7): "show me pictures of the Nothing Phone 4a" - once they are shown, a small model
+        # kept searching for more (an 81 % full context, a minute more) instead of ending.
+        if (step_ran and made and all(n in ("generate_image", "show_web_images") and ok for n, ok in step_ran)
                 and not (shared.task_board.steps and not shared.task_board.is_complete())
                 and not _wants_more_than_pictures(shared.app_state.get("current_user_request") or "")):
             message = picture_reply(prose, made)

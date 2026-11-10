@@ -98,6 +98,8 @@ def merge(events: list) -> list:
                 and prev.get("temp") == e.get("temp")):
             texts.append(e.get("text") or "")
             prev["seq"] = e["seq"]
+            if "n" in e or "n" in prev:              # tokens in the merged run, for the live tok/s (1.4.7)
+                prev["n"] = int(prev.get("n") or 0) + int(e.get("n") or 0)
             if e.get("name"):
                 prev["name"] = e["name"]
         else:
