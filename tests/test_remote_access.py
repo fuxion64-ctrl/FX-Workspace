@@ -63,7 +63,8 @@ class RemoteAccessTests(unittest.TestCase):
         for method, path in (("POST", "/api/settings"), ("POST", "/api/remote"), ("GET", "/api/remote"),
                              ("POST", "/api/remote/password"), ("POST", "/api/channels"), ("POST", "/api/keys/openai")):
             self.assertTrue(remote_access.blocked(method, path), path)
-        for method, path in (("POST", "/api/chat"), ("GET", "/api/state"), ("GET", "/api/settings"), ("POST", "/api/approve")):
+        # 1.4.8: an allow-list - a real route ("/api/approve" never existed; an unlisted path is refused now)
+        for method, path in (("POST", "/api/chat"), ("GET", "/api/state"), ("GET", "/api/settings"), ("POST", "/api/approval/ab12")):
             self.assertFalse(remote_access.blocked(method, path), path)
 
     def test_never_starts_without_a_password(self):

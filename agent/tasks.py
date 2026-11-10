@@ -983,8 +983,13 @@ def _run_turn(req) -> dict:
     answer: a failure is logged and the result is returned as is.
     A temporary chat's turn runs inside privacy.scope: every store refuses it."""
     temp = sessions.temporary_chat()
-    with privacy.scope(temp["id"] if temp else None):
-        return _run_turn_in_chat(req)
+    try:
+        with privacy.scope(temp["id"] if temp else None):
+            return _run_turn_in_chat(req)
+    finally:
+        # (1.4.8, audit 2.10) The phone/PC origin is this turn's only: left at "phone", a routine or an accepted
+        # suggestion afterwards sent its approvals to a phone card and lost the PC-control tools.
+        shared.app_state["turn_origin"] = "pc"
 
 
 def _run_turn_in_chat(req) -> dict:
@@ -1043,10 +1048,14 @@ def _run_turn_in_chat(req) -> dict:
                 if candidate:
                     result = {**result, "routine_candidate": candidate}
             result = _after_answer(req, result)
-        result = _with_timelines(result)
-        result = _with_images(result)
-        result = _with_charts(result)
-        result = _with_care(req, result)
+        # (1.4.8, audit 2.9) Each extra after the answer in its own try: one of them failing turned a finished reply
+        # into "Turn failed" - never saved, the chat left "pending". Log it and keep the answer.
+        for step, post in (("timelines", _with_timelines), ("images", _with_images), ("charts", _with_charts),
+                           ("care", lambda r: _with_care(req, r))):
+            try:
+                result = post(result)
+            except Exception as e:
+                event_log.log_action(f"Adding {step} to the reply failed (the reply is kept): {str(e)[:160]}")
         _keep_attachments()
         try:
             thinking = sessions.record_turn(req, result, start_seq)
@@ -1060,12 +1069,13 @@ def _run_turn_in_chat(req) -> dict:
         run = _save_run(req, result, start_seq)
         if run and isinstance(result, dict):
             result = {**result, "run_id": run["id"]}
+        return result
+    finally:
+        # (1.4.8, audit 2.9) in finally: a turn that raised left these for the next turn.
         for key in ("turn_tools", "turn_files", "turn_command_note", "turn_instructions", "turn_search_mode", "turn_voice",
                     "turn_voice_lang", "turn_persona", "request_grants", "turn_images", "turn_charts", "turn_auto",
                     "raw_mode", "turn_tool_history"):    # this turn's only
             shared.app_state.pop(key, None)
-        return result
-    finally:
         run_control.end()
         shared.app_state.pop("turn_system_message", None)
 

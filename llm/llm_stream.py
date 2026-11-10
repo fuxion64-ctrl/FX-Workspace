@@ -52,32 +52,71 @@ class StreamHTTPError(RuntimeError):
     """The server answered with an error status; the message carries its body."""
 
 
-def http_transport(url: str, payload: dict, headers: dict, timeout: float, should_cancel=None):
+class FirstTokenTimeout(TimeoutError):
+    """(1.4.8) The model never started answering within the first-token allowance."""
+
+
+class StreamStalled(TimeoutError):
+    """(1.4.8) The model started answering, then went quiet for longer than the gap allowance."""
+
+
+# (1.4.8, audit 2.11) The wait before the first token is the model reading the whole prompt - minutes for a big
+# model partly on CPU with a long chat - while a gap between tokens is a few seconds at most. One 300 s read
+# timeout covered both, so a slow prompt read ended as a generic failure. The first wait gets its own allowance,
+# grown with the prompt's size; gaps keep the plain timeout.
+FIRST_TOKEN_BASE_S = 300
+FIRST_TOKEN_TOKENS_PER_S = 40            # a slow, partly-on-CPU prompt read - the allowance, not a prediction
+FIRST_TOKEN_MAX_S = 1800
+
+
+def first_token_allowance(payload: dict, timeout: float) -> float:
+    """Seconds to wait for the first output: at least `timeout`, more for a long prompt (~4 chars a token)."""
+    try:
+        chars = len(json.dumps(payload.get("messages") or [], default=str))
+    except (TypeError, ValueError):
+        chars = 0
+    return max(float(timeout), min(FIRST_TOKEN_MAX_S, FIRST_TOKEN_BASE_S + chars / 4 / FIRST_TOKEN_TOKENS_PER_S))
+
+
+def http_transport(url: str, payload: dict, headers: dict, timeout: float, should_cancel=None,
+                   first_token_timeout: float | None = None):
     """Yield parsed SSE `data:` objects from llama-server. Closing the
     generator closes the connection, which makes llama-server stop.
 
     A watcher thread closes the connection as soon as should_cancel() is true,
     so Stop works even before the first token (while the server is still
-    processing the prompt nothing arrives to check between)."""
+    processing the prompt nothing arrives to check between).
+    first_token_timeout (1.4.8): the read timeout until the first line arrives; after it, the same watcher ends a
+    stream that goes quiet for longer than `timeout`."""
     import httpx
     import netlayer
     should_cancel = should_cancel or (lambda: False)
+    first_wait = max(float(timeout), float(first_token_timeout or timeout))
     done = threading.Event()
     active_socket = None
+    seen = {"last": None, "stalled": False}         # time of the last line; set once output has started
+
+    def cut():
+        if active_socket is not None:
+            try:
+                active_socket.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass                 # already closed by the reader
     # Through the network layer: llama-server on this PC stays direct and unlogged; a model server
     # elsewhere would take the "models" route (proxy / Tor, kill switch, log).
-    with netlayer.client("models", timeout=httpx.Timeout(timeout, connect=10.0)) as client:
+    with netlayer.client("models", timeout=httpx.Timeout(first_wait, connect=10.0)) as client:
         def watcher():
             while not done.wait(0.2):
                 if should_cancel():
                     # close() on another thread need not interrupt recv() on
                     # Unix. Shutdown the established stream first so Stop
                     # does not wait for the model's entire read timeout.
-                    if active_socket is not None:
-                        try:
-                            active_socket.shutdown(socket.SHUT_RDWR)
-                        except OSError:
-                            pass                 # already closed by the reader
+                    cut()
+                    client.close()
+                    return
+                if seen["last"] is not None and time.time() - seen["last"] > timeout:
+                    seen["stalled"] = True
+                    cut()
                     client.close()
                     return
         threading.Thread(target=watcher, daemon=True, name="stream-stop-watcher").start()
@@ -92,6 +131,7 @@ def http_transport(url: str, payload: dict, headers: dict, timeout: float, shoul
                     body = resp.read().decode("utf-8", "replace")
                     raise StreamHTTPError(f"Error code: {resp.status_code} - {body[:600]}")
                 for line in resp.iter_lines():
+                    seen["last"] = time.time()
                     if not line or not line.startswith("data:"):
                         continue
                     data = line[5:].strip()
@@ -106,6 +146,13 @@ def http_transport(url: str, payload: dict, headers: dict, timeout: float, shoul
         except (httpx.HTTPError, RuntimeError) as e:
             if should_cancel():
                 raise StreamCancelled("stopped while the model was generating") from e
+            if seen["stalled"]:
+                raise StreamStalled(f"The model stopped sending its answer for over {round(timeout)} s.") from e
+            if seen["last"] is None and isinstance(e, httpx.ReadTimeout):
+                raise FirstTokenTimeout(
+                    f"The model was still reading the conversation after {round(first_wait)} s and had not started "
+                    "its answer. A big model partly on the CPU reads long chats slowly - try a smaller model, "
+                    "compress the chat, or start a new one.") from e
             raise
         finally:
             done.set()
@@ -157,7 +204,8 @@ def complete(url: str, payload: dict, *, api_key: str = "", timeout: float = 300
             if _repeating(state["tail"]):
                 return "repetition"
         return None
-    chunks = transport(url, body, headers, timeout, should_cancel=should_cancel) if transport is http_transport \
+    chunks = transport(url, body, headers, timeout, should_cancel=should_cancel,
+                       first_token_timeout=first_token_allowance(body, timeout)) if transport is http_transport \
         else transport(url, body, headers, timeout)
     try:
         for chunk in chunks:

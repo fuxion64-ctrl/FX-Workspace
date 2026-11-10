@@ -171,6 +171,7 @@ class RawMessageTests(_Saved):
             sent.clear()
             shared.app_state["raw_mode"] = raw
             shared.app_state["effort_thinking"] = None
+            shared.app_state["turn_policy"] = {"mode": "action"}     # 1.4.8: only action turns are sampled at 0.1
             with mock.patch("llama_local.server_models", return_value={"m": {}}), \
                  mock.patch.object(llm, "resolve_local_model", return_value="m"), \
                  mock.patch.object(llm, "_watch_load", return_value=None), \

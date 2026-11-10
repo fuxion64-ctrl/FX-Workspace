@@ -12,6 +12,8 @@ Parts marked **Beta** work, but are still being finished.
 - **Reliability:** a model that can't load says why (a missing file, RAM, GPU memory); Run on RAM too works; llama-server and the app's server start again by themselves; another program on a port no longer stops the app.
 - **Pictures** show the moment they're made, and a picture request ends there - no searching the disk for it.
 - **Clear errors:** each problem has its own message and the button that helps; a message too long for the model no longer blocks the chat.
+- **Models and pictures:** your own names for models; Images lists only the models on this PC; pictures from the web show in the chat; each picture shows its model and styles; no blinking while a picture draws.
+- **Speed and looks:** live reply speed in tokens per second; smoother toggles.
 
 ## 1.4.6 - 2026-11-04
 

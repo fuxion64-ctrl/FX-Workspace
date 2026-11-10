@@ -406,7 +406,8 @@ class PortTests(unittest.TestCase):
 
     def test_whoami_names_this_install(self):
         from api import server
-        w = server.whoami()
+        import asyncio
+        w = asyncio.run(server.whoami())                     # async since 1.4.8 (audit 3.3)
         self.assertEqual(w["app"], "fx-workspace")
         self.assertEqual(os.path.normcase(w["root"]), os.path.normcase(HERE))
         from connect import remote_access

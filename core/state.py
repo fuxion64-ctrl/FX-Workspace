@@ -106,6 +106,11 @@ class ChatRequest(BaseModel):
     # The temporary chat the page is showing (privacy.py). If the server no longer has it (it restarted),
     # the message is refused instead of landing in a normal, saved chat.
     temporary_chat: str | None = None
+    # The chat the page is showing when it sends (1.4.8): its id, or "" for a new chat. The server has one open chat
+    # for every screen, so a message written in one chat could land in another (a second window, the phone, a
+    # channel's turn); a message whose chat isn't the open one is refused and the page reopens its chat. None: not
+    # checked (routines, channels, an older page).
+    chat_id: str | None = None
     search_mode: str | None = None   # a per-message Web Search privacy mode (search_engine.MODES), or None
     research_depth: str | None = None   # Research's depth: auto | quick | standard | deep | ultra (agent/research.DEPTHS)
     voice: bool = False                 # said aloud in voice mode (voice.py): answer conversationally

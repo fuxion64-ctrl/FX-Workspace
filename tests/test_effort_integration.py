@@ -15,6 +15,12 @@ import replay_harness as replay
 import agent.models as models
 
 
+def _agent_step(request: dict) -> bool:
+    """A streamed reply step of the agent (it offers tools), not a planner / reviewer helper call."""
+    return bool(request.get('streamed') and (request.get('tools') or any(
+        'You can call these tools' in str(m.get('content', '')) for m in request.get('messages') or [])))
+
+
 class SliderRuntimeTests(unittest.TestCase):
     def setUp(self):
         from fastapi.testclient import TestClient
@@ -82,13 +88,14 @@ class SliderRuntimeTests(unittest.TestCase):
                 self.assertEqual(started['limits']['orchestration'], 'none')
                 self.assertFalse(started['limits']['delegation'])
                 self.assertEqual(next(x['limits'] for x in selected['levels'] if x['id'] == level), started['limits'])
-                calls = [r for r in run.requests if r.get('streamed')]
+                calls = [r for r in run.requests if _agent_step(r)]
                 self.assertTrue(calls)
                 profile = effort.PROFILES[level]
                 for call in calls:
                     self.assertEqual(call['chat_template_kwargs']['enable_thinking'], profile.thinking)
                     self.assertEqual(call['max_tokens'], config.LOCAL_MAX_TOKENS + (profile.reasoning_tokens if profile.thinking else 0))
-                reviews = [r for r in run.requests if not r.get('streamed') and 'You verify whether' in r['messages'][0]['content']]
+                # 1.4.8: the reviewer (model_json) streams too now, so Stop ends it - told apart by its prompt.
+                reviews = [r for r in run.requests if 'You verify whether' in r['messages'][0]['content']]
                 self.assertEqual(bool(reviews), level in ('high', 'extra', 'max', 'ultra'))
                 seen[level] = (started['limits']['steps_local'], calls[0]['max_tokens'])
         self.assertGreater(seen['max'][0], seen['low'][0])
@@ -105,7 +112,7 @@ class SliderRuntimeTests(unittest.TestCase):
         self.assertEqual(next(x['limits'] for x in selected['levels'] if x['id'] == 'max')['reasoning_tokens'], 0)
         run = replay.run_fixture(self.fixture(saved))
         self.assertEqual(run.status, 'success', run.message)
-        calls = [request for request in run.requests if request.get('streamed')]
+        calls = [request for request in run.requests if _agent_step(request)]
         self.assertTrue(calls)
         for call in calls:
             self.assertTrue(call['chat_template_kwargs']['enable_thinking'])

@@ -306,7 +306,34 @@ RESTART_LIMIT = 3                     # restarts per RESTART_WINDOW before it is
 RESTART_WINDOW = 600.0
 WATCH_EVERY = 10.0
 HUNG_CHECKS = 3
-_watch = {"thread": None, "restarts": [], "last": "", "seen_up": False, "fails": 0, "stop": threading.Event()}
+_watch = {"thread": None, "restarts": [], "last": "", "seen_up": False, "fails": 0, "stop": threading.Event(),
+          "in_use": None, "crashes": {}}
+# (1.4.8, audit 3.5) Crashes are counted per model that was loading or answering when the router went down: one model
+# that crashes it on load used up the allowance for every model. That model is set aside by name; the router is
+# started again for the others. Restarts with no model to blame still count toward the router's own allowance.
+
+
+def note_in_use(model: str | None) -> None:
+    """agent/models: the model a request is loading or running on now (None when it is done)."""
+    _watch["in_use"] = model or None
+
+
+def _recent(times: list) -> list:
+    now = time.time()
+    return [t for t in times if now - t < RESTART_WINDOW]
+
+
+def set_aside(model: str | None) -> str:
+    """Why this model is set aside now ("" when it isn't): it took the router down RESTART_LIMIT times lately."""
+    if not model:
+        return ""
+    times = _watch["crashes"][model] = _recent(_watch["crashes"].get(model, []))
+    if len(times) < RESTART_LIMIT:
+        return ""
+    back = time.strftime("%H:%M", time.localtime(times[0] + RESTART_WINDOW))
+    return (f"{model} stopped llama-server {len(times)} times in {int(RESTART_WINDOW / 60)} minutes while loading or "
+            f"answering, so the app set it aside until {back}. Other models still work. The log says why: "
+            "data\\logs\\llama-server.log.")
 
 
 def adopt(proc) -> None:
@@ -328,8 +355,7 @@ def _restart_exe() -> str | None:
 
 
 def _too_many() -> bool:
-    now = time.time()
-    _watch["restarts"] = [t for t in _watch["restarts"] if now - t < RESTART_WINDOW]
+    _watch["restarts"] = _recent(_watch["restarts"])
     return len(_watch["restarts"]) >= RESTART_LIMIT
 
 
@@ -354,12 +380,21 @@ def ensure_running(reason: str = "", wait: float = READY_TIMEOUT) -> dict:
         if not exe:
             return {"ok": False, "restarted": False,
                     "message": "llama-server isn't installed (local\\llama.cpp) - install it from Settings › Models, or use Cloud."}
-        if _too_many():
+        culprit = _watch["in_use"] or local_runtime.loading.get("model")
+        _watch["in_use"] = None
+        if culprit:
+            # A model was loading or answering when it went down: that model's count, not the router's (1.4.8).
+            _watch["crashes"].setdefault(culprit, []).append(time.time())
+        elif _too_many():
+            # (1.4.8) It does recover by itself once the window passes - say when, instead of "Restart the app".
+            back = time.strftime("%H:%M", time.localtime(_watch["restarts"][0] + RESTART_WINDOW))
             msg = (f"llama-server stopped {RESTART_LIMIT} times in {int(RESTART_WINDOW / 60)} minutes, so the app left it "
-                   "off. The log says why: data\\logs\\llama-server.log. Restart the app to try again.")
+                   f"off for now. It tries again by itself from {back}, or restart the app to try now. The log says why: "
+                   "data\\logs\\llama-server.log.")
             _watch["last"] = msg
             return {"ok": False, "restarted": False, "message": msg}
-        _watch["restarts"].append(time.time())
+        else:
+            _watch["restarts"].append(time.time())
         port = llama_local.LLAMA_PORT
         info = ports.holder(port)
         moved = ""
@@ -465,12 +500,25 @@ def stop_started() -> None:
 
 
 # ---- what Settings shows -----------------------------------------------------------------------------
+def _stamp(exe: str | None):
+    """What changes when an executable is replaced (an update in place): its path, size and modified time."""
+    if not exe:
+        return None
+    try:
+        st = os.stat(exe)
+        return (exe, st.st_size, int(st.st_mtime))
+    except OSError:
+        return (exe, None, None)
+
+
 def version(exe: str | None) -> str:
-    """"b11541" from `llama-server --version`, cached per executable; "" when unknown."""
+    """"b11541" from `llama-server --version`, cached per executable (1.4.8: per file stamp - an update in place
+    showed the old build number until the app restarted); "" when unknown."""
     if not exe:
         return ""
-    if exe in _versions:
-        return _versions[exe]
+    key = _stamp(exe)
+    if key in _versions:
+        return _versions[key]
     out = ""
     try:
         res = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=10, creationflags=NO_WINDOW)
@@ -479,18 +527,37 @@ def version(exe: str | None) -> str:
         out = f"b{m.group(1)}" if m else ""
     except Exception:
         out = ""
-    _versions[exe] = out
+    _versions[key] = out
     return out
+
+
+_builds_cache = {"key": None, "builds": None}
+
+
+def _builds() -> dict:
+    """Each build's install state and version - asked again only when an executable appears, goes or changes
+    (1.4.8, audit 1.3: this answer took 406 ms and held up the first paint of Settings > Models)."""
+    exes = {kind: exe_of(kind) for kind in ("latest", "prism")}
+    key = tuple(_stamp(exes[k]) for k in ("latest", "prism"))
+    if _builds_cache["key"] != key or _builds_cache["builds"] is None:
+        _builds_cache["builds"] = {kind: {"installed": bool(exe), "exe": exe, "version": version(exe), "name": NAMES[kind]}
+                                   for kind, exe in exes.items()}
+        _builds_cache["key"] = key
+    return {k: dict(v) for k, v in _builds_cache["builds"].items()}
 
 
 def status() -> dict:
     """For Settings › Models: the setting, each build (installed, path, version) and the one running."""
     run = running()
-    builds = {}
-    for kind in ("latest", "prism"):
-        exe = exe_of(kind)
-        builds[kind] = {"installed": bool(exe), "exe": exe, "version": version(exe), "name": NAMES[kind]}
-    return {"mode": mode(), "running": run["kind"], "running_exe": run["exe"], "builds": builds}
+    return {"mode": mode(), "running": run["kind"], "running_exe": run["exe"], "builds": _builds()}
+
+
+def warm() -> None:
+    """At startup, on a background thread: the build versions are known before Settings asks (1.4.8)."""
+    try:
+        _builds()
+    except Exception:
+        pass
 
 
 @local_runtime.exclusive

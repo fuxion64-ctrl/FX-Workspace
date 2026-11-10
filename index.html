@@ -5786,13 +5786,11 @@ html.voice-on .idle-screen { display: none !important; }
     <symbol id="i-shield" viewBox="0 0 24 24"><path class="ip-guard" d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/></symbol>
     <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path class="ip-shackle" d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
     <symbol id="i-ghost" viewBox="0 0 24 24"><g class="ip-float"><path d="M5 20V11a7 7 0 0 1 14 0v9l-2.3-1.6L14.3 20 12 18.4 9.7 20l-2.4-1.6L5 20z"/><circle cx="9.5" cy="11" r=".6"/><circle cx="14.5" cy="11" r=".6"/></g></symbol>
-    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></symbol>
     <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M4 17a8 8 0 1 1 16 0"/><path class="ip-needle" d="M12 17l4-5"/><path d="M7 17h.01M17 17h.01"/></symbol>
     <symbol id="i-layers" viewBox="0 0 24 24"><path class="ip-layer1" d="M12 3l9 5-9 5-9-5 9-5z"/><path class="ip-layer3" d="M3 13l9 5 9-5"/></symbol>
     <symbol id="i-star6" viewBox="0 0 24 24"><g class="ip-spin"><path d="M12 2.5l8.2 14.3H3.8L12 2.5z"/><path d="M12 21.5L3.8 7.2h16.4L12 21.5z"/></g></symbol>
     <symbol id="i-sun" viewBox="0 0 24 24"><circle class="ip-glow" cx="12" cy="12" r="4"/><path class="ip-spin-half" d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
     <symbol id="i-moon" viewBox="0 0 24 24"><path class="ip-float" d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
-    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18M4.6 7.5h14.8M4.6 16.5h14.8"/></symbol>
     <symbol id="i-dock-left" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path class="ip-right" d="M9.5 4v16"/></symbol>
     <symbol id="i-dock-right" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path class="ip-left" d="M14.5 4v16"/></symbol>
     <symbol id="i-dock-bottom" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path class="ip-layer1" d="M3 14.5h18"/></symbol>
@@ -5824,7 +5822,6 @@ html.voice-on .idle-screen { display: none !important; }
     <symbol id="i-play" viewBox="0 0 24 24"><path class="ip-push" d="M7 5l12 7-12 7V5z"/></symbol>
     <symbol id="i-repeat" viewBox="0 0 24 24"><g class="ip-spin"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></g></symbol>
     <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle class="ip-left" cx="16" cy="6" r="2"/><circle class="ip-right" cx="10" cy="12" r="2"/><circle class="ip-knob" cx="18" cy="18" r="2"/></symbol>
-    <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></symbol>
     <symbol id="i-film" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14"/><path class="ip-reel" d="M3 9h4M3 15h4M17 9h4M17 15h4"/></symbol>
     <symbol id="i-bookmark" viewBox="0 0 24 24"><path class="ip-dip" d="M6 3h12v18l-6-4.5L6 21V3z"/></symbol>
     <symbol id="i-external" viewBox="0 0 24 24"><path class="ip-out" d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
@@ -6339,11 +6336,23 @@ const icon = (name, cls = 'sm') => `<svg class="icon ${cls}"><use href="#${name}
 // Loading: placeholders shaped like what is coming (rows, text) - no blank flash, no lone spinner.
 const SKELETON_ROWS = `<div class="sb-skel" aria-busy="true" aria-label="Loading">${'<div><i></i><i></i></div>'.repeat(3)}</div>`;
 const SKELETON_TEXT = '<div class="skel-lines" aria-busy="true" aria-label="Loading"><i></i><i></i><i></i><i></i></div>';
-async function api(path, body, method) {
+// (1.4.8) A request gives up after 60 s by default (a spinner no longer waits for ever). A caller that really waits
+// longer (a picture/video/music generation, an install, an import) passes { timeout: 0 } (none) or its own ms as the 4th
+// argument. Errors carry .path and .status, and clientLog records them (the "body: Field required" bursts of 9 Nov named no endpoint).
+async function api(path, body, method, o = {}) {
   const opts = body === undefined ? { method: method || 'GET' } : { method: method || 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
+  const ms = o.timeout === undefined ? 60000 : o.timeout;
+  const ctl = ms > 0 && typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = ctl ? setTimeout(() => ctl.abort(), ms) : null;
+  if (ctl) opts.signal = ctl.signal;
   let res;
   try { res = await fetch(path, opts); }
-  catch (_) { throw Object.assign(new Error("Couldn't reach FX Workspace’s server - it may be restarting."), { network: true }); }
+  catch (_) {
+    if (timer) clearTimeout(timer);
+    if (ctl && ctl.signal.aborted) throw Object.assign(new Error(`The server didn't answer in ${Math.round(ms / 1000)} s (${path}). Try again.`), { timeout: true, path, method: opts.method });
+    throw Object.assign(new Error("Couldn't reach FX Workspace’s server - it may be restarting."), { network: true, path, method: opts.method });
+  }
+  if (timer) clearTimeout(timer);
   let data = null;
   try { data = await res.json(); } catch (_) { /* non-JSON body, e.g. a plain 500 page */ }
   if (!res.ok) {
@@ -6352,7 +6361,7 @@ async function api(path, body, method) {
     const fields = data && Array.isArray(data.detail)
       ? data.detail.map(e => `${(e.loc || []).slice(-1)[0] || 'value'}: ${e.msg}`).join('; ') : null;
     const detail = data && (data.message || (typeof data.detail === 'string' ? data.detail : fields));
-    throw Object.assign(new Error(detail || `The server returned an error (${res.status}).`), { status: res.status });
+    throw Object.assign(new Error(detail || `The server returned an error (${res.status}).`), { status: res.status, path, method: opts.method });
   }
   return data ?? {};
 }
@@ -7496,7 +7505,7 @@ const ImagesView = (() => {
     if (st.ref) { if (st.ref.id) body.ref_id = st.ref.id; else body.file_id = st.ref.fileId; }
     st.busy = true; st.error = null; paintGen(); paintRun(); poll();
     let r;
-    try { r = await api('/api/images/generate', body); } catch (e) { r = { ok: false, message: e.message }; }
+    try { r = await api('/api/images/generate', body, undefined, { timeout: 0 }); } catch (e) { r = { ok: false, message: e.message }; }
     st.busy = false;
     if (r.ok) {
       const first = r.image.images ? r.image.images[0] : r.image;
@@ -7840,7 +7849,7 @@ const VideosView = (() => {
     if (st.ref && !over) { if (st.ref.id) body.ref_id = st.ref.id; else body.file_id = st.ref.fileId; }
     st.busy = true; st.error = null; paintGen(); paintRun(); setTimeout(poll, 500);
     let r;
-    try { r = await api('/api/videos/generate', body); } catch (e) { r = { ok: false, message: e.message }; }
+    try { r = await api('/api/videos/generate', body, undefined, { timeout: 0 }); } catch (e) { r = { ok: false, message: e.message }; }
     st.busy = false;
     if (r.ok) { st.sel = r.video.id; if (st.filter === 'trash') st.filter = 'all'; Notify.done('Your video is ready', prompt.slice(0, 80)); }
     else st.error = { message: r.message, code: r.code };
@@ -8274,7 +8283,7 @@ const MusicView = (() => {
   }
   async function run(body, done) {
     st.busy = true; st.error = null; paintMain(); paintRun(); setTimeout(poll, 600);
-    let r; try { r = await api('/api/music/generate', body); } catch (e) { r = { ok: false, message: e.message }; }
+    let r; try { r = await api('/api/music/generate', body, undefined, { timeout: 0 }); } catch (e) { r = { ok: false, message: e.message }; }
     st.busy = false;
     if (r.ok) { if (st.filter !== 'all') { st.filter = 'all'; } done(r.song); } else st.error = { message: r.message, code: r.code };
     await load(); paintMain(); paintRun(); poll();
@@ -9558,7 +9567,7 @@ const Viewer = (() => {
       const b = e.target.closest('[data-act],[data-z],[data-i]'); if (!b) { if (e.target === el.querySelector('.vw-stage')) close(); return; }
       if (b.dataset.z) setZoom(b.dataset.z);
       else if (b.dataset.i != null) { const i = +b.dataset.i; if (cmp != null && e.shiftKey) cmp = i; else jump(i); paint(); }
-      else ({ close, prev: () => go(-1), next: () => go(1), compare: toggleCompare })[b.dataset.act]();
+      else ({ close, prev: () => go(-1), next: () => go(1), compare: toggleCompare })[b.dataset.act]?.();   // (1.4.8) guarded: an unknown data-act no longer throws
     });
     el.addEventListener('wheel', e => {
       if (e.target.closest('.vw-strip')) {                          // the strip scrolls sideways with the wheel
@@ -15827,7 +15836,11 @@ function clientLog(kind, message, detail = '') {
   try { fetch('/api/client-log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, message: String(message).slice(0, 1000), detail: String(detail).slice(0, 3000) }) }).catch(() => {}); } catch (e) { /* never in the way */ }
 }
 window.addEventListener('error', e => clientLog('error', e.message, (e.error && e.error.stack) || `${e.filename}:${e.lineno}`));
-window.addEventListener('unhandledrejection', e => clientLog('rejection', (e.reason && e.reason.message) || e.reason, e.reason && e.reason.stack));
+// (1.4.8) a failed api() call names its request: "[POST /api/x -> 422] body: Field required"
+window.addEventListener('unhandledrejection', e => {
+  const r = e.reason, where = r && r.path ? `[${r.method || 'GET'} ${r.path}${r.status ? ' -> ' + r.status : r.timeout ? ' timed out' : ''}] ` : '';
+  clientLog('rejection', where + ((r && r.message) || r), r && r.stack);
+});
 // Settings open but showing nothing: what the page looks like then.
 function checkSettingsShown(tab) {
   setTimeout(() => {
@@ -16221,7 +16234,7 @@ async function installUpdate(btn) {
   const say = (html, err) => { box.innerHTML = `<p class="set-note"${err ? ' role="alert"' : ''}>${html}</p>`; };
   btn.disabled = true;
   let p;
-  try { p = await api('/api/version/install', {}); } catch (e) { btn.disabled = false; return say(esc(e.message), true); }
+  try { p = await api('/api/version/install', {}, undefined, { timeout: 0 }); } catch (e) { btn.disabled = false; return say(esc(e.message), true); }
   for (;;) {
     if (p.state === 'error') { btn.disabled = false; return say(esc(p.error || "The update didn't start."), true); }
     if (p.state === 'started') return say('Installing - FX Workspace closes in a moment and opens again when the update is done.');
@@ -16503,15 +16516,21 @@ function openModelsFolder() {
 }
 async function renderModelsTab() {
   if (!S.modelConfigs.length) $('settings-body').innerHTML = `<h3>Models</h3>${SKELETON_TEXT}`;
-  const [, cfg, assets, , builds, folders] = await Promise.all([fetchLocalModels(), api('/api/local-models/config').catch(() => ({})), api('/api/models/assets').catch(() => null), fetchBench(),
-    api('/api/llama/builds').catch(() => null), api('/api/local-models/folders').catch(() => null)]);
-  if (folders) S.modelFolders = folders;
-  S.modelAssets = assets; if (builds && builds.builds) S.llamaBuilds = builds;
-  if (S.bench.running) pollBench();
+  // (1.4.8) Paint as soon as the config and the model list are in; builds, assets, folders and benchmarks fill in
+  // when they arrive (/api/llama/builds alone took 400 ms and left the skeleton up - audit 1.3).
+  const slow = Promise.all([api('/api/models/assets').catch(() => null), fetchBench(), api('/api/llama/builds').catch(() => null), api('/api/local-models/folders').catch(() => null)]);
+  const [, cfg] = await Promise.all([fetchLocalModels(), api('/api/local-models/config').catch(() => ({}))]);
   S.modelConfigs = (cfg && cfg.models) || []; S.modelDefaults = (cfg && cfg.defaults) || {};
   if (S.settingsTab !== 'models') return;
   renderModelsCached();
   renderMoeTest(); renderSpeedTune();
+  slow.then(([assets, , builds, folders]) => {
+    if (folders) S.modelFolders = folders;
+    S.modelAssets = assets; if (builds && builds.builds) S.llamaBuilds = builds;
+    if (S.bench.running) pollBench();
+    const typing = document.activeElement && document.activeElement.closest && document.activeElement.closest('#settings-body input, #settings-body textarea, #settings-body select');
+    if (S.settingsTab === 'models' && !typing) { renderModelsCached(); renderMoeTest(); renderSpeedTune(); }
+  });
   // The context limits come after (the first read of every model's header is slow); the page is usable meanwhile.
   if (!S.ctxInfo) api('/api/local-models/ctx-info').then(d => {
     S.ctxInfo = (d && d.models) || {};
@@ -16769,7 +16788,7 @@ function refreshBenchUI() {
 }
 async function runBench(id) {
   let r;
-  try { r = await api('/api/benchmarks', { model: id }); } catch (e) { toast(e.message); return; }
+  try { r = await api('/api/benchmarks', { model: id }, undefined, { timeout: 0 }); } catch (e) { toast(e.message); return; }
   if (!r.ok) { toast(r.message); return; }
   Object.assign(S.bench, { running: id, last: id, progress: 'Loading the model', error: null });
   refreshBenchUI(); pollBench();
@@ -17503,7 +17522,7 @@ const TEST_PROMPT = 'a red apple on a wooden table, soft daylight, photo';
 async function testImageModel(m) {
   toast(`Added ${m.name} - making a test picture to check it works…`, { ms: 6000 });
   let r;
-  try { r = await api('/api/images/generate', { prompt: TEST_PROMPT, quality: m.key, size: 'square', count: 1 }); }
+  try { r = await api('/api/images/generate', { prompt: TEST_PROMPT, quality: m.key, size: 'square', count: 1 }, undefined, { timeout: 0 }); }
   catch (e) { r = { ok: false, message: e.message }; }
   const box = document.querySelector('.im-add-out');
   if (r.ok) {
@@ -20811,7 +20830,7 @@ async function memImport(input) {
   const f = input.files && input.files[0]; if (!f) return;
   const text = await f.text(); let data = text;
   if (/\.json$/i.test(f.name)) { try { data = JSON.parse(text); } catch (_) { toast("That JSON file couldn't be read."); return; } }
-  const r = await api('/api/memory-import', { data }).catch(e => ({ ok: false, message: e.message }));
+  const r = await api('/api/memory-import', { data }, undefined, { timeout: 0 }).catch(e => ({ ok: false, message: e.message }));
   toast(r.ok ? `Imported ${r.added} memor${r.added === 1 ? 'y' : 'ies'}${r.skipped ? ` (${r.skipped} skipped - duplicates or too long)` : ''}.` : r.message);
   renderMemory();
 }
@@ -20875,7 +20894,7 @@ async function skillImport(input) {
   const f = input.files && input.files[0]; if (!f) return;
   const buf = new Uint8Array(await f.arrayBuffer()); let bin = '';
   for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
-  const r = await api('/api/skills-import', { filename: f.name, data_b64: btoa(bin) }).catch(e => ({ ok: false, message: e.message }));
+  const r = await api('/api/skills-import', { filename: f.name, data_b64: btoa(bin) }, undefined, { timeout: 0 }).catch(e => ({ ok: false, message: e.message }));
   if (!r.ok) { toast(r.message); return; }
   S.skillEdit = { slug: r.skill.slug, name: r.skill.name, description: r.skill.description, body: r.skill.body, review: r.skill.review };
   toast(r.skill.review.flags.length ? 'Imported, off - it has things to check first.' : 'Imported, off - read it, then turn it on.');
@@ -21325,7 +21344,7 @@ function chatMenu(e, id) {
   if (!pop) return;
   pop.querySelectorAll('[data-act]').forEach(b => b.onclick = () => { closePopover(); ({
     open: () => openChat(id), pin: () => setChatFlags(id, { pinned: !c.pinned }), rename: () => renameChat(id, c.title),
-    archive: () => setChatFlags(id, { archived: !c.archived }), delete: () => deleteChat(id, c.title) })[b.dataset.act](); });
+    archive: () => setChatFlags(id, { archived: !c.archived }), delete: () => deleteChat(id, c.title) })[b.dataset.act]?.(); });   // (1.4.8) guarded
   pop.querySelectorAll('[data-move]').forEach(b => b.onclick = () => { closePopover(); moveChat(id, b.dataset.move); });
 }
 function projectMenu(e, id) {
@@ -22001,7 +22020,7 @@ const FirstRun = (() => {
   async function download(e) {
     const p = starter && starter.pick; if (!p) return;
     e.target.disabled = true;
-    const r = await api('/api/model-finder/download', { repo: p.repo, path: p.path, mmproj: false }).catch(err => ({ ok: false, message: err.message }));
+    const r = await api('/api/model-finder/download', { repo: p.repo, path: p.path, mmproj: false }, undefined, { timeout: 0 }).catch(err => ({ ok: false, message: err.message }));
     if (!r.ok) { toast(r.message || 'The download did not start.'); e.target.disabled = false; return; }
     S.frDownload = r; paint(); watch();
   }
@@ -22222,8 +22241,8 @@ const NotesView = (() => {
     if (!r.ok) { toast(r.message); return; }
     st.editing = null; await load(); paint();
   }
-  async function delTask(id) { await api(`/api/tasks/${id}`, undefined, 'DELETE').catch(() => {}); await load(); paint(); }
-  async function clearDone() { await api('/api/tasks/clear-done', {}).catch(() => {}); st.showDone = false; await load(); paint(); }
+  async function delTask(id) { await api(`/api/tasks/${id}`, undefined, 'DELETE').catch(e => { toast(e.message); clientLog('error', e.message, e.path || ''); })  /* (1.4.8) shown */; await load(); paint(); }
+  async function clearDone() { await api('/api/tasks/clear-done', {}).catch(e => { toast(e.message); clientLog('error', e.message, e.path || ''); })  /* (1.4.8) shown */; st.showDone = false; await load(); paint(); }
   function ask(id) {
     if (id) { const t = st.data.tasks.find(x => x.id === id); if (t) handToAssistant(t.text); return; }
     const n = st.data.notes.find(x => x.id === st.sel); if (n) handToAssistant(`About my note "${n.title}":\n\n${n.body}\n\n`);
@@ -22247,7 +22266,7 @@ const NotesView = (() => {
   async function pin() { await flush(); const n = st.data.notes.find(x => x.id === st.sel); if (!n) return; await api(`/api/notes/${n.id}`, { body: n.body, pinned: !n.pinned }); await load(); paint(); }
   async function delNote() {
     const n = st.data.notes.find(x => x.id === st.sel); if (!n || !confirm(`Delete the note "${n.title}"?`)) return;
-    clearTimeout(st.saveT); await api(`/api/notes/${n.id}`, undefined, 'DELETE').catch(() => {}); st.sel = null; await load(); paint();
+    clearTimeout(st.saveT); await api(`/api/notes/${n.id}`, undefined, 'DELETE').catch(e => { toast(e.message); clientLog('error', e.message, e.path || ''); })  /* (1.4.8) shown */; st.sel = null; await load(); paint();
   }
   function toggleDone() { st.showDone = !st.showDone; paint(); }
   setTimeout(load, 2500); setInterval(() => { if (S.view !== 'notes') load(); }, 5 * 60000);   // the sidebar's open-task count
@@ -22455,7 +22474,7 @@ const DocsView = (() => {
   async function remove() {
     if (!confirm(`Delete "${st.doc.title}" and all its versions?`)) return;
     clearTimeout(st.saveT);
-    await api(`/api/docs/${st.doc.id}`, undefined, 'DELETE').catch(() => {});
+    await api(`/api/docs/${st.doc.id}`, undefined, 'DELETE').catch(e => { toast(e.message); clientLog('error', e.message, e.path || ''); })  /* (1.4.8) shown */;
     st.doc = null; st.list = null; render();
   }
   return { render, create, importFile, open, back, setMode, typed, retitle, keys, aiStart, aiContinue, aiRun, aiCancel, accept,
@@ -22528,7 +22547,7 @@ const MailView = (() => {
   function cancelSetup() { st.setup = false; render(); }
   async function removeAccount(id) {
     if (!confirm('Remove this account from FX Workspace? Nothing is deleted from the mailbox.')) return;
-    await api(`/api/mail/accounts/${id}`, undefined, 'DELETE').catch(() => {});
+    await api(`/api/mail/accounts/${id}`, undefined, 'DELETE').catch(e => { toast(e.message); clientLog('error', e.message, e.path || ''); })  /* (1.4.8) shown */;
     st.setup = false; st.acct = null; st.folders = st.list = st.msg = null; await loadAccounts(); render();
   }
   // ---- the mailbox
@@ -22728,7 +22747,7 @@ const MailView = (() => {
   }
   async function discard() {
     const c = st.compose; if (!c) return;
-    if (c.draft_id && confirm('Delete this draft?')) { await api(`/api/mail/drafts/${c.draft_id}`, undefined, 'DELETE').catch(() => {}); await loadAccounts(); }
+    if (c.draft_id && confirm('Delete this draft?')) { await api(`/api/mail/drafts/${c.draft_id}`, undefined, 'DELETE').catch(e => { toast(e.message); clientLog('error', e.message, e.path || ''); })  /* (1.4.8) shown */; await loadAccounts(); }
     st.compose = null; paint();
   }
   async function improve() {
@@ -22891,7 +22910,7 @@ async function finderFiles(repo) {
 }
 async function finderDownload(repo, path, mmproj = true) {
   S.finder.samples = [];
-  const r = await api('/api/model-finder/download', { repo, path, mmproj }).catch(e => ({ ok: false, message: e.message }));
+  const r = await api('/api/model-finder/download', { repo, path, mmproj }, undefined, { timeout: 0 }).catch(e => ({ ok: false, message: e.message }));
   if (!r.ok) { toast(r.message); return; }
   S.finder.status = r; finderRepaint(); finderPoll();
 }

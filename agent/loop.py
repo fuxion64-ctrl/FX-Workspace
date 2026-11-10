@@ -20,7 +20,7 @@ import permissions
 import secret_mask
 import shell_lint
 import stream_hub
-from run_control import run_control
+from run_control import RunStopped, run_control
 import studio_mcp
 import tool_registry
 import untrusted
@@ -84,6 +84,16 @@ def _stopped_response(reason: str = None) -> dict:
 _HOST_RESULT_TOOLS = {"set_plan", "update_plan", "ask_user", "generate_image", "make_chart", "use_tools", "load_skill"}
 
 
+def _held_note() -> str:
+    """The "not run yet" note for calls held back this step, said once - on whichever tool message answers the
+    kept call (1.4.8, audit 2.11: an invalid, repeated, denied or rejected kept call used to drop it)."""
+    held = shared.app_state.pop("held_back_calls", None)
+    if not held:
+        return ""
+    return (f"\n\n[NOT RUN YET - you asked for these in the same step, before this result was known: "
+            f"{'; '.join(held)}. Call again any you still need now that you have this result.]")
+
+
 def _append_tool_result(tc, tool_name, res):
     message = res.get("message", "") or ("ok" if res.get("ok") else "failed")
     if tool_name not in _HOST_RESULT_TOOLS:
@@ -92,13 +102,9 @@ def _append_tool_result(tc, tool_name, res):
             _report_embedded_instructions(tool_name, found)
         url_guard.note_read(message)            # from here on, only addresses seen so far open by themselves
         message = untrusted.frame(tool_name, message, found)
-    held = shared.app_state.pop("held_back_calls", None)
-    if held:
-        message += (f"\n\n[NOT RUN YET - you asked for these in the same step, before this result was known: "
-                    f"{'; '.join(held)}. Call again any you still need now that you have this result.]")
     shared.app_state["conversation"].append({
         "role": "tool", "tool_call_id": tc.id, "name": tool_name,
-        "content": message,
+        "content": message + _held_note(),
     })
     if res.get("image_b64"):
         shared.app_state["conversation"].append({
@@ -179,21 +185,29 @@ def final_summary() -> str:
                         "your task board, and what you need from them to continue."),
         }]
         if shared.app_state.get("mode") == config.MODE_LOCAL:
-            res = llm_compat.completion(model=f"openai/{shared.app_state.get('local_engaged') or llm.resolve_local_model(False)}",
-                                        api_base=config.LLAMA_SERVER_BASE, api_key=config.LOCAL_API_KEY,
-                                        messages=llm.strip_images(messages), temperature=0.1,
-                                        max_tokens=500, timeout=180)
+            # (1.4.8, audit 2.5) streamed and hidden, so Stop ends it at once and model_monitor counts it.
+            res = llm._local_complete(dict(
+                model=f"openai/{shared.app_state.get('local_engaged') or llm.resolve_local_model(False)}",
+                messages=llm.strip_images(messages), temperature=0.1, max_tokens=500, timeout=180),
+                record=False, publish=False)
         else:
             model_name, key = shared.LAST_GOOD.get("text") or llm.candidate_pairs(False)[0]
             res = llm_compat.completion(model=model_name, api_key=key, messages=llm.strip_images(messages), timeout=45)
         return res.choices[0].message.content or ""
+    except llm_stream.StreamCancelled:
+        raise RunStopped("user")
     except Exception as e:
         event_log.log_action(f"Final summary failed: {str(e)[:120]}")
         return ""
 
 
 _FABRICATED_CLAIM_RE = re.compile(r"\b(?:successfully|done|added|created|completed|connected|opened)\b", re.I)
-_FABRICATED_CODE_SPAN_RE = re.compile(r"`([a-zA-Z][\w\-\.]{2,})")
+_FABRICATED_CODE_SPAN_RE = re.compile(r"`([a-zA-Z][^`\n]{2,})`")
+# (1.4.8, audit 1.4) Only a span that reads as an invocation counts: a run/call verb just before it, or arguments
+# inside it. "Done - I created `notes.txt`" names a file, not a tool, and was flagged as made up.
+_INVOKE_VERB_RE = re.compile(r"\b(?:run|runs|ran|running|call|calls|called|calling|execute|executes|executed|"
+                             r"executing|invoke|invokes|invoked|invoking)\b[^`\n]{0,20}$", re.I)
+_FILE_LIKE_RE = re.compile(r"[\\/:]|\.[A-Za-z0-9]{1,6}$")
 
 
 def _fabricated_tool_name(prose: str):
@@ -206,14 +220,20 @@ def _fabricated_tool_name(prose: str):
     was previously returned to the user as a genuine, unquestioned success.
     This is a last-resort net: if the prose both names something in a
     code span that is NOT a real tool, and separately claims completion,
-    it is fabricated - nothing was actually executed."""
+    it is fabricated - nothing was actually executed.
+    The caller only asks when no tool call succeeded in this run (1.4.8)."""
     if not prose or not _FABRICATED_CLAIM_RE.search(prose):
         return None
     for m in _FABRICATED_CODE_SPAN_RE.finditer(prose):
-        raw = m.group(1)
-        name = raw.replace("-", "_").split(".")[0].split()[0]
-        if not schemas.known_tool(name):
-            return raw
+        span = m.group(1).strip()
+        first = span.split()[0]
+        if _FILE_LIKE_RE.search(first):
+            continue                            # a file, folder or path: something made, not something run
+        has_args = len(span.split()) > 1
+        if not has_args and not _INVOKE_VERB_RE.search(prose[max(0, m.start() - 40):m.start()]):
+            continue                            # a name mentioned, not a call described
+        if not schemas.known_tool(first.replace("-", "_")):
+            return first
     return None
 
 
@@ -363,7 +383,8 @@ def _answer_invalid_calls(invalid: list):
         event_log.finish_event(ev, ok=False, result="permanent_failure",
                      detail="Not run: the model's arguments were cut off by the length limit." if cut
                      else "Not run: " + reason.replace("NOT EXECUTED - ", "")[:300])
-        shared.app_state["conversation"].append({"role": "tool", "tool_call_id": tc.id, "name": name, "content": reason})
+        shared.app_state["conversation"].append({"role": "tool", "tool_call_id": tc.id, "name": name,
+                                                 "content": reason + _held_note()})
 
 
 # Tools whose result can change without anything this agent did (the screen,
@@ -457,6 +478,7 @@ def run_agent_loop():
     repeat_rounds = 0             # consecutive replies whose every tool call was a repeat
     run_sigs = {}                 # call signature -> (mutation epoch, times run in that epoch)
     mutation_epoch = 0            # bumps whenever a tool changes the machine
+    ran_ok = 0                    # tool calls that succeeded in this run (1.4.8: the fabrication net needs none)
     run_budget = shared.app_state.get("run_budget")    # effort.RunBudget for orchestrated runs
 
     iteration = -1
@@ -528,7 +550,8 @@ def run_agent_loop():
 
         if not parsed:
             policy = shared.app_state.get("turn_policy") or {}
-            fabricated = _fabricated_tool_name(prose) if policy.get("allow_mutation") else None
+            # (1.4.8) After a real tool call succeeded, "Done - I created `notes.txt`" is a report, not a fabrication.
+            fabricated = _fabricated_tool_name(prose) if policy.get("allow_mutation") and not ran_ok else None
             if fabricated and nudges < config.MAX_NUDGES:
                 # This check is NOT gated to local mode - the bug report showed
                 # a cloud model doing the exact same thing, so the net has to
@@ -645,7 +668,8 @@ def run_agent_loop():
             options = parsing._normalize_clarification_options(question, raw_options)
 
             expected = (shared.app_state.get("intent_guard") or {}).get("expected_app", "")
-            previous_apps = ["proton"] + (shared.app_state.get("completed_app_tasks") or [])
+            # (1.4.8, audit 2.11) a leftover hardcoded "proton" blocked any question that mentioned it.
+            previous_apps = list(shared.app_state.get("completed_app_tasks") or [])
             unrelated = next((name for name in previous_apps
                               if name.casefold() not in expected.casefold()
                               and name.casefold() in (question + " " + " ".join(options)).casefold()), None)
@@ -733,7 +757,7 @@ def run_agent_loop():
                 shared.app_state["conversation"].append({"role": "tool", "tool_call_id": tc.id, "name": n, "content": (
                     "NOT EXECUTED - you already made this exact call in this task and nothing on the machine has "
                     "changed since; its result is above in this conversation. Use that result: take a DIFFERENT "
-                    "next action, mark the step with update_plan, or give the user your final answer.")})
+                    "next action, mark the step with update_plan, or give the user your final answer.") + _held_note()})
             parsed = [x for x in parsed if id(x[0]) not in rep_ids]
             if not parsed:
                 repeat_rounds += 1
@@ -752,9 +776,10 @@ def run_agent_loop():
         step_ran = []                    # (tool, ok) of this step's calls - a picture may end the turn (below)
 
         def run_and_record(tc, n, a):
-            nonlocal mutation_epoch
+            nonlocal mutation_epoch, ran_ok
             res = runtime.execute_tool_guarded(n, a, tool_call_id=tc.id, links=_step_links(thought_id, a))
             step_ran.append((n, bool(res.get("ok"))))
+            ran_ok += 1 if res.get("ok") else 0
             if res.get("ok") and n not in schemas.READ_ONLY_TOOLS and n not in _PLAN_TOOLS:
                 mutation_epoch += 1             # the machine changed: earlier reads may be stale now
             sig = ctx.signature(n, a)
@@ -788,7 +813,7 @@ def run_agent_loop():
                 "role": "tool", "tool_call_id": tc.id, "name": n,
                 "content": (f"NOT EXECUTED - '{n}' is set to DENY in the user's permission settings "
                             "(Settings > Permissions). It will never run. Tell the user, or try a "
-                            "different approach that does not need this tool."),
+                            "different approach that does not need this tool.") + _held_note(),
             })
 
         if need_approval:
@@ -823,7 +848,7 @@ def run_agent_loop():
                     shared.app_state["conversation"].append({
                         "role": "tool", "tool_call_id": tc.id, "name": n,
                         "content": ("The user REJECTED this action. Do not retry it. Ask the user what they "
-                                    "would prefer, or propose a different approach."),
+                                    "would prefer, or propose a different approach.") + _held_note(),
                     })
                 # Without this, the active step stays [>] and the LIVE MACHINE
                 # STATE block re-asserts "YOUR NEXT TOOL CALL MUST ADVANCE STEP

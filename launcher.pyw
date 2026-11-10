@@ -56,11 +56,20 @@ def message(text: str, error: bool = True) -> None:
     ctypes.windll.user32.MessageBoxW(None, text, TITLE, 0x10 if error else 0x40)
 
 
+KEEP_RUNS = 3          # previous runs kept: <name>.prev.log, .prev2.log, .prev3.log
+
+
 def log_file(name: str):
     os.makedirs(LOGS, exist_ok=True)
     path = os.path.join(LOGS, f"{name}.log")
+    # (1.4.8, audit 1.2) Only one run before was kept: a restart or two later, the run with the 9 Nov errors was gone
+    # before anyone looked. The last KEEP_RUNS runs are kept now.
+    prev = [os.path.join(LOGS, f"{name}.prev{'' if n == 1 else n}.log") for n in range(1, KEEP_RUNS + 1)]
+    for older, newer in zip(reversed(prev[1:]), reversed(prev[:-1])):
+        if os.path.exists(newer):
+            os.replace(newer, older)
     if os.path.exists(path):
-        os.replace(path, os.path.join(LOGS, f"{name}.prev.log"))
+        os.replace(path, prev[0])
     return open(path, "w", encoding="utf-8", errors="replace", buffering=1)
 
 

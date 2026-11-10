@@ -186,13 +186,39 @@ _NEAR = 60                                              # characters between the
 
 
 def _rule_minors(text: str) -> bool:
+    """The two kinds of word close together: reason enough to ask the model, even about a short message."""
     sexual = [m.start() for m in _CHAT_SEXUAL.finditer(text)]
     if not sexual:
         return False
     return any(abs(m.start() - s) <= _NEAR for m in _CHAT_MINOR.finditer(text) for s in sexual)
 
 
+# (1.4.8, audit 1.5) Refusing on the words alone - when the model can't give a verdict - needs a pair that can't be
+# innocent: at least one side unambiguous, or a phrase that names the act. "sex education lesson plan for teens",
+# "my kids ran naked through the sprinkler" and "a child process that strips nsfw tags" pair two everyday words and
+# were refused with a minors notice whenever the checking model rambled.
+_AMBIGUOUS_SEXUAL = {"sex", "naked", "nsfw"}
+_AMBIGUOUS_MINOR = {"child", "children", "kid", "kids", "teen", "teens", "teenage", "teenager", "teenagers"}
+_CHAT_MINOR_ACT = re.compile(
+    r"\b(?:sex|naked|nsfw)\b[^.!?\n]{0,12}\b(?:with|of|involving|featuring)\s+(?:a |an |the |some )?"
+    r"(?:child|children|kid|kids|teen|teens|minor|minors)\b"
+    r"|\b(?:naked|nsfw)\s+(?:child|children|kid|kids|teen|teens)\s+(?:pic|pics|photo|photos|picture|pictures|image|images|video|videos)\b",
+    re.I)
+
+
+def _rule_minors_strict(text: str) -> bool:
+    if _CHAT_MINOR_ACT.search(text):
+        return True
+    sexual = [(m.start(), m.group(0).lower()) for m in _CHAT_SEXUAL.finditer(text)]
+    if not sexual:
+        return False
+    return any(abs(m.start() - s) <= _NEAR and not (w in _AMBIGUOUS_SEXUAL and m.group(0).lower() in _AMBIGUOUS_MINOR)
+               for m in _CHAT_MINOR.finditer(text) for s, w in sexual)
+
+
 _ANSWERS = {"ALLOW", *(c.upper() for c in CATEGORIES)}
+ONE_WORD_RETRY = ("\n\nYour last answer could not be read. Reply with exactly ONE word and nothing else: ALLOW or "
+                  + " or ".join(sorted(c.upper() for c in CATEGORIES)) + ".")
 
 
 def parse_verdict(text: str) -> str | None:
@@ -229,11 +255,17 @@ def screen(message: str, previous: str = "", ask_model=None) -> dict:
         user = (f"Previous user message (context only): {previous[:400]}\n\n" if previous else "") + \
                f"Message to screen: {text[:3000]}"
         try:
-            verdict = parse_verdict(ask_model(_POLICY, user))
+            answer = ask_model(_POLICY, user)
+            verdict = parse_verdict(answer)
+            if verdict is None:
+                # (1.4.8, audit 1.5) An answer that can't be read is not a verdict: ask once more, one word only.
+                verdict = parse_verdict(ask_model(_POLICY, user + ONE_WORD_RETRY))
         except Exception:
             verdict = None
-    if verdict is None:                                 # no usable check: the rules decide
-        return {"action": "refuse", "category": "minors", "via": "rules"} if rule_hit else allow
+    if verdict is None:
+        # No usable check: only an unambiguous phrase is refused on the words alone (1.4.8); the rest is allowed.
+        strict = _rule_minors_strict(text) or bool(previous and _rule_minors_strict(f"{previous[-_NEAR:]}\n{text}"))
+        return {"action": "refuse", "category": "minors", "via": "rules"} if strict else allow
     if verdict == "allow" or verdict not in enabled:
         return allow
     if verdict == "self_harm":

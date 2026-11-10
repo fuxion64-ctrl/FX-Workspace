@@ -18,6 +18,8 @@ from types import SimpleNamespace
 import asyncio
 
 from fastapi import FastAPI, HTTPException
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -185,7 +187,26 @@ async def _same_origin_only(request: Request, call_next):
     why = _refusal(request)
     if why:
         return JSONResponse({"status": "error", "ok": False, "message": why}, status_code=403)
-    return await call_next(request)
+    response = await call_next(request)
+    if response.status_code >= 400:
+        _log_http_error(request, response.status_code)
+    return response
+
+
+def _log_http_error(request: Request, status: int, detail: str = "") -> None:
+    """(1.4.8, audit 1.2) Every 4xx/5xx in server.log with its method and path, from either listener - the phone's
+    listener logs no access lines at all, and a 422 with no path left the 9 Nov failures unidentified."""
+    where = "phone" if remote_access.is_remote(request.scope) else "pc"
+    print(f"[HTTP {status}] {request.method} {request.url.path} ({where}){f' - {detail}' if detail else ''}", flush=True)
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_failed(request: Request, exc: RequestValidationError):
+    """A request the endpoint can't read (422): which field, said in the log; the answer is FastAPI's usual one."""
+    first = (exc.errors() or [{}])[0]
+    detail = f"{'.'.join(str(p) for p in first.get('loc', ()))}: {first.get('msg', '')}"[:200]
+    print(f"[HTTP 422 detail] {request.method} {request.url.path} - {detail}", flush=True)
+    return await request_validation_exception_handler(request, exc)
 
 # Compare, Find models, Notes & tasks, Docs and Mail (api/extras.py).
 import api.extras as extras
@@ -240,10 +261,36 @@ def start_chat(req: shared.ChatRequest, request: Request = None):
     turn = tasks.turns.start(req, {"message": req.message[:500], "with_vision": bool(req.with_vision),
                              "command": req.command, "event_seq": shared.app_state.get("event_seq", 0),
                              "temp": open_temp["id"] if open_temp else None},
-                             on_start=lambda: shared.app_state.__setitem__("turn_origin", origin))
+                             on_start=lambda: shared.app_state.__setitem__("turn_origin", origin),
+                             check=lambda: _wrong_chat(req))
     if turn is None:
         return {"status": "error", "message": "Busy - a task is already running. Stop it or wait for it to finish."}
+    if "refused" in turn:
+        return turn["refused"]
     return {"status": "accepted", "turn": turn}
+
+
+def _wrong_chat(req) -> dict | None:
+    """Why this message can't start a turn in the open chat, or None (1.4.8, audit 2.1). Runs under the turn
+    manager's lock (turns.start's check), and chat switches re-check for a running turn once they hold state_lock
+    (_with_lock), so the open chat can't change between this check and the turn.
+    - something is switching chats or loading a model right now (it holds state_lock);
+    - a channel's turn has its own chat open for a moment (chat_hold);
+    - the page wrote the message in another chat than the one open here: the page reopens its chat and sends again."""
+    if shared.state_lock.locked():
+        return {"status": "error", "message": _busy("Busy - a chat is being opened. Try again in a moment.")}
+    hold = shared.app_state.get("chat_hold")
+    if hold:
+        return {"status": "error", "message": f"Busy - a message from {hold} is being answered. Try again in a moment."}
+    wanted = getattr(req, "chat_id", None)
+    if wanted is None:
+        return None
+    active = (shared.app_state.get("active_chat") or {}).get("id") or ""
+    if str(wanted) != active:
+        event_log.log_action("A message was written in another chat than the open one - not sent; its page reopens that chat.")
+        return {"status": "error", "chat_changed": True, "chat": sessions.public_chat(),
+                "message": "This chat was switched on another screen - reopening it to send your message."}
+    return None
 
 
 @app.get("/api/turn/{turn_id}")
@@ -325,10 +372,13 @@ def control_run(action: str):
 @app.post("/api/reset")
 def reset_conversation():
     # Refuse instead of waiting: blocking here made "New chat" hang for the
-    # rest of a running task.
-    if not shared.state_lock.acquire(timeout=2):
+    # rest of a running task. (1.4.8, audit 2.2) A turn holds state_lock only once the agent starts: during the
+    # message check, Prompt Prep and planning the lock was free and this wiped the running turn's chat.
+    if tasks.turns.running() or not shared.state_lock.acquire(timeout=2):
         return {"status": "error", "message": _busy("A task is still running - stop it first.")}
     try:
+        if tasks.turns.running():        # one started while this waited for the lock (see _with_lock)
+            return {"status": "error", "message": _busy("A task is still running - stop it first.")}
         _reset_conversation_locked()
         sessions.new_chat()              # the next message starts a new saved chat (in the open project); ends a temporary one
     finally:
@@ -760,10 +810,17 @@ def get_context(mode: str | None = None, model: str | None = None):
 
 
 @app.get("/api/shell")
-def get_shell():
+async def get_shell():
     """What the desktop app applies about once a second (desktop/main.js): close-to-tray, and the mini window -
-    open, opacity, click-through, place, and Roblox Studio's window to sit over (mini_window.py)."""
-    return {**mini_window.shell_state(), **({"quit": True} if _shell_quit.is_set() else {})}
+    open, opacity, click-through, place, and Roblox Studio's window to sit over (mini_window.py).
+    (1.4.8, audit 3.3) async: asked every second, it took one of the 40 request threads each time, so with long
+    streams and polls holding the rest the app looked dead. With the mini window open it asks Windows about windows,
+    which runs off the event loop (the default executor, not the request threads)."""
+    if shared.app_state["settings"].get("overlay_window"):
+        state = await asyncio.to_thread(mini_window.shell_state)
+    else:
+        state = mini_window.shell_state()          # settings only - nothing that waits
+    return {**state, **({"quit": True} if _shell_quit.is_set() else {})}
 
 
 _shell_quit = threading.Event()
@@ -898,45 +955,74 @@ def _channel_turn(chat_id, message: str, origin: str, on_approval):
     previous = (shared.app_state.get("active_chat") or {}).get("id")
     previous_project = shared.app_state.get("active_project")
     try:
+        if tasks.turns.running():                           # one started while this waited for the lock (_with_lock)
+            return chat_id, {"status": "error", "message": "Busy - another task is running on the PC. Try again soon."}
+        # From here until the PC's chat is back, a message from the PC or the phone is refused as busy (_wrong_chat):
+        # in the gap between opening the channel's chat and starting its turn, a PC send used to land in the
+        # channel's chat (1.4.8, audit 2.1).
+        shared.app_state["chat_hold"] = origin
         _reset_conversation_locked()
         if not (chat_id and shared.chat_store.load(chat_id) and sessions.open_chat(chat_id)):
             shared.app_state["active_project"] = None       # a channel's chat is an Assistant session, in no project
             sessions.new_chat()
     finally:
         shared.state_lock.release()
-    req = shared.ChatRequest(message=message, mode=shared.app_state.get("mode") or config.MODE_LOCAL,
-                             local_model=shared.app_state.get("local_model") or "")
-    req.command = None
-    # The origin only once the turn is accepted (1.4.6): set before, a refused one left a running PC turn marked
-    # as the channel's, with fewer tools.
-    turn = tasks.turns.start(req, {"message": message[:500], "with_vision": False, "command": None,
-                                   "event_seq": shared.app_state.get("event_seq", 0), "temp": None, "origin": origin},
-                             on_start=lambda: shared.app_state.__setitem__("turn_origin", origin))
-    if turn is None:
-        return chat_id, {"status": "error", "message": "Busy - another task is running on the PC."}
-    asked = None
-    while True:
-        done = tasks.turns.wait(turn["id"], 1.0)
-        if done is None or done.get("status") != "running":
-            break
-        p = approvals.broker.pending()
-        if p and p["id"] != asked:
-            asked = p["id"]
-            try:
-                on_approval(p)
-            except Exception:
-                pass
-    used = (shared.app_state.get("active_chat") or {}).get("id") or chat_id
-    shared.app_state["turn_origin"] = "pc"
-    if shared.state_lock.acquire(timeout=10):
-        try:                                            # back to what the PC had open
+    used, done = chat_id, None
+    try:
+        req = shared.ChatRequest(message=message, mode=shared.app_state.get("mode") or config.MODE_LOCAL,
+                                 local_model=shared.app_state.get("local_model") or "")
+        req.command = None
+        # The origin only once the turn is accepted (1.4.6): set before, a refused one left a running PC turn marked
+        # as the channel's, with fewer tools.
+        turn = tasks.turns.start(req, {"message": message[:500], "with_vision": False, "command": None,
+                                       "event_seq": shared.app_state.get("event_seq", 0), "temp": None, "origin": origin},
+                                 on_start=lambda: shared.app_state.__setitem__("turn_origin", origin))
+        if turn is None:                                    # a routine started in between: its chat is put back below
+            return chat_id, {"status": "error", "message": "Busy - another task is running on the PC."}
+        asked = None
+        while True:
+            done = tasks.turns.wait(turn["id"], 1.0)
+            if done is None or done.get("status") != "running":
+                break
+            p = approvals.broker.pending()
+            if p and p["id"] != asked:
+                asked = p["id"]
+                try:
+                    on_approval(p)
+                except Exception:
+                    pass
+        used = (shared.app_state.get("active_chat") or {}).get("id") or chat_id
+        return used, (done or {}).get("result") or {}
+    finally:
+        shared.app_state["turn_origin"] = "pc"
+        _restore_pc_chat(previous, previous_project)
+        shared.app_state["chat_hold"] = None
+
+
+def _restore_pc_chat(previous, previous_project) -> bool:
+    """Back to the chat the PC had open before a channel's turn. It used to give up after 10 s without a word, and
+    the PC's next message then went into the channel's chat (1.4.8): now it waits for a turn that is still running
+    (a routine), tries for a minute, and says so in the log when it couldn't."""
+    for _ in range(6):
+        if tasks.turns.running():
+            cur = tasks.turns.current() or {}
+            tasks.turns.wait(cur.get("id") or "", 10.0)
+            continue
+        if not shared.state_lock.acquire(timeout=10):
+            continue
+        try:
+            if tasks.turns.running():
+                continue
             _reset_conversation_locked()
             if not (previous and shared.chat_store.load(previous) and sessions.open_chat(previous)):
                 shared.app_state["active_project"] = previous_project
                 sessions.new_chat()
+            return True
         finally:
             shared.state_lock.release()
-    return used, (done or {}).get("result") or {}
+    event_log.log_action("Could not reopen the PC's chat after a channel's message - the channel's chat is still the "
+                         "open one. A message from the PC reopens its own chat by itself.")
+    return False
 
 
 import channels                                         # noqa: E402
@@ -1582,6 +1668,8 @@ def _start_background_services():
     _crash_log()
     # llama-server that stops or hangs is started again by itself (1.4.7) - it used to stay down until a restart.
     llama_builds.start_watchdog()
+    # (1.4.8, audit 1.3) build versions read once, off the request path - Settings > Models waited on them.
+    threading.Thread(target=llama_builds.warm, daemon=True, name="llama-builds-warm").start()
     try:
         import ports
         ports.note("app", APP_PORT)
@@ -2482,6 +2570,10 @@ def _with_lock(fn):
     if tasks.turns.running() or not shared.state_lock.acquire(timeout=2):
         return {"ok": False, "message": _busy("A task is still running - stop it first.")}
     try:
+        # Again, now that the lock is held (1.4.8): a turn checks this lock as it starts (_wrong_chat), so either it
+        # saw the lock and was refused, or it is running by now and the switch is - never both at once.
+        if tasks.turns.running():
+            return {"ok": False, "message": _busy("A task is still running - stop it first.")}
         return fn()
     finally:
         shared.state_lock.release()
@@ -2985,7 +3077,9 @@ def run_routine(rid: str, trigger: str = "click"):
     message = f"Run routine: {routine['name']}"
     turn = tasks.turns.start(SimpleNamespace(message=message, with_vision=False, routine_id=rid, trigger=trigger),
                              {"message": message, "with_vision": False, "routine": rid, "trigger": trigger,
-                              "event_seq": shared.app_state.get("event_seq", 0)})
+                              "event_seq": shared.app_state.get("event_seq", 0)},
+                             # (1.4.8, audit 2.10) a routine is the PC's own: every turn start sets the origin.
+                             on_start=lambda: shared.app_state.__setitem__("turn_origin", "pc"))
     if turn is None:
         if trigger == "schedule":
             routine_runner._record(routine, "skipped", "Another task was running at the scheduled time.", trigger)
@@ -3250,9 +3344,10 @@ def remove_model_entry(body: ModelEntryRequest):
 
 
 @app.get("/api/whoami")
-def whoami():
+async def whoami():
     """Which app answers on this port (1.4.7): the desktop app, launcher.pyw and run.bat ask before they reuse a
-    server - another program on 8000 answered /api/settings with 404 and the app then failed to bind the port."""
+    server - another program on 8000 answered /api/settings with 404 and the app then failed to bind the port.
+    (1.4.8, audit 3.3) async, so it answers even when every request thread is taken."""
     import app_version
     return {"app": "fx-workspace", "root": os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             "pid": os.getpid(), "port": APP_PORT, "llama_port": llama_local.LLAMA_PORT,

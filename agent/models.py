@@ -553,6 +553,12 @@ def _queued_wait():
         event_log.update_event(ev, phase="loading", loading=name, loading_since=local_runtime.loading["since"], model=name)
 
 
+def _tool_steady_turn() -> bool:
+    """(1.4.8) An action turn, or the retry that may only be a tool call: sampled at the agent's steady 0.1."""
+    policy = shared.app_state.get("turn_policy") or {}
+    return policy.get("mode") == "action" or bool(shared.app_state.get("force_tool_once"))
+
+
 @local_runtime.exclusive(stop=lambda: _queued_wait())
 def call_local(messages, requires_vision: bool, model_name: str = None):
     reported = llama_local.server_models(force=True)
@@ -579,11 +585,15 @@ def call_local(messages, requires_vision: bool, model_name: str = None):
     if model_name is None:
         raise RuntimeError(llama_local.empty_registry_message())
 
+    aside = llama_builds.set_aside(model_name)
+    if aside:
+        raise RuntimeError(aside)                # it took the router down again and again (1.4.8, audit 3.5)
     payload = messages if (requires_vision and llama_local.is_vision_model(model_name)) else strip_images(messages)
     event_log.log_action(f"Local model: {model_name}")
     _ensure_build(model_name)
     load_watch = _watch_load(model_name)        # "Loading <model>" in the chat while the router loads it
     retry_from_disk = False
+    llama_builds.note_in_use(model_name)        # a crash from here on is this model's (1.4.8)
     try:
         # nvidia-smi cannot reliably expose per-process VRAM on Windows/WDDM.
         # Capture the system-only floor before llama-server loads its first
@@ -602,8 +612,10 @@ def call_local(messages, requires_vision: bool, model_name: str = None):
             # differ on every single turn and the cache would never hit.
             extra_body={"cache_prompt": True},
         )
-        if raw:
-            # Raw mode: the model's own sampling (models.ini / the GGUF's defaults), not the agent's tool-steady 0.1.
+        if raw or not _tool_steady_turn():
+            # Raw mode and (1.4.8, audit 2.4) conversation turns: the model's own sampling (models.ini / the GGUF's
+            # defaults). Near-greedy 0.1 with thinking on is a known cause of loops in Qwen-family models; it stays
+            # for action turns and forced tool retries, where a steady call shape matters most.
             kwargs.pop("temperature")
             kwargs.pop("top_p")
         if shared.app_state.get("effort_thinking") is not None:
@@ -657,6 +669,7 @@ def call_local(messages, requires_vision: bool, model_name: str = None):
                 raise RuntimeError(why)
             raise RuntimeError(f"Local model '{model_name}' failed: {str(e)[:250]}" + llama_local.load_hint(model_name))
     finally:
+        llama_builds.note_in_use(None)
         if load_watch:
             load_watch.set()
     if retry_from_disk:
@@ -1170,9 +1183,12 @@ def model_json(system: str, user: str, max_tokens: int = 600, secondary: bool = 
             model = shared.app_state.get("local_engaged") or resolve_local_model(False)
             if not model:
                 return None
-            res = llm_compat.completion(model=f"openai/{model}", api_base=config.LLAMA_SERVER_BASE, api_key=config.LOCAL_API_KEY,
-                                        messages=messages, temperature=0, max_tokens=max_tokens, timeout=120,
-                                        extra_body={"chat_template_kwargs": {"enable_thinking": False}})
+            # (1.4.8, audit 2.5) streamed and hidden, so Stop ends it at once and model_monitor counts it - the
+            # blocking call held Stop for up to 120 s.
+            res = _local_complete(dict(model=f"openai/{model}", api_base=config.LLAMA_SERVER_BASE, api_key=config.LOCAL_API_KEY,
+                                       messages=messages, temperature=0, max_tokens=max_tokens,
+                                       timeout=120, extra_body={"chat_template_kwargs": {"enable_thinking": False}}),
+                                  record=False, publish=False)
             engage_local_model(model)
         else:
             pairs = candidate_pairs(False)
@@ -1192,6 +1208,8 @@ def model_json(system: str, user: str, max_tokens: int = 600, secondary: bool = 
                                         temperature=0, max_tokens=max_tokens)
         answer, _ = model_output.split_reasoning(res.choices[0].message.content or "")
         return parsing._coerce_args(answer) or None
+    except llm_stream.StreamCancelled:
+        raise RunStopped("user")
     except Exception as e:
         event_log.log_action(f"Structured {'cross-check ' if secondary else ''}model call failed: {str(e)[:120]}")
         return None
@@ -1247,7 +1265,13 @@ def model_text(system: str, user: str, max_tokens: int = 1500, model: str | None
                           messages=messages, temperature=temperature, top_p=0.9, max_tokens=max_tokens, timeout=300,
                           extra_body={"cache_prompt": True, "chat_template_kwargs": {"enable_thinking": bool(think)}})
             res = _local_complete(kwargs, record=False, publish=stream)
-            engage_local_model(local)
+            if model:
+                # (1.4.8, audit 2.7) a one-off call to a named model (Compare) does not take over: replies stayed on
+                # it until the pin changed. What was engaged stays engaged; the router's list is stale after a swap.
+                if local != shared.app_state.get("local_engaged"):
+                    llama_local.invalidate_cache()
+            else:
+                engage_local_model(local)
             used = local
         else:
             pairs = [(model, k) for k in get_keys_for_model(model)] if model else candidate_pairs(False)

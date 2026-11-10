@@ -53,7 +53,7 @@ class TaskFlowTests(unittest.TestCase):
                  "run_task_queue", "resume_task_queue", "finish_task_queue",
                  "_normalize_clarification_options", "_same_clarification", "_clarification_key",
                  "tool_allowed_current_turn", "gate_batch", "_stopped_response", "_previous_turn", "_classify",
-                 "_decide", "_same_tool_batch"}
+                 "_decide", "_same_tool_batch", "_held_note"}
         root = Path(__file__).resolve().parent.parent
         nodes = [node for src in SOURCES for node in ast.parse((root / src).read_text(encoding="utf-8")).body
                  if isinstance(node, ast.FunctionDef) and node.name in names]
@@ -226,7 +226,8 @@ class TaskFlowTests(unittest.TestCase):
         self.assertFalse(self.g["task_board"].is_complete())
 
     def test_model_cannot_reopen_unrelated_proton_clarification(self):
-        self.state.update(mode="local", intent_guard={"expected_app": "wiztree"},
+        # 1.4.8 (audit 2.11): blocked because Proton was a finished task, not because of a hardcoded "proton".
+        self.state.update(mode="local", intent_guard={"expected_app": "wiztree"}, completed_app_tasks=["proton"],
                           current_user_request="Scan drive C with wiztree")
         self.g["call_model"] = Mock(return_value=SimpleNamespace(
             choices=[SimpleNamespace(message=object())]))
