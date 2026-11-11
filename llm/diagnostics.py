@@ -439,6 +439,19 @@ def _version(exe: str) -> str:
         return ""
 
 
+def gpu_devices(exe: str) -> list | None:
+    """(1.4.8) The GPUs llama-server can use ("CUDA0: NVIDIA GeForce RTX 3060 Ti ..."), [] for none, None if unknown."""
+    try:
+        out = subprocess.run([exe, "--list-devices"], capture_output=True, text=True, timeout=20,
+                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except Exception:
+        return None
+    text = (out.stdout or "") + (out.stderr or "")
+    if "Available devices" not in text:
+        return None                                       # an older build without --list-devices
+    return re.findall(r"^\s*((?:CUDA|Vulkan|ROCm|SYCL|Metal)\d+:.*)$", text, re.M)
+
+
 def drive_media(letter: str) -> dict:
     """{"media": "HDD" | "SSD" | ..., "name"} of the physical disk behind a drive letter (Windows), or {}."""
     if os.name != "nt" or not re.fullmatch(r"[A-Za-z]", letter or ""):
@@ -491,6 +504,15 @@ def run(app_dir: str | None = None) -> dict:
     exe = _server_exe()
     if exe:
         checks.append(_check("server", "ok", f"llama-server: {exe}", _version(exe)))
+        # (1.4.8) The engine can see the GPU at all. On 10 Nov a llama.cpp update ran out of disk space mid-unpack:
+        # NVIDIA's runtime files were missing or cut short, llama-server listed no device, and every model ran on
+        # the CPU at 4 tokens/s with nothing saying why.
+        devices = gpu_devices(exe)
+        if gpu and devices is not None and not devices:
+            checks.append(_check("server", "error", "llama.cpp can't use your GPU - every model runs on the CPU",
+                                 f"llama-server lists no GPU although {gpu['name']} is there. Its GPU files are missing or "
+                                 "damaged (an update that ran out of disk space does this). Free some space on the drive, then "
+                                 "run the installer again (Settings > About > Update now, or the setup file): setup repairs it."))
         prism = llama_builds.exe_of("prism")
         if prism and prism != exe:
             checks.append(_check("server", "ok", f"PrismML's llama.cpp, for Ternary Bonsai 2: {prism}", _version(prism)))

@@ -354,6 +354,28 @@ def watch(server) -> None:
         time.sleep(1)
 
 
+EXIT_GRACE = 20.0     # seconds after shutdown starts before a process that hasn't ended is ended by force
+STUCK_EXIT = 3        # exit code: an earlier copy holds the lock but answers nothing (desktop/main.js ends it, retries)
+
+
+def exit_guard(server, llama, grace: float = EXIT_GRACE, poll: float = 0.5) -> None:
+    """(1.4.8) A shutdown that hangs still ends. uvicorn printed "Finished server process" on 10 Nov 16:18 and the
+    process stayed alive: Python 3.11's asyncio.run waits, with no time limit, for every thread of its default
+    executor (asyncio.to_thread - voice, mail, Find models, model scan...), so one stuck call kept the windowless
+    process - and its single-instance lock - alive. Every later start then found "already running", no server
+    answering, and quit without a word: the app didn't open until the PC restarted."""
+    while not server.should_exit:
+        time.sleep(poll)
+    time.sleep(grace)
+    print(f"[WARNING] Shutdown didn't finish within {int(grace)} s (a worker thread is stuck) - ending the process.",
+          flush=True)
+    try:
+        stop_tree(llama)
+    except Exception:
+        pass
+    os._exit(0)
+
+
 def quiet_children() -> None:
     """Under run.bat every console program the app runs (PowerShell for the clipboard and the app list,
     tasklist, the assistant's shell commands...) shared run.bat's console. Under pythonw there is no console to
@@ -430,7 +452,12 @@ def main() -> int:
             import app_window
             _set_app_port(running)
             app_window.open_app(APP_URL)
-        return 0
+        elif not running and not shell_mode():
+            # (1.4.8) An earlier copy holds the lock but answers nothing (it hung while closing): say so, not nothing.
+            message("FX Workspace is still closing from last time and doesn't answer.\n\n"
+                    "End \"pythonw.exe\" (FX Workspace) in Task Manager, or restart Windows, then start it again.")
+        # 3: an earlier copy holds the lock and answers nothing - the desktop app ends that copy and starts again (1.4.8).
+        return 0 if running else STUCK_EXIT
     out = log_file("server")
     sys.stdout = sys.stderr = out
     print(f"FX Workspace - {time.strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
@@ -473,6 +500,7 @@ def main() -> int:
         # A stream still open (the Studio overlay's, say) must not hold the shutdown up.
         server = uvicorn.Server(uvicorn.Config("main:app", host="127.0.0.1", port=APP_PORT, timeout_graceful_shutdown=5))
         threading.Thread(target=watch, args=(server,), daemon=True, name="app-window-watch").start()
+        threading.Thread(target=exit_guard, args=(server, llama), daemon=True, name="exit-guard").start()
         print(f"Starting the API at {APP_URL} ...", flush=True)
         try:
             server.run()

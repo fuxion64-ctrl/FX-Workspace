@@ -119,7 +119,10 @@ def review(answer: str, question: str, registry, tools_used: bool, web_available
         canon = lambda u: u               # noqa: E731
     given = {canon(u.rstrip(".,;:")) for u in _URL.findall(str(question or ""))}     # links the user gave are fine
     links = []
-    for u in _URL.findall(prose):
+    # (1.4.8) Not inside code: an HTML page's image and script addresses are part of the code it was asked to write,
+    # and listing them under every generated site read as a warning about the answer (11 Nov, owner).
+    outside_code = re.sub(r"```.*?(?:```|$)", " ", prose, flags=re.S)
+    for u in _URL.findall(outside_code):
         u = u.rstrip(".,;:")
         key = canon(u)
         if key not in seen_keys and key not in given and u not in links and not re.match(r"https?://(?:127\.0\.0\.1|localhost)", u):

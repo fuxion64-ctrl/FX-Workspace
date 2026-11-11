@@ -293,6 +293,41 @@ def studio_rules(offered) -> str:
 _SENTENCE_RE = re.compile(r"((?<=[^\d\s][.!?])[ \t]+(?=[A-Z])|\n)")
 
 
+# (1.4.8, item 4) Rule lines for one area of tools ("- Roblox Studio: ...", "Files: ...") go only when a tool of that
+# area is offered: a greeting carried the file, browser and Roblox rules (about 300 tokens), and the Roblox line names no
+# tool, so the sentence rule below never dropped it - every chat mentioned Roblox.
+def _studio(names) -> bool:
+    return any(n.startswith("roblox_") or n.endswith(("__execute_luau", "__multi_edit", "__insert_asset")) for n in names)
+
+
+AREA_LINES = {
+    "files": (("Files", "Long files"), lambda names: bool({"write_file", "edit_file", "apply_patch"} & names)),
+    "roblox": (("Roblox Studio",), _studio),
+    "web": (("Web", "Sources"), lambda names: bool({"web_search", "fetch_page", "web_read"} & names)),
+    "browser": (("Browser",), lambda names: any(n.startswith("browser_") for n in names)),
+    "commands": (("Commands",), lambda names: bool({"run_powershell", "execute_command"} & names)),
+}
+_AREA_LINE_RE = re.compile(r"^\s*(?:-\s+)?(" + "|".join(sorted({re.escape(lbl) for labels, _ in AREA_LINES.values()
+                                                                for lbl in labels}, key=len, reverse=True)) + r"):", re.I)
+
+
+def for_areas(prompt: str, offered) -> str:
+    """The prompt without the rule lines of tool areas this turn has none of (AREA_LINES)."""
+    names = set(offered or ())
+    off = {lbl.lower() for labels, has in AREA_LINES.values() if not has(names) for lbl in labels}
+    if not off:
+        return prompt
+    out = []
+    for para in prompt.split("\n\n"):
+        head = _AREA_LINE_RE.match(para)
+        if head and head.group(1).lower() in off and not para.lstrip().startswith("-"):
+            continue                    # a paragraph about that area ("ROBLOX STUDIO: ...\n...Luau ...") goes whole
+        lines = [l for l in para.split("\n") if not ((m := _AREA_LINE_RE.match(l)) and m.group(1).lower() in off)]
+        if any(l.strip() for l in lines):
+            out.append("\n".join(lines))
+    return "\n\n".join(out)
+
+
 def for_tools(prompt: str, offered, known) -> str:
     """The prompt without any sentence that names a tool this turn does not
     offer: a model told about roblox_get_tree it was not given guesses at
@@ -301,6 +336,7 @@ def for_tools(prompt: str, offered, known) -> str:
     is judged on its own, sentence by sentence, and kept lines keep their
     line breaks (D47 - the core's numbered rules stay a list)."""
     offered = set(offered)
+    prompt = for_areas(prompt, offered)
     names = re.compile(r"\b(" + "|".join(sorted((re.escape(n) for n in known), key=len, reverse=True)) + r")\b")
     families = {m.group(1) for n in offered for m in [re.match(r"([a-z]+)_", n)] if m}
     out = []

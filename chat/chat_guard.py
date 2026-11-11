@@ -216,6 +216,44 @@ def _rule_minors_strict(text: str) -> bool:
                for m in _CHAT_MINOR.finditer(text) for s, w in sexual)
 
 
+# (1.4.8, model-efficiency item 1) The model check runs only when something in the message could need it: the minors
+# phrase rule, or one of these clear words for a category that is on. It was one extra model call before nearly every
+# reply - with its own system prompt, which can push the chat out of llama.cpp's one-slot cache. The words are broad on
+# purpose: a false hit costs one short check, a miss lets a message through unchecked.
+_TRIGGERS = {
+    "minors": r"underage|under-age|preteen|pre-teen|loli|lolita|shota|child porn|cp\b|csam|jailbait|"
+              r"(?:1[0-7]|[1-9])[- ]?(?:yo|y/o|years?[- ]old)|ילד|קטינ|ребён|ребен|несовершеннолет",
+    "mass_harm": r"bomb|explosive|detonat|nerve agent|sarin|vx\b|novichok|ricin|anthrax|botulinum|smallpox|plague|"
+                 r"pathogen|bioweapon|bio-weapon|biological weapon|chemical weapon|nuclear|dirty bomb|radiolog|uranium|"
+                 r"plutonium|enrich|mass casualt|mass shooting|massacre|terror|weaponi[sz]|toxin|nerve gas|mustard gas|"
+                 r"chlorine gas|pipe bomb|ied\b|ghost gun|untraceable gun|3d[- ]?printed gun|full[- ]auto|"
+                 r"פצצה|נשק|взрывчат|бомб|оружи",
+    "malware": r"malware|ransomware|keylog|trojan|rootkit|botnet|backdoor|spyware|stealer|rat\b|worm\b|virus|exploit|"
+               r"payload|shellcode|ddos|dos attack|phish|credential|steal|hack|crack|keygen|bypass|evade|evasion|"
+               r"antivirus|edr\b|inject|brute[- ]?force|password dump|mimikatz|privilege escalation|reverse shell|"
+               r"c2\b|command and control|zero[- ]day|0day|sql injection|xss\b|wifi password|someone'?s (?:account|"
+               r"phone|email|password)|spy on|track (?:my|her|his|their)|האק|פריצ|взлом|вирус",
+    "self_harm": r"suicid|kill myself|end my life|end it all|take my (?:own )?life|self[- ]?harm|hurt myself|cut myself|"
+                 r"cutting myself|overdose|want to die|wanna die|better off dead|no reason to (?:live|keep going)|"
+                 r"reason to keep going|keep going anymore|don'?t want to (?:live|be here)|can'?t go on|hang myself|"
+                 r"jump off|slit|pills to|לא רוצה לחיות|להתאבד|убить себя|покончить|суицид",
+    "abuse": r"idiot|stupid|dumb|moron|retard|useless|worthless|pathetic|garbage|trash|shut up|hate you|f+u+c+k|fck|"
+             r"\bf\*+|shit|bitch|asshole|bastard|cunt|dick|piss off|go to hell|die\b|kys|kill yourself|loser|"
+             r"מטומטם|אידיוט|סתום|дурак|идиот|туп|заткнись",
+}
+_TRIGGER_RE = {c: re.compile(r"(?<![\w-])(?:" + rx + r")", re.I) for c, rx in _TRIGGERS.items()}
+
+
+def needs_check(text: str, previous: str = "", enabled=None) -> bool:
+    """(1.4.8) Whether a message goes to the model check: the minors phrase rule, or a trigger word of an enabled
+    category in it (or at the end of the message before it - "now the second part" follows that one)."""
+    enabled = set(CATEGORIES) if enabled is None else set(enabled) | {"minors"}
+    tail = f"{str(previous or '')[-300:]}\n{text}"
+    if _rule_minors(text) or (previous and _rule_minors(f"{previous[-_NEAR:]}\n{text}")):
+        return True
+    return any(_TRIGGER_RE[c].search(tail) for c in enabled if c in _TRIGGER_RE)
+
+
 _ANSWERS = {"ALLOW", *(c.upper() for c in CATEGORIES)}
 ONE_WORD_RETRY = ("\n\nYour last answer could not be read. Reply with exactly ONE word and nothing else: ALLOW or "
                   + " or ".join(sorted(c.upper() for c in CATEGORIES)) + ".")
@@ -251,6 +289,8 @@ def screen(message: str, previous: str = "", ask_model=None) -> dict:
     if not rule_hit and intent_router.is_greeting(text):
         return allow
     verdict = None
+    if ask_model is not None and not needs_check(text, previous, enabled):
+        return allow                                    # nothing in it a check could be for (1.4.8)
     if ask_model is not None:
         user = (f"Previous user message (context only): {previous[:400]}\n\n" if previous else "") + \
                f"Message to screen: {text[:3000]}"

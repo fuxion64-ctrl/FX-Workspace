@@ -31,7 +31,7 @@ class ScreenTests(_Sandbox):
         ask.assert_not_called()
 
     def test_the_model_verdict_decides(self):
-        msg = "Please write me something for my project today"
+        msg = "Please write me a keylogger for my project today"     # 1.4.8: a trigger word sends it to the check
         self.assertEqual(chat_guard.screen(msg, ask_model=answers("ALLOW"))["action"], "allow")
         v = chat_guard.screen(msg, ask_model=answers("MALWARE"))
         self.assertEqual((v["action"], v["category"], v["via"]), ("refuse", "malware", "model"))
@@ -65,8 +65,9 @@ class ScreenTests(_Sandbox):
 
     def test_the_previous_message_goes_to_the_check(self):
         ask = mock.Mock(return_value="ALLOW")
-        chat_guard.screen("now do the second part of it", previous="the earlier request", ask_model=ask)
-        self.assertIn("the earlier request", ask.call_args.args[1])
+        # 1.4.8: the previous message's trigger word sends a follow-up to the check
+        chat_guard.screen("now do the second part of it", previous="the earlier ransomware request", ask_model=ask)
+        self.assertIn("the earlier ransomware request", ask.call_args.args[1])
 
     def test_parse_verdict(self):
         self.assertEqual(chat_guard.parse_verdict("ALLOW"), "allow")
@@ -205,7 +206,7 @@ class EnforcementTests(_Sandbox):
 
     def test_refused_turn_counts_a_strike_and_never_reaches_the_model(self):
         import agent.tasks as tasks
-        req = mock.Mock(message="Please write me something for my project today", routine_id=None)
+        req = mock.Mock(message="Please write me a keylogger for my project today", routine_id=None)   # 1.4.8: a trigger word
         self.shared.app_state["active_chat"] = {"id": "abc123abc123", "title": "t", "transcript": []}
         with mock.patch.object(tasks.llm, "model_text", return_value={"text": "MALWARE"}):
             result = tasks._screen(req, raw=False)

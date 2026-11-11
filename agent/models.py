@@ -101,12 +101,18 @@ def trim_conversation(budget_tokens: int = None):
 _MODE_NOTES = {
     # "No computer tools" alone read to small models as "no tools": they stopped calling web_search and
     # world_monitor on questions and made the answers up (2026-09-29).
-    "none": ("no tools that control this computer for this message (it reads as conversation or a question) - any web "
-             "or data tools you are given still work: use them for facts you don't know. If the user wants you to do "
-             "something, say you can do it as soon as they ask for it directly - never say you are only a text assistant."),
-    "read": ("only tools that look are offered - nothing that changes things. If the user wants a change, say you'll "
-             "make it as soon as they ask for it directly (\"add ...\", \"stack ...\") - never say you can only read."),
+    # (1.4.8, item 6) Said shorter.
+    "none": ("no tools that control this computer; web or data tools you're given still work - use them for facts you "
+             "don't know. If they want something done, you can as soon as they ask directly - never say you are only a "
+             "text assistant."),
+    "read": ("only tools that look. If they want a change, you'll make it as soon as they ask directly - never say you "
+             "can only read."),
 }
+
+
+# Tool groups that act on or read this PC's screen, windows and processes: with one offered, the live block shows
+# the windows (1.4.8).
+MACHINE_GROUPS = frozenset({"desktop", "system", "clipboard", "roblox"})
 
 
 def build_messages(base_prompt: str = None):
@@ -151,6 +157,11 @@ def build_messages(base_prompt: str = None):
         # models only, and nothing when proactive help is off (awareness.py).
         "activity": observer._activity_line() if local else "",
     }
+    if not design:
+        # (1.4.8, item 3) The machine's state only when this turn can act on it, and hints only for tools it has.
+        names = [t["function"]["name"] for t in schemas.tools_for_current_turn(local)]
+        runtime["offered"] = names
+        runtime["machine"] = any(schemas.tool_group(n) in MACHINE_GROUPS for n in names)
     live = "" if design else ctx.render_live_block(shared.task_board, shared.ledger, runtime)
     current = shared.app_state.get("current_user_request") or "(none)"
     policy = shared.app_state.get("turn_policy") or {}
@@ -189,6 +200,9 @@ def build_messages(base_prompt: str = None):
     if shared.app_state.get("turn_instructions") and not design:
         turn_header += ("\nTHE USER'S INSTRUCTIONS FOR THIS CHAT (a saved preset): "
                         + shared.app_state["turn_instructions"])
+    overview = "" if design else _memory_overview()
+    if overview:                                    # what it remembers about, one line per topic (1.4.8: moved here)
+        turn_header += "\n\n" + overview
     convo = with_attachments(convo)
     # Orchestrator brief: the verbatim original request plus the prepared
     # notes and plan. It sits beside CURRENT REQUEST, never in place of it.
@@ -201,11 +215,14 @@ def build_messages(base_prompt: str = None):
         return [{"role": "system", "content": f"{prompt}\n\n{turn_header}\n\n{close}"}] + convo[1:]
     # Skills not loaded yet, one line each (skills.py) - what load_skill can still add.
     import skills
-    more = skills.index(t["function"]["name"] for t in schemas.tools_for_current_turn(local))
+    # (1.4.8, item 9) Only when the request's words point to no skill: then the model may need to load one. When they
+    # do, those skills are on already, and the list was 250-311 tokens a step (load_skill still takes a skill by name).
+    more = ("" if skills.pick(shared.app_state.get("current_user_request") or "")
+            else skills.index(t["function"]["name"] for t in schemas.tools_for_current_turn(local)))
     if local:
         offered = schemas.tools_for_current_turn(local=True)
         tool_note = ""
-        if offered:
+        if offered and tool_name_line():
             tool_note = "\nAVAILABLE TOOLS THIS TURN: " + ", ".join(t["function"]["name"] for t in offered) + "."
             tool_note += (" These are callable tools, not examples. Use their exact names. "
                           "Connected MCP tools are available alongside built-in tools.")
@@ -262,11 +279,9 @@ def system_prompt(local: bool, base_prompt: str = None) -> str:
         soul = identity.block()
         if soul:
             prompt = f"{prompt}\n\n{soul}"
-        # What it remembers about, one line per topic (memory_graph.py) - not the memories themselves.
-        import memory_graph
-        overview = memory_graph.overview_block()
-        if overview:
-            prompt = f"{prompt}\n\n{overview}"
+        # What it remembers about (memory_graph.py) went here until 1.4.8 (item 8): it changes whenever a memory is
+        # saved, and in the system message that made the model re-read the whole chat. It rides in the last message
+        # now (build_messages, _memory_overview).
         if shared.app_state.get("turn_persona"):
             import personas
             prompt = f"{prompt}\n\n{personas.block(shared.app_state['turn_persona'])}"
@@ -280,12 +295,31 @@ def system_prompt(local: bool, base_prompt: str = None) -> str:
     return prompt
 
 
+def tool_name_line() -> bool:
+    """(1.4.8, item 5 - waits for a measurement) "AVAILABLE TOOLS THIS TURN: ..." repeats the schemas' names (59-297
+    tokens). It was added because small models made names up, so it stays on until a benchmark with and without it
+    says otherwise. The one switch: FX_TOOL_NAME_LINE=0 in the environment leaves it out."""
+    return os.environ.get("FX_TOOL_NAME_LINE", "1") != "0"
+
+
+def _memory_overview() -> str:
+    """What the assistant remembers about, one line per topic (memory_graph.py) - not the memories themselves.
+    Not in Raw mode or /design; never for a temporary chat's sake either way (memory_graph decides what it shows)."""
+    if shared.app_state.get("raw_mode") or shared.app_state.get("design_mode"):
+        return ""
+    try:
+        import memory_graph
+        return memory_graph.overview_block() or ""
+    except Exception:
+        return ""
+
+
 def _turn_tokens() -> int:
     """What the final user message adds besides the live block: the request, the orchestrator brief,
-    the composer's tool notes, a preset's instructions and this turn's attached files."""
+    the composer's tool notes, a preset's instructions, the memory overview and this turn's attached files."""
     s = shared.app_state
     parts = [s.get("current_user_request"), s.get("task_context"), s.get("turn_instructions"), s.get("turn_command_note"),
-             composer_tools.header(s.get("turn_tools")), (s.get("turn_attachments") or {}).get("text")]
+             composer_tools.header(s.get("turn_tools")), (s.get("turn_attachments") or {}).get("text"), _memory_overview()]
     return int(sum(len(p) for p in parts if isinstance(p, str)) / history.CHARS_PER_TOKEN) + 400   # + the fixed lines
 
 
@@ -628,6 +662,7 @@ def call_local(messages, requires_vision: bool, model_name: str = None):
         if not res.choices:
             raise RuntimeError("empty response")
         res = _retry_if_cut_off(res, sent)
+        res = _continue_if_cut_off(res, sent)          # a long answer (an HTML page) goes on where it stopped (1.4.8)
         if protocol in ("schema", "text"):
             res = _unwrap_schema_reply(res, turn_tools)
         model_caps.observe_reply(model_name, res.choices[0].message)
@@ -757,6 +792,7 @@ def _local_complete(kwargs: dict, cancel=None, record=True, publish=True):
     ev = shared.app_state.get("running_model_event")
     label = ev.get("label", "") if isinstance(ev, dict) else ""
     call_id = shared.app_state.get("_stream_call") if publish else None
+    gate = model_output.SelfTalkGate()
     got_output = {"any": False}
     # When the model stopped thinking: its first answer text or tool call.
     # Reasoning printed inline (<think>...</think>) is still thinking.
@@ -776,6 +812,11 @@ def _local_complete(kwargs: dict, cancel=None, record=True, publish=True):
                 _mark_answer_start(timing)
         if call_id is not None:
             # n: one streamed chunk is one token from llama-server - the page's live speed is tok/s, not char/s (1.4.7)
+            if channel == "content":
+                # (1.4.8) The opening self-talk streams as thinking, not as answer text that is deleted afterwards.
+                for ch, part in gate.feed(text):
+                    stream_hub.hub.publish("delta", call=call_id, channel=ch, text=part, n=1, **extra)
+                return
             stream_hub.hub.publish("delta", call=call_id, channel=channel, text=text, n=1, **extra)
     # A dropped connection BEFORE any output (router swapping models, a brief
     # restart) is retried twice with backoff. Once output has arrived nothing is
@@ -799,6 +840,9 @@ def _local_complete(kwargs: dict, cancel=None, record=True, publish=True):
             event_log.log_action(f"Local model connection failed ({type(e).__name__}); retrying ({attempt + 1}/2).")
             event_log.emit_event("note", f"Lost the connection to the local model - retrying ({attempt + 1} of 2)…", status="done")
             time.sleep(0.8 * (2 ** attempt))
+    if call_id is not None:                  # what the gate still held: a short reply with no sentence end
+        for ch, part in gate.finish():
+            stream_hub.hub.publish("delta", call=call_id, channel=ch, text=part, n=0)
     if record and recorder.active():         # raw reply, before any parsing (see recorder.py)
         recorder.response(res.choices[0].message, res.choices[0].finish_reason, res.usage)
     usage = getattr(res, "usage", None)
@@ -1018,7 +1062,7 @@ def _refit_after_overflow(error) -> bool:
     return True
 
 
-DESIGN_REPLY_TOKENS = 8192          # room for a /design reply: a whole HTML document
+DESIGN_REPLY_TOKENS = 16384         # room for a /design reply: a whole HTML document (1.4.8: above the new 8192 base)
 
 
 def _local_reply_tokens() -> int:
@@ -1055,6 +1099,49 @@ def _cut_off_kind(choice) -> str | None:
     if not native and not answer.strip() and (reasoning or getattr(msg, "reasoning_content", None)):
         return "reasoning"
     return None
+
+
+CONTINUE_LIMIT = 2                  # times a cut-off answer is continued (1.4.8)
+
+
+def _continue_if_cut_off(res, kwargs, cancel=None):
+    """(1.4.8) A plain answer that stopped at the length limit is continued where it stopped, up to CONTINUE_LIMIT times,
+    and returned as one reply: an HTML page ended mid-code ("the message gets cut off, even at Max"). The continuation
+    streams into the same live draft. Only text answers: a cut-off tool call or reasoning is _retry_if_cut_off's."""
+    for _ in range(CONTINUE_LIMIT):
+        choice = res.choices[0]
+        msg = choice.message
+        text = getattr(msg, "content", "") or ""
+        answer, _reasoning = model_output.split_reasoning(text)
+        if (getattr(choice, "finish_reason", None) != "length" or getattr(msg, "tool_calls", None)
+                or not answer.strip() or model_output.looks_truncated_json(answer)):
+            return res
+        event_log.log_action(f"Local answer reached the length limit ({kwargs.get('max_tokens')} tokens) - continuing it.")
+        more = dict(kwargs)
+        extra = dict(more.get("extra_body") or {})
+        extra["chat_template_kwargs"] = {**(extra.get("chat_template_kwargs") or {}), "enable_thinking": False}
+        more["extra_body"] = extra
+        more.pop("tools", None); more.pop("tool_choice", None)
+        more["messages"] = list(kwargs["messages"]) + [
+            {"role": "assistant", "content": answer},
+            {"role": "user", "content": "[SYSTEM] Your reply was cut off by the length limit. Continue exactly where it "
+                                        "stopped - the very next characters. Don't repeat anything, don't introduce it, "
+                                        "don't close or restart a code block that is still open."}]
+        try:
+            nxt = _local_complete(more, cancel)
+        except llm_stream.StreamCancelled:
+            raise
+        except Exception as e:
+            event_log.log_action(f"Continuing the answer failed: {str(e)[:120]}")
+            return res
+        if not nxt.choices:
+            return res
+        tail = model_output.split_reasoning(getattr(nxt.choices[0].message, "content", "") or "")[0]
+        msg.content = text + tail
+        choice.finish_reason = getattr(nxt.choices[0], "finish_reason", None) or "stop"
+        if not tail.strip():
+            return res
+    return res
 
 
 def _retry_if_cut_off(res, kwargs, cancel=None):

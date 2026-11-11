@@ -11,7 +11,27 @@ def _number(value):
     return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) else None
 
 
+def cache_facts(response) -> dict:
+    """(1.4.8) What the prompt cost: tokens llama-server actually read (prompt_n) and took from its cache (cache_n),
+    from the stream's timings. Left out when the server didn't report them."""
+    timings = getattr(response, 'timings', None)
+    if not isinstance(timings, dict):
+        return {}
+    read, reused = _number(timings.get('prompt_n')), _number(timings.get('cache_n'))
+    out = {}
+    if read is not None and read >= 0:
+        out['tokens_read'] = int(read)
+    if reused is not None and reused >= 0:
+        out['tokens_reused'] = int(reused)
+    return out
+
+
 def generation_facts(response) -> dict:
+    """Generation speed, plus the prompt's read / reused tokens (cache_facts) when known."""
+    return {**_speed_facts(response), **cache_facts(response)}
+
+
+def _speed_facts(response) -> dict:
     timings = getattr(response, 'timings', None)
     if isinstance(timings, dict):
         tokens, millis = _number(timings.get('predicted_n')), _number(timings.get('predicted_ms'))

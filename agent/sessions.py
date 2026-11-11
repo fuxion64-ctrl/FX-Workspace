@@ -87,9 +87,14 @@ def metrics_of(events: list, started: float | None = None) -> dict:
     if first is not None:
         out["ttft"] = round(float(first), 1)
     out["calls"] = len(calls)
+    # (1.4.8) Prompt tokens llama-server read vs took from its cache, summed over the reply's calls - only when known.
+    for key, name in (("tokens_read", "read"), ("tokens_reused", "reused")):
+        known = [int(e[key]) for e in calls if isinstance(e.get(key), (int, float)) and not isinstance(e.get(key), bool)]
+        if known:
+            out[name] = sum(known)
     web = web_of(events) or {}
     out.update(searches=web.get("searches", 0), reads=web.get("reads", 0))
-    return {k: v for k, v in out.items() if v not in (0, "", None)}
+    return {k: v for k, v in out.items() if v not in (0, "", None) or k in ("read", "reused")}   # 0 reused is a fact
 
 
 def sources_for(message: str) -> list:
@@ -363,6 +368,10 @@ def edit_messages(chat_id: str, op: str, index: int, pinned: bool = False, befor
         raise ValueError("Unknown message action.")
     chat["transcript"] = transcript
     chat["conversation"] = convo
+    if active:
+        # (1.4.8) convo is the model's view (the open chat's), not the whole stored list: the store keeps what
+        # came before it (chat_store._keep_older).
+        chat.pop("conversation_start", None)
     if temporary:
         chat["updated"] = time.time()
         saved = {k: v for k, v in chat.items() if k != "conversation"}
@@ -471,8 +480,11 @@ def open_chat(chat_id: str) -> dict | None:
         return None
     close_temporary()
     import agent.prompts as prompts
-    shared.app_state["conversation"] = ([{"role": "system", "content": prompts.SYSTEM_PROMPT}]
-                                        + [m for m in chat.get("conversation") or [] if isinstance(m, dict)])
+    # (1.4.8) The whole conversation is on disk; the model's view starts at conversation_start (what fitting and
+    # compression had left of it), so a long chat's request is the same size as before.
+    stored = [m for m in chat.get("conversation") or [] if isinstance(m, dict)]
+    start = max(0, min(int(chat.get("conversation_start") or 0), len(stored)))
+    shared.app_state["conversation"] = [{"role": "system", "content": prompts.SYSTEM_PROMPT}] + stored[start:]
     shared.app_state["context_summary"] = str(chat.get("context_summary") or "")
     import skills
     skills.reset_chat()                                    # skills loaded in another chat don't carry over

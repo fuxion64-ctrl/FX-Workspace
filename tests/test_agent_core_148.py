@@ -73,7 +73,7 @@ class ScreenTests(unittest.TestCase):
 
     def test_the_retry_answer_is_the_verdict(self):
         ask = mock.Mock(side_effect=["Let me think about this message carefully.", "MALWARE"])
-        v = chat_guard.screen("Please write me something for my project today", ask_model=ask)
+        v = chat_guard.screen("Please write me a keylogger for my project today", ask_model=ask)
         self.assertEqual((v["action"], v["category"], v["via"]), ("refuse", "malware", "model"))
 
     def test_the_harmful_set_is_still_refused_without_a_verdict(self):
@@ -272,6 +272,38 @@ class ClarificationBlockerTests(unittest.TestCase):
     def test_no_proton_hardcode(self):
         src = _src(loop.__file__)
         self.assertNotIn('["proton"]', src)
+
+
+class CutOffAnswerTests(unittest.TestCase):
+    """11 Nov (owner): HTML sites were cut off mid-code at every effort level - 2048 tokens and no continuation."""
+
+    @staticmethod
+    def _res(text, finish):
+        return NS(choices=[NS(finish_reason=finish, message=NS(content=text, tool_calls=None))])
+
+    def test_room_for_a_page(self):
+        import core.config as config
+        self.assertGreaterEqual(config.LOCAL_MAX_TOKENS, 8192)
+        self.assertEqual(config.LOCAL_RESPONSE_RESERVE, 2048)          # the history budget isn't cut to make room
+
+    def test_a_cut_off_answer_is_continued_into_one_reply(self):
+        parts = iter([self._res("<p>middle</p>", "length"), self._res("<p>end</p></html>", "stop")])
+        sent = []
+        with mock.patch.object(llm, "_local_complete", side_effect=lambda kw, cancel=None: (sent.append(kw), next(parts))[1]), \
+                mock.patch("events.log_action"):
+            out = llm._continue_if_cut_off(self._res("<html><p>start</p>", "length"),
+                                           {"messages": [{"role": "user", "content": "make a site"}], "max_tokens": 8192})
+        self.assertEqual(out.choices[0].message.content, "<html><p>start</p><p>middle</p><p>end</p></html>")
+        self.assertEqual(out.choices[0].finish_reason, "stop")
+        self.assertEqual(len(sent), 2)
+        self.assertEqual(sent[0]["messages"][-2], {"role": "assistant", "content": "<html><p>start</p>"})
+
+    def test_finished_answers_and_tool_calls_are_left_alone(self):
+        with mock.patch.object(llm, "_local_complete", side_effect=AssertionError("no continuation")):
+            done = self._res("All done.", "stop")
+            self.assertIs(llm._continue_if_cut_off(done, {"messages": []}), done)
+            call = NS(choices=[NS(finish_reason="length", message=NS(content="", tool_calls=[NS()]))])
+            self.assertIs(llm._continue_if_cut_off(call, {"messages": []}), call)
 
 
 class FirstTokenTests(unittest.TestCase):

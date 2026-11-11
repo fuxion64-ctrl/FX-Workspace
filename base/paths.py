@@ -51,6 +51,16 @@ def prism_dirs() -> tuple:
 
 
 def model_dirs(settings: dict | None = None) -> list:
-    """Folders scanned for chat models: HOME\\models plus any the user added (Settings > Models)."""
-    extra = [d for d in ((settings or {}).get("model_dirs") or []) if isinstance(d, str) and d.strip()]
-    return list(dict.fromkeys([home("models"), *extra]))
+    """Folders scanned for chat models, the main one first (new downloads go there): the folder chosen in
+    Settings > Models (1.4.8, "models_folder") or HOME\\models, then HOME\\models when another was chosen (models
+    already there keep working), then any more folders the user added ("model_dirs").
+    settings None: the app's current settings (Find models' downloads used to ignore the choice)."""
+    if settings is None:
+        try:
+            import core.state as shared
+            settings = shared.app_state.get("settings") or {}
+        except Exception:
+            settings = {}
+    main = settings.get("models_folder") if isinstance(settings.get("models_folder"), str) else ""
+    extra = [d for d in (settings.get("model_dirs") or []) if isinstance(d, str) and d.strip()]
+    return list(dict.fromkeys([main.strip() or home("models"), home("models"), *extra]))

@@ -63,9 +63,10 @@ class StableToolOrderTests(unittest.TestCase):
     """Local chat templates put the tool list first: llama.cpp reuses what it read up to the first tool that differs."""
 
     def test_shared_tools_first_use_tools_last(self):
+        # 1.4.8 (item 7): the plain question's whole set opens the list, use_tools included.
         got = [t["function"]["name"] for t in schemas.stable_order(
             [_tool(n) for n in ("ask_user", "web_search", "use_tools", "observe", "web_read", "fetch_page", "list_dir")])]
-        self.assertEqual(got, ["web_search", "fetch_page", "web_read", "ask_user", "observe", "list_dir", "use_tools"])
+        self.assertEqual(got, ["web_search", "fetch_page", "web_read", "use_tools", "ask_user", "observe", "list_dir"])
 
     def test_two_kinds_of_turn_share_their_start(self):
         chat = schemas.stable_order([_tool(n) for n in ("web_search", "fetch_page", "use_tools", "web_read")])

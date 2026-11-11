@@ -64,6 +64,58 @@ def strip_self_talk(text: str) -> str:
     return rest if rest.strip() else text
 
 
+class SelfTalkGate:
+    """(1.4.8) The live draft without the opening self-talk. strip_self_talk cleans the finished reply, but while it
+    streamed the chat showed "The user said..., I should..." as the answer and then deleted it - the owner saw every
+    reply write and erase its first sentences. The opening is held until its first sentence is whole: self-talk goes
+    to the thinking channel (it is thinking), anything else is released as the answer. Held at most HOLD characters.
+    feed(text) / finish() -> [(channel, text), ...] to publish."""
+    HOLD = 240
+
+    def __init__(self):
+        self.buf, self.mode = "", "probe"        # probe -> talk (sentences go to thinking) -> pass (all is answer)
+
+    def feed(self, text: str) -> list:
+        if self.mode == "pass":
+            return [("content", text)] if text else []
+        self.buf += text or ""
+        return self._drain(final=False)
+
+    def finish(self) -> list:
+        if self.mode == "pass" or not self.buf:
+            return []
+        return self._drain(final=True)
+
+    def _drain(self, final: bool) -> list:
+        out = []
+        while self.buf and self.mode != "pass":
+            head = self.buf.lstrip()
+            if not head:
+                break                             # only whitespace so far
+            if not _SELF_TALK_RE.match(head):
+                if len(head) < 24 and not final and not re.search(r"[.!?\n]", head):
+                    break                         # too little to tell yet ("The user" could still be "The users table")
+                self.mode = "pass"
+                out.append(("content", self.buf))
+                self.buf = ""
+                break
+            m = _SENTENCE_RE.match(head)
+            whole = m and m.group(0).strip() and (m.end() < len(head) or re.search(r"[.!?\n]\s*$", m.group(0)))
+            if not whole:
+                if final or len(head) > self.HOLD:     # no sentence end for a long while: it is the answer after all
+                    self.mode = "pass"
+                    out.append(("content", self.buf))
+                    self.buf = ""
+                break
+            self.mode = "talk"
+            out.append(("reasoning", m.group(0)))
+            self.buf = head[m.end():]
+        if final and self.buf:
+            out.append(("content", self.buf))
+            self.buf = ""
+        return out
+
+
 def split_reasoning(content: str) -> tuple[str, str]:
     """Return (answer, reasoning). Handles closed blocks, a reply cut off
     inside an unclosed <think> (everything after it is reasoning), and a

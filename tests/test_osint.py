@@ -268,7 +268,7 @@ class NudgeTests(unittest.TestCase):
         last = models.build_messages()[-1]["content"]
         self.assertTrue(last.rstrip().endswith("answer only from what it returns (Markdown is rendered)."))
         self.assertIn("WORLD MONITOR NEEDED", last)
-        self.assertIn("any web or data tools you are given still work", last)       # not "no tools"
+        self.assertIn("web or data tools you're given still work", last)       # not "no tools" (said shorter in 1.4.8)
 
 
 class OfferTests(unittest.TestCase):

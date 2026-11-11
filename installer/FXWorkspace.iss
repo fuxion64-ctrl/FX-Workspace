@@ -336,7 +336,8 @@ begin
     WizardForm.ProgressGauge.Style := npbstNormal;
     if (not Ok) or (Code <> 0) then
       SuppressibleMsgBox('Setup copied the app, but its last step hit a problem:' + #13#10#13#10 + SetupTail.Text + #13#10 +
-                         'The full log is in ' + SetupLogFile + '. Running this installer again usually fixes it.',
+                         'The full log is in ' + SetupLogFile + '. Start FX Workspace when you''re online again: it finishes ' +
+                         'setting itself up (1.4.8) - no terminal needed.',
                          mbError, MB_OK, IDOK);
   finally
     SetupTail.Free;

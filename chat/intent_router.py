@@ -119,11 +119,13 @@ def split_tasks(message: str) -> list[str]:
 
 
 def _contains_task_boundary(value: str) -> bool:
-    """Reject a target that still contains another imperative task."""
+    """Reject a target that still contains another imperative task. (1.4.8) Not only the listed verbs: "open paint
+    and draw a horse" looked for an app called "paint and draw a horse" (11 Nov). Any "then", and an "and" followed by
+    two or more words, is a second task for the agent; a name like "Tom and Jerry" (one word after it) stays a name."""
     return bool(re.search(
         r"(?:,|;|\band\b|\bthen\b)\s+(?:stop|pause|play|resume|skip|prev|previous|next|scan|check|status|open|launch|start|run|close|exit|quit|"
         r"search|write|create|delete|send|establish|enable|disconnect|connect)\b",
-        value, re.I))
+        value, re.I) or re.search(r"\bthen\b|\band\s+\S+\s+\S+", value, re.I))
 
 
 def route(message: str):

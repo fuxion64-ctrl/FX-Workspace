@@ -80,6 +80,7 @@ def measure(message: str, opts: dict, ctx: int) -> dict:
     shared.app_state["settings"] = config.load_settings()
     shared.app_state["turn_policy"] = intent_router.classify_turn(message, False, None)
     shared.task_board.clear()
+    skills.reset_chat()                                  # each kind of turn as the first message of a new chat
     req = SimpleNamespace(message=message, command=None, tools=[], files=[], voice=bool(opts.get("voice")),
                           voice_lang="en", persona=None, instructions="", search_mode=None)
     with mock.patch("image_gen.warm"):
@@ -97,10 +98,13 @@ def measure(message: str, opts: dict, ctx: int) -> dict:
     soul, overview = identity.block(), memory_graph.overview_block()
 
     from context import render_live_block
-    live = render_live_block(shared.task_board, shared.ledger, {
-        "mode": config.MODE_LOCAL, "model": None, "pywinauto": False, "shot_meta": None, "shot_age": 0, "activity": ""})
+    runtime = {"mode": config.MODE_LOCAL, "model": shared.app_state.get("last_working_model"), "pywinauto": True,
+               "shot_meta": None, "shot_age": 0, "activity": ""}
+    if getattr(llm, "MACHINE_GROUPS", None) is not None:          # 1.4.8: the live block follows the offered tools
+        runtime.update(offered=names, machine=any(schemas.tool_group(n) in llm.MACHINE_GROUPS for n in names))
+    live = render_live_block(shared.task_board, shared.ledger, runtime)
     tool_line = next((l for l in last.split("\n") if l.startswith("AVAILABLE TOOLS THIS TURN")), "")
-    more = skills.index(names) or ""
+    more = next((l for l in last.split("\n") if l.startswith("MORE SKILLS")), "")      # as sent, not as it could be
     head = last.split("\n\n" + live)[0] if live and live in last else last.split("\n\n")[0]
     tail = last[last.rfind("\n\n") + 2:] if "\n\n" in last else ""
 
@@ -110,6 +114,8 @@ def measure(message: str, opts: dict, ctx: int) -> dict:
         groups[g] = groups.get(g, 0) + schemas._cost([t])
     text = message.strip()
     guard = not (len(text) < chat_guard.MIN_CHECK_CHARS) and not intent_router.is_greeting(text)
+    if hasattr(chat_guard, "needs_check"):              # 1.4.8: only when the pre-filter finds something
+        guard = guard and chat_guard.needs_check(text)
     return {
         "policy": shared.app_state["turn_policy"].get("mode"), "turn_tools": sorted(shared.app_state.get("turn_tools") or []),
         "names": names, "groups": groups, "tool_costs": {t["function"]["name"]: schemas._cost([t]) for t in offered},

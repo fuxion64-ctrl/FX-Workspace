@@ -100,12 +100,20 @@ def section_name(model_file: str, taken: set) -> str:
     return unique
 
 
+# (1.4.8) What a model that must stay whole on the GPU gets with it, so it also FITS: ngl = 99 alone left it the
+# [*] context (65,536 on the owner's PC) - more than an 8 GB card holds - and it spilled into system RAM at 16 tokens/s
+# (11 Nov 2026). These are the settings the owner's own Qwen 3.5 9B entries use; Settings > Models and Diagnostics
+# can raise the context where there's room.
+KEEP_WHOLE_OPTIONS = "ngl = 99\nctx-size = 16384\ncache-type-k = q8_0\ncache-type-v = q8_0\nflash-attn = on\n"
+
+
 def _own_options(model: str) -> str:
     """Options a model needs from the start: a hybrid (Qwen 3.5 - Gated DeltaNet layers) must stay whole on the GPU,
-    or llama.cpp splits it and it crawls (diagnostics.keeps_whole) - so it gets ngl = 99 when it is added."""
+    or llama.cpp splits it and it crawls (diagnostics.keeps_whole) - so it gets ngl = 99 when it is added, with a
+    context that fits beside it (KEEP_WHOLE_OPTIONS, 1.4.8)."""
     try:
         import diagnostics
-        return "ngl = 99\n" if diagnostics.keeps_whole(diagnostics.meta_for(model)) else ""
+        return KEEP_WHOLE_OPTIONS if diagnostics.keeps_whole(diagnostics.meta_for(model)) else ""
     except Exception:
         return ""
 

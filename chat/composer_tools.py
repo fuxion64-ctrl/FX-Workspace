@@ -101,18 +101,17 @@ HEADERS = {
               "\"title\": str, \"labels\": [..], \"series\": [{\"name\": str, \"values\": [numbers]}]} - the chat draws it."),
     # stats_tools.py - turned on by the chip, or by itself for numbers to compute or plot (auto_tools.py).
     # Interactive replies (D50): blocks the chat draws itself - no tool call, nothing runs on the PC.
-    "visuals": ("VISUALS (on because a picture may make this clearer): when one does, put ONE interactive block in your "
-                "answer and still explain in words; skip it for short or simple answers.\n"
-                "```chart with JSON {\"type\":\"bar|line|area|pie|scatter\",\"title\":\"..\",\"labels\":[..],"
-                "\"series\":[{\"name\":\"..\",\"values\":[..]}],\"unit\":\"..\",\"source\":\"..\"} - only numbers you "
-                "were given or computed, never invented.\n"
-                "```chart for a formula to explore: {\"type\":\"function\",\"title\":\"..\",\"functions\":[{\"name\":\"y\","
-                "\"expr\":\"a*x^2+b\"}],\"params\":{\"a\":[1,-5,5],\"b\":[0,-10,10]},\"x\":[-10,10]} - a slider per "
-                "parameter [value, min, max]; math: + - * / ^, sin cos tan sqrt abs log exp, pi, e.\n"
-                "```widget with a small self-contained HTML page (inline CSS and JS only - nothing from the web) for a "
-                "diagram, timeline, step-by-step explainer or calculator; use the CSS variables --bg --surface --text "
-                "--muted --accent --border.\n"
-                "```choices with one option per line when the user should pick - each becomes a button."),
+    # (1.4.8, item 6) The same four blocks said shorter; the JSON keys and the formula syntax are unchanged.
+    "visuals": ("VISUALS (on because a picture may help): when one does, add ONE block and still explain in words; skip "
+                "it for short answers.\n"
+                "```chart {\"type\":\"bar|line|area|pie|scatter\",\"title\":\"..\",\"labels\":[..],\"series\":[{\"name\":\"..\","
+                "\"values\":[..]}],\"unit\":\"..\",\"source\":\"..\"} - only numbers you have, never invented.\n"
+                "```chart {\"type\":\"function\",\"title\":\"..\",\"functions\":[{\"name\":\"y\",\"expr\":\"a*x^2+b\"}],"
+                "\"params\":{\"a\":[1,-5,5]},\"x\":[-10,10]} - a formula, a slider per parameter [value, min, max]; "
+                "math: + - * / ^, sin cos tan sqrt abs log exp, pi, e.\n"
+                "```widget - a self-contained HTML page (inline CSS/JS; CSS variables --bg --surface --text --muted --accent "
+                "--border) for a diagram or explainer.\n"
+                "```choices - one option per line, each becomes a button."),
     "charts": ("CHARTS AND STATISTICS: for any statistic - mean, median, spread, percentages, growth, correlation - call "
                "compute_stats and quote its numbers; never work them out in your head. To show numbers as a chart, call "
                "make_chart with the exact numbers you have (from sources, an attached file, or compute_stats): type bar, "

@@ -228,11 +228,51 @@ class HttpErrorLogTests(unittest.TestCase):
         with open(os.path.join(self.logs, "server.prev3.log")) as f:
             self.assertEqual(f.read(), "run 1")
 
+    def test_a_hung_shutdown_still_ends_the_process(self):
+        # 1.4.8: 10 Nov 16:18 - "Finished server process", then the process stayed alive and the app never opened again.
+        import threading
+        path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "launcher.pyw")
+        with open(path, encoding="utf-8") as f:
+            src = f.read()
+        exited, stopped = threading.Event(), []
+        fake_os = NS(_exit=lambda code: exited.set())
+        ns = {"os": fake_os, "time": time, "stop_tree": stopped.append}
+        exec(src[src.index("EXIT_GRACE = "):src.index("def quiet_children(")], ns)
+        server = NS(should_exit=False)
+        with patch("builtins.print"):
+            t = threading.Thread(target=ns["exit_guard"], args=(server, "llama-proc", 0.05, 0.01), daemon=True)
+            t.start()
+            time.sleep(0.1)
+            self.assertFalse(exited.is_set())                       # still serving: nothing happens
+            server.should_exit = True
+            self.assertTrue(exited.wait(2))
+        self.assertEqual(stopped, ["llama-proc"])
+        self.assertIn("exit_guard, args=(server, llama)", src)        # started with the server
+
     def _logs(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.logs = tmp.name
         return tmp.name
+
+
+class BootAndExitTests(unittest.TestCase):
+    """11 Nov: the first answer came 3.4 s after the server listened (diagnostics and a process scan competed with it),
+    and quitting waited up to 20 s for plain timers."""
+
+    def test_timers_never_hold_the_process(self):
+        import threading
+        t = server._later(60, lambda: None)
+        self.addCleanup(t.cancel)
+        self.assertTrue(t.daemon)
+        src = inspect.getsource(server._start_background_services)
+        self.assertNotIn("threading.Timer(", src)
+
+    def test_work_that_can_wait_starts_after_the_first_page(self):
+        src = inspect.getsource(server._start_background_services)
+        self.assertIn("_later(BOOT_QUIET_S, diagnostics.run_in_background)", src)
+        self.assertIn("_later(BOOT_QUIET_S, lambda: browser.agent_browser.close_leftover())", src)
+        self.assertGreaterEqual(server.BOOT_QUIET_S, 5)
 
 
 class NoWorkerThreadTests(unittest.TestCase):

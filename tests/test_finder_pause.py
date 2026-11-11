@@ -58,7 +58,9 @@ class Wiring(unittest.TestCase):
         with open(os.path.join(ROOT, "index.html"), encoding="utf-8") as f:
             html = f.read()
         body = html[html.index("async function testImageModel("):][:1600]
-        self.assertIn("testImageModel(r.model);", html)
+        # 1.4.8 (owner, 11 Nov): offered after adding, never started by itself.
+        self.assertNotIn("testImageModel(r.model);", html)
+        self.assertIn("action: 'Run a quick test', run: () => testImageModel(r.model)", html)
         self.assertIn("quality: m.key", body)              # drawn with the new model itself
         self.assertIn("/trash`", body)                     # kept out of the gallery, restorable
         self.assertIn("removeImageModel(", body)           # a failure offers taking it off the list

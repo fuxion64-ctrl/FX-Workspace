@@ -55,6 +55,35 @@ def _strip_images(message: dict) -> dict:
     return message
 
 
+def _key(message: dict) -> str:
+    return json.dumps(message, ensure_ascii=False, sort_keys=True, default=str)
+
+
+def _keep_older(old: dict | None, view: list, start=None) -> tuple:
+    """(1.4.8) The conversation to store, and where the model's view starts in it (conversation_start).
+    The open chat's conversation in memory is only what the model sees: fitting (history.fit) and compression drop
+    its oldest messages, and saving it used to drop them from the file too. The file keeps its older messages in
+    front: the view is matched against the stored list from the old view's start, and whatever came before the
+    match stays. A caller that already gives the whole list passes conversation_start itself (start)."""
+    if start is not None:                                 # the whole conversation was given, with its view start
+        return view, max(0, min(int(start), len(view)))
+    if not old:
+        return view, 0
+    stored = [m for m in (old.get("conversation") or []) if isinstance(m, dict)]
+    from_ = max(0, min(int(old.get("conversation_start") or 0), len(stored)))
+    if not view:
+        return stored[:from_], from_
+    first, keys = _key(view[0]), None
+    for p in range(from_, len(stored)):
+        if _key(stored[p]) != first:
+            continue
+        keys = keys or [_key(m) for m in view]
+        tail = [_key(m) for m in stored[p:p + len(view)]]
+        if tail == keys[:len(tail)]:
+            return stored[:p] + view, p
+    return stored[:from_] + view, from_                   # the view no longer matches: keep what was before it
+
+
 def title_from(text: str) -> str:
     line = next((l.strip() for l in str(text or "").splitlines() if l.strip()), "")
     return (line[:70] + "…") if len(line) > 70 else (line or "New chat")
@@ -101,10 +130,13 @@ class ChatStore:
             if touch or not chat.get("updated"):
                 chat["updated"] = time.time()
             chat.setdefault("created", chat["updated"])
-            chat["transcript"] = list(chat.get("transcript") or [])[-MAX_TRANSCRIPT:]
-            chat["conversation"] = history.recent_turns(
-                [_strip_images(m) for m in (chat.get("conversation") or [])
-                 if isinstance(m, dict) and m.get("role") != "system"], MAX_CONVERSATION)
+            # (1.4.8, audit 2.8) Every transcript entry and conversation message is kept: the last 400 / 300 were, and
+            # older ones were deleted from the file for good. The model's view is fitted when a request is built.
+            chat["transcript"] = list(chat.get("transcript") or [])
+            view = [_strip_images(m) for m in (chat.get("conversation") or [])
+                    if isinstance(m, dict) and m.get("role") != "system"]
+            old = self.load(chat.get("id") or "") if "conversation_start" not in chat else None
+            chat["conversation"], chat["conversation_start"] = _keep_older(old, view, chat.get("conversation_start"))
             path = self._path(chat["id"])
             os.makedirs(self.root, exist_ok=True)
             tmp = path + ".tmp"

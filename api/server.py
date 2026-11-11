@@ -1393,8 +1393,108 @@ def _models_added(added: list, restart: bool) -> dict:
 
 @app.get("/api/local-models/folders")
 def local_model_folders():
-    """Where Scan looks for .gguf files, and where models.ini is."""
-    return {"folders": paths.model_dirs(shared.app_state["settings"]), "ini": model_scan.ini_path(), "home": paths.HOME}
+    """Where Scan looks for .gguf files, and where models.ini is. (1.4.8) main: where new models go (the chosen
+    folder, or the default); default: the folder the installer set up; extra: more folders Scan looks in."""
+    s = shared.app_state["settings"]
+    return {"folders": paths.model_dirs(s), "ini": model_scan.ini_path(), "home": paths.HOME,
+            "main": paths.model_dirs(s)[0], "default": paths.home("models"), "chosen": s.get("models_folder") or "",
+            "extra": list(s.get("model_dirs") or [])}
+
+
+class ModelFolders(BaseModel):
+    main: str | None = None           # the main models folder; "" = back to the default
+    extra: list | None = None         # more folders Scan looks in (the whole list)
+
+
+@app.post("/api/local-models/folders")
+def set_local_model_folders(body: ModelFolders):
+    """(1.4.8) Settings > Models: choose the main models folder and more folders to scan - the models no longer have
+    to live under the install folder or on C:. A folder must exist; it is never created or moved here, and the models
+    already found keep their places in models.ini."""
+    s = dict(shared.app_state["settings"])
+    if body.main is not None:
+        main = config.clean_folder(body.main) if body.main.strip() else ""
+        if body.main.strip() and not (main and os.path.isdir(main)):
+            return {"ok": False, "message": "That folder doesn't exist (or isn't a full path like D:\\Models)."}
+        s["models_folder"] = main
+    if body.extra is not None:
+        extra = [config.clean_folder(d) for d in body.extra if isinstance(d, str)]
+        missing = [d for d, raw in zip(extra, body.extra) if not (d and os.path.isdir(d))]
+        if missing or len(extra) != len(body.extra):
+            return {"ok": False, "message": "Every folder must exist and be a full path like D:\\Models."}
+        s["model_dirs"] = extra
+    s.update(config.clean_privacy_settings(s))
+    if not config.save_settings(s):
+        return {"ok": False, "message": "Couldn't save the settings file."}
+    shared.app_state["settings"] = s
+    event_log.log_action(f"Models folders: main {paths.model_dirs(s)[0]}" + (f"; also {', '.join(s['model_dirs'])}" if s.get("model_dirs") else ""))
+    return {"ok": True, **local_model_folders()}
+
+
+class MmprojBody(BaseModel):
+    model: str                        # the model's name in models.ini
+    path: str = ""                    # the vision file (a .gguf projector); "" takes it off
+
+
+@app.post("/api/local-models/mmproj")
+async def local_models_mmproj(body: MmprojBody):
+    """(1.4.8) Give a model already in models.ini its vision file (mmproj), or take it off - for a projector the user
+    downloaded themselves: Find models only offers one with a model it downloads. The file must exist and be a GGUF;
+    the model reloads with it the next time it is used (the router restarts now when it is the loaded one)."""
+    try:
+        names = {c["name"] for c in llama_local.list_model_configs()}
+    except Exception:
+        names = set()
+    if body.model not in names:
+        return {"ok": False, "message": "That model isn't in your model list."}
+    path = os.path.normpath(body.path.strip().strip('"')) if body.path.strip() else ""
+    if path:
+        if not os.path.isfile(path):
+            return {"ok": False, "message": "That file doesn't exist."}
+        try:
+            with open(path, "rb") as f:
+                if f.read(4) != b"GGUF":
+                    return {"ok": False, "message": "That isn't a GGUF file - a vision file (mmproj) is a .gguf."}
+        except OSError as e:
+            return {"ok": False, "message": f"Couldn't read it: {str(e)[:120]}"}
+    llama_local.set_model_files(body.model, mmproj=path or None)
+    loaded = bool(llama_local.router_status(body.model).get("loaded"))
+    restarted = (await asyncio.to_thread(_models_added, [{"name": body.model}], True))["restarted"] if loaded else False
+    event_log.log_action(f"Vision file for {body.model}: {path or 'removed'}.")
+    return {"ok": True, "model": body.model, "mmproj": path, "restarted": restarted,
+            "message": (f"{body.model} can read images now." if path else f"{body.model} reads text only now.")
+                       + (" It reloads with the change." if loaded else " It applies the next time it loads.")}
+
+
+class BrowseBody(BaseModel):
+    kind: str = "file"                # "file": a .gguf model; "folder": a models folder; "mmproj": a vision file
+
+
+@app.post("/api/local-models/browse")
+def local_models_browse(body: BrowseBody):
+    """(1.4.8) Windows' own picker for a chat model file or a models folder, on this PC: a page in the desktop app can't
+    learn a picked path itself. The page then adds the file (/api/local-models/add) or saves the folder (/folders).
+    Nothing is opened or changed here - the path is only returned."""
+    start = paths.model_dirs(shared.app_state["settings"])[0]
+    start = start if os.path.isdir(start) else os.path.expanduser("~")
+    if body.kind == "folder":
+        pick = f"f.askdirectory(title='Pick a models folder', initialdir={start!r}, mustexist=True)"
+    elif body.kind == "mmproj":
+        pick = (f"f.askopenfilename(title='Pick the vision file (mmproj)', initialdir={start!r}, "
+                "filetypes=[('Vision files (mmproj GGUF)', '*mmproj*.gguf'), ('GGUF files', '*.gguf'), ('All files', '*.*')])")
+    else:
+        pick = (f"f.askopenfilename(title='Pick a chat model', initialdir={start!r}, "
+                "filetypes=[('Chat models (GGUF)', '*.gguf'), ('All files', '*.*')])")
+    script = ("import tkinter as t, tkinter.filedialog as f; r = t.Tk(); r.withdraw(); r.attributes('-topmost', True); "
+              f"print({pick} or '')")
+    try:
+        out = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True, timeout=900,
+                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return {"ok": False, "message": f"The picker didn't open: {str(e)[:160]}"}
+    path = (out.stdout or "").strip()
+    kind = body.kind if body.kind in ("folder", "mmproj") else "file"
+    return {"ok": True, "kind": kind, "path": os.path.normpath(path) if path else ""}
 
 
 @app.post("/api/local-models/open-folder")
@@ -1653,6 +1753,17 @@ def _crash_log() -> None:
         print(f"[WARNING] crash log: {e}", flush=True)
 
 
+BOOT_QUIET_S = 8.0          # (1.4.8) work that can wait starts this long after the server is up
+
+
+def _later(seconds: float, fn) -> threading.Timer:
+    """(1.4.8) A daemon timer: runs fn after `seconds` and never keeps the process alive on exit."""
+    t = threading.Timer(seconds, fn)
+    t.daemon = True
+    t.start()
+    return t
+
+
 @app.on_event("startup")
 def _start_background_services():
     # A fresh install: models.ini from models.example.ini, and whatever is already in local\models added to it.
@@ -1677,12 +1788,14 @@ def _start_background_services():
     except Exception:
         pass
     # Phone access, when it's on (remote_access.py): its listener starts once this server is up.
+    # (1.4.8) Every timer here is a daemon: a plain Timer kept the process alive until it fired - quitting within
+    # 20 s of a start waited for clean_downloads (an exit measured at 16 s), and a stuck one never let it end.
     if (shared.app_state["settings"].get("remote_access") or "off") != "off":
-        threading.Timer(3, lambda: remote_access.sync()).start()
+        _later(3, lambda: remote_access.sync())
     # Channels you connected (channels.py): their listeners, the same way.
-    threading.Timer(4, lambda: __import__("channels").start_all()).start()
+    _later(4, lambda: __import__("channels").start_all())
     # The installer Update now downloaded has done its job once this version runs (app_version.py).
-    threading.Timer(20, app_version.clean_downloads).start()
+    _later(20, app_version.clean_downloads)
     # ...and newer versions are looked for by itself, for Home's update banner (Settings > About can turn it off).
     app_version.start_auto(lambda: (shared.app_state.get("settings") or {}).get("update_check") is not False)
     # A crash leaves temporary chats' folders behind: nothing of them survives a restart (privacy.py).
@@ -1694,7 +1807,8 @@ def _start_background_services():
     # The assistant's email tools when a Mail account exists, and notifications for tasks that come due.
     extras.start_background()
     # A hidden browser the last run left behind (closed without its shutdown) holds the browser's port and memory.
-    threading.Thread(target=lambda: browser.agent_browser.close_leftover(), daemon=True, name="browser-leftover").start()
+    # (1.4.8) After the first page is served: scanning every process on the PC competed with the first requests.
+    _later(BOOT_QUIET_S, lambda: browser.agent_browser.close_leftover())
     # Reopen the chat and project that were open when the server stopped.
     try:
         sessions.restore()
@@ -1703,8 +1817,18 @@ def _start_background_services():
     if os.environ.get("AGENTIC_DISABLE_AWARENESS") != "1":
         observer.engine.start()
     # The system check (GPU fit of every model, llama-server, disks) - Settings > Diagnostics shows it.
+    # (1.4.8) Started BOOT_QUIET_S after the server is up: reading every model's header right away held the first
+    # answer back by ~1.3 s (measured: listening at 2.3 s, first answer at 6.1 s with it, 4.5 s without).
     if os.environ.get("AGENTIC_DISABLE_DIAGNOSTICS") != "1":
-        diagnostics.run_in_background()
+        _later(BOOT_QUIET_S, diagnostics.run_in_background)
+    # The first request imported anyio's socket and thread backends itself, on the event loop (~0.3 s, seen in the
+    # boot trace): done here, before the server listens.
+    try:
+        import anyio._backends._asyncio  # noqa: F401
+        import anyio._core._sockets  # noqa: F401
+        import anyio.to_thread  # noqa: F401
+    except Exception:
+        pass
     # The Studio Overlay's always-on-top window, when it was on (app_window.py).
     if shared.app_state["settings"].get("overlay_window") and os.environ.get("AGENTIC_DISABLE_APP_WINDOW") != "1":
         app_window.overlay_sync(shared.app_state["settings"])
@@ -2625,7 +2749,8 @@ def save_temporary_chat():
             return {"ok": False, "message": "No temporary chat is open."}
         except ValueError as e:                        # locked (chat_guard.py)
             return {"ok": False, "message": str(e)}
-        return {"ok": True, "chat": {k: saved.get(k) for k in ("id", "title", "project", "created", "updated", "transcript")},
+        return {"ok": True, "chat": {**{k: saved.get(k) for k in ("id", "title", "project", "created", "updated")},
+                                     **_page(saved)},
                 "project": sessions.public_project()}
     return _with_lock(go)
 
@@ -2636,20 +2761,49 @@ def get_chat(chat_id: str):
         chat = sessions.temporary_chat()
         if not chat or chat["id"] != chat_id:
             return {"ok": False, "message": "That temporary chat has ended - nothing of it was kept."}
-        return {"ok": True, "chat": {**{k: chat.get(k) for k in ("id", "title", "project", "created", "updated", "transcript")},
-                                     "temporary": True}}
+        return {"ok": True, "chat": {**{k: chat.get(k) for k in ("id", "title", "project", "created", "updated")},
+                                     **_page(chat), "temporary": True}}
     chat = shared.chat_store.load(chat_id)
     if chat is None:
         return {"ok": False, "message": "That chat no longer exists."}
     return {"ok": True, "chat": _chat_view(chat)}
 
 
+TRANSCRIPT_PAGE = 200
+
+
+def _page(chat: dict, limit: int = TRANSCRIPT_PAGE) -> dict:
+    """(1.4.8, audit 2.8) The last `limit` transcript entries, with "offset" (the absolute index of the first one) and
+    "total": the whole chat is on disk now, and the page asks for older entries as it scrolls up (/transcript)."""
+    entries = list(chat.get("transcript") or [])
+    offset = max(0, len(entries) - limit)
+    return {"transcript": entries[offset:], "offset": offset, "total": len(entries)}
+
+
 def _chat_view(chat: dict) -> dict:
     """A saved chat for the page, with `locked` when it was closed for going past the chat limits."""
-    out = {k: chat.get(k) for k in ("id", "title", "project", "created", "updated", "transcript", "pending")}
+    out = {**{k: chat.get(k) for k in ("id", "title", "project", "created", "updated", "pending")}, **_page(chat)}
     if chat_guard.is_locked(chat):
         out["locked"] = (chat.get("guard") or {}).get("reason") or True
     return out
+
+
+@app.get("/api/chats/{chat_id}/transcript")
+def chat_transcript(chat_id: str, before: int | None = None, limit: int = TRANSCRIPT_PAGE):
+    """(1.4.8) Older transcript entries: up to `limit` entries before the absolute index `before` (default: the end)."""
+    if privacy.is_temp_id(chat_id):
+        chat = sessions.temporary_chat()
+        if not chat or chat["id"] != chat_id:
+            return {"ok": False, "message": "That temporary chat has ended - nothing of it was kept."}
+    else:
+        chat = shared.chat_store.load(chat_id)
+        if chat is None:
+            return {"ok": False, "message": "That chat no longer exists."}
+    entries = list(chat.get("transcript") or [])
+    total = len(entries)
+    end = total if before is None else max(0, min(int(before), total))
+    start = max(0, end - max(1, min(int(limit), 1000)))
+    return {"ok": True, "entries": entries[start:end], "offset": start, "total": total}
 
 
 @app.post("/api/chats/{chat_id}/open")
@@ -2695,8 +2849,10 @@ def message_action(chat_id: str, body: MessageAction):
     open chat's conversation is what that task is using."""
     def go():
         # A branch becomes the open chat: the task state of the old one is cleared first.
+        # body.index is the entry's absolute index in the whole transcript (1.4.8: the page pages it, see _page).
         chat = sessions.edit_messages(chat_id, body.op, body.index, body.pinned, before_open=_reset_conversation_locked)
-        return {"ok": True, "chat": {k: chat.get(k) for k in ("id", "title", "project", "created", "updated", "transcript", "pending")},
+        return {"ok": True, "chat": {**{k: chat.get(k) for k in ("id", "title", "project", "created", "updated", "pending")},
+                                     **_page(chat)},
                 "project": sessions.public_project()}
     try:
         return _with_lock(go)
@@ -3352,6 +3508,29 @@ async def whoami():
     return {"app": "fx-workspace", "root": os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             "pid": os.getpid(), "port": APP_PORT, "llama_port": llama_local.LLAMA_PORT,
             "version": app_version.current()}
+
+
+# ---- (1.4.8) The page's look-and-feel choices, kept on the server (chat/ui_state.py) -------------------------------
+def _ui_profile(request: Request) -> str:
+    return "phone" if remote_access.is_remote(request.scope) else "pc"   # the phone keeps its own layout
+
+
+@app.get("/api/ui-state")
+def get_ui_state(request: Request):
+    import ui_state
+    profile = _ui_profile(request)
+    return {"ok": True, "profile": profile, "state": ui_state.get(profile)}
+
+
+@app.post("/api/ui-state")
+def set_ui_state(request: Request, body=__import__("fastapi").Body(None)):   # any JSON shape reaches the check below
+    """Merges the given keys; a body without a "state" dict is refused (200, so the page's fetch doesn't throw)."""
+    import ui_state
+    state = body.get("state") if isinstance(body, dict) else None
+    if not isinstance(state, dict):
+        return {"ok": False, "message": "Send {\"state\": {key: value}}."}
+    profile = _ui_profile(request)
+    return {"ok": True, "profile": profile, "state": ui_state.update(profile, state)}
 
 
 class RamSplitRequest(BaseModel):

@@ -414,7 +414,13 @@ _SHELL_WINDOWS = {"Program Manager", "Microsoft Text Input Application", "Window
 
 
 def render_live_block(board: TaskBoard, ledger: ActionLedger, runtime: dict) -> str:
-    """runtime: mode, model, pywinauto, shot_meta, shot_age, budget_note."""
+    """runtime: mode, model, pywinauto, shot_meta, shot_age, budget_note.
+    (1.4.8) runtime["offered"]: the tool names this turn offers (None = every hint, as before). runtime["machine"]:
+    PC tools are offered. Without them only the time and any plan or done actions go - a greeting carried every open
+    window's title and "call inspect_screen" for tools it didn't have (244 tokens, plan 1.4.8-model-efficiency)."""
+    offered = runtime.get("offered")
+    if offered is not None:
+        return _render_live_trimmed(board, ledger, runtime, set(offered))
     now = time.time()
     windows = [w for w in probe_windows(WINDOW_RENDER + 16) if w not in _SHELL_WINDOWS]
     shown = [w[:TITLE_CLIP] for w in windows[:WINDOW_RENDER]]
@@ -449,6 +455,47 @@ def render_live_block(board: TaskBoard, ledger: ActionLedger, runtime: dict) -> 
         "=== ALREADY EXECUTED THIS SESSION (do NOT redo any of these) ===",
         ledger.render(),
     ]
+    if runtime.get("budget_note"):
+        lines += ["", runtime["budget_note"]]
+    return "\n".join(lines)
+
+
+def _render_live_trimmed(board: TaskBoard, ledger: ActionLedger, runtime: dict, offered: set) -> str:
+    """The live block for this turn's tools only (1.4.8)."""
+    now = time.time()
+    lines = ["=== LIVE STATE (regenerated every turn - trust this over your own memory) ===",
+             f"Local time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(now))}"]
+    if runtime.get("machine"):
+        windows = [w for w in probe_windows(WINDOW_RENDER + 16) if w not in _SHELL_WINDOWS]
+        shown = [w[:TITLE_CLIP] for w in windows[:WINDOW_RENDER]]
+        more = len(windows) - len(shown)
+        if not runtime.get("pywinauto"):
+            lines.append("Element control (UI Automation): UNAVAILABLE"
+                         + (" - use inspect_screen + click_at only" if {"inspect_screen", "click_at"} <= offered else ""))
+        lines += [f"Focused window: '{probe_active_window()[:TITLE_CLIP]}'",
+                  f"Open windows ({len(windows)}): " + (" | ".join(shown) if shown else "none detected")
+                  + (f"  (+{more} more" + (" - call list_windows for all)" if "list_windows" in offered else ")")
+                     if more > 0 else "")]
+        if "act_element" in offered:
+            handles = probe_element_handles()
+            if "list_elements" not in offered:
+                handles = handles.split(" - ")[0]
+            lines.append(f"Cached element handles: {handles}")
+        shot_meta = runtime.get("shot_meta")
+        if shot_meta:
+            age = int(now - (runtime.get("shot_age") or now))
+            lines.append(f"Last screenshot: {shot_meta.get('thumb_w')}x{shot_meta.get('thumb_h')} captured {age}s ago "
+                         "- click_at/drag_at/scroll_at coordinates must be read off THAT image")
+        elif "inspect_screen" in offered and {"click_at", "drag_at", "scroll_at"} & offered:
+            lines.append("Last screenshot: none yet - call inspect_screen before any coordinate-based action")
+    if runtime.get("activity"):         # the app the user works in: "this" / "here" in a question means it
+        lines.append(runtime["activity"])
+    if board.steps:
+        lines += ["", "=== CURRENT TASK ===", board.render(compact=True)]
+    elif "set_plan" in offered:
+        lines += ["", "=== CURRENT TASK ===", board.render(compact=True)]
+    if ledger.entries:
+        lines += ["", "=== ALREADY EXECUTED THIS SESSION (do NOT redo any of these) ===", ledger.render()]
     if runtime.get("budget_note"):
         lines += ["", runtime["budget_note"]]
     return "\n".join(lines)

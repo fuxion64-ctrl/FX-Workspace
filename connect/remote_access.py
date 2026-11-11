@@ -45,7 +45,9 @@ PHONE_BLOCKED = (("POST", "/api/settings"), ("POST", "/api/keys"), ("*", "/api/r
                  ("*", "/api/data-files"), ("POST", "/api/images/models"),
                  ("POST", "/api/local-models/ram-split"),   # 1.4.6: it rewrites models.ini
                  ("GET", "/api/whoami"),
-                 ("POST", "/api/local-models/find-file"), ("POST", "/api/local-models/remove"))   # 1.4.7: models.ini                    # 1.4.7: the install folder and process - for this PC only
+                 ("POST", "/api/local-models/find-file"), ("POST", "/api/local-models/remove"),
+                 ("POST", "/api/local-models/folders"), ("POST", "/api/local-models/browse"),   # 1.4.8: settings, a PC dialog
+                 ("POST", "/api/local-models/mmproj"))                                          # 1.4.8: models.ini   # 1.4.7: models.ini                    # 1.4.7: the install folder and process - for this PC only
 # (1.4.8, audit 3.6) What a phone MAY call under /api/: path template -> methods. An endpoint in neither list is
 # refused from a phone, so a new endpoint is PC-only until it is added here on purpose (tests/test_server_148.py
 # walks app.routes and fails on one that is in neither). Taken from every route PHONE_BLOCKED let through on
@@ -75,6 +77,7 @@ PHONE_ALLOWED = {
     "/api/chats/{chat_id}": "DELETE GET POST",
     "/api/chats/{chat_id}/messages": "POST",
     "/api/chats/{chat_id}/open": "POST",
+    "/api/chats/{chat_id}/transcript": "GET",      # (1.4.8) older messages of a long chat, as the page scrolls up
     "/api/chats/{chat_id}/unlock": "POST",
     "/api/clarification-popup": "POST",
     "/api/client-log": "POST",
@@ -285,6 +288,7 @@ PHONE_ALLOWED = {
     "/api/tasks/{tid}": "DELETE POST",
     "/api/tools": "GET",
     "/api/turn/{turn_id}": "GET",
+    "/api/ui-state": "GET POST",   # (1.4.8) the page's own look-and-feel choices, kept per device profile
     "/api/undo": "GET",
     "/api/undo/last": "POST",
     "/api/undo/{change_id}": "POST",

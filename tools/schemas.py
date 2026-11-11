@@ -339,8 +339,11 @@ def tools_for_current_turn(local: bool = False) -> list:
 # Local chat templates put the tool list at the very top of the prompt, so llama.cpp can only reuse what it read
 # for the last message up to the first tool that differs: with the shared ones first, a question after a
 # "list my files" keeps at least those.
-_FIRST = ("web_search", "fetch_page", "web_read")
-_LAST = ("use_tools",)
+# (1.4.8, item 7) A plain question's whole set opens the list, use_tools included: a question, a web question and a
+# voice question then share their first five tools (about 1,000 tokens) instead of three - use_tools used to go last,
+# after each kind's own extras, so the shared start ended at the fourth tool.
+_FIRST = ("web_search", "fetch_page", "web_read", "show_web_images", "use_tools")
+_LAST = ()
 
 
 def stable_order(tools: list) -> list:
@@ -443,6 +446,21 @@ def origin_off() -> set:
     return set() if (shared.app_state.get("settings") or {}).get("remote_allow_control") is True else {"desktop"}
 
 
+def _read_areas(tools: list, extra) -> list:
+    """(1.4.8, item 2) A look-only turn gets the areas its words point to (skills.pick), this chat's skills and the web -
+    not every look tool there is: "latest news about the telescope" carried the screen, windows, processes, files,
+    clipboard, notes and reminders tools (about 2,600 tokens). The core tools and the question extras stay; use_tools
+    adds an area the words missed. With skills off in Settings, nothing changes."""
+    settings = shared.app_state.get("settings")
+    if not skills.on(settings):
+        return tools
+    request = shared.app_state.get("current_user_request") or ""
+    areas = set(skills.pick(request)) | set(skills._chat()) | {"web"}
+    keep = [t for t in tools if (t["function"]["name"] in skills.CORE or t["function"]["name"] in extra
+                                 or skills.skill_of(t["function"]["name"]) in areas | {None})]
+    return keep or tools
+
+
 def _tools_for_mode(local: bool, mode: str) -> list:
     """The tools a turn in `mode` (action / read / memory / none) is offered.
     The context meter sizes the next turn with mode 'action' (the most)."""
@@ -478,7 +496,8 @@ def _tools_for_mode(local: bool, mode: str) -> list:
         return source
     if mode == "read":
         extra = offered_to_questions()
-        return [tool for tool in source if tool["function"]["name"] in QUERY_TOOL_NAMES or tool["function"]["name"] in extra]
+        return _read_areas([tool for tool in source if tool["function"]["name"] in QUERY_TOOL_NAMES
+                            or tool["function"]["name"] in extra], extra)
     if mode == "memory":
         return MEMORY_TOOLS_ONLY
     extra = offered_to_questions()

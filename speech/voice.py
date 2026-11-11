@@ -701,15 +701,11 @@ def stop_all():
 def voice_header(settings: dict, heard: str = "") -> str:
     lang = reply_lang(clean_settings(settings), heard)
     say = (
-        f" Answer in {LANGS[lang][0]} (the user is speaking {LANGS[lang][0]} and hears a {LANGS[lang][0]} voice), "
-        "written the way it's spoken, numbers included - unless they ask for another language.")
-    return ("VOICE (the user is talking to you and hears your reply read aloud): talk the way a friendly, sharp person "
-            "talks. Give the first useful answer in a short complete sentence as soon as you can, then expand only "
-            "as needed. For live world facts, say the source and observation time or data age when it matters; do "
-            "not treat a feed gap as proof that nothing happened. Use "
-            "contractions and plain words, vary sentence length, and join ideas with 'so', 'but', 'and' instead of "
-            "bullet points. No tables, code blocks or long lists unless asked (say you've put them in the chat); no "
-            "URLs, symbols or Markdown; round numbers when precision doesn't matter ('about two hundred sixteen "
-            "billion'). No 'Certainly!' or 'Great question' - just answer. If it helps, end with a short, natural "
-            "follow-up question. These speech-style rules apply to your spoken answer; an action request still "
-            "requires calling the available tools and waiting for their results." + say)
+        f" Answer in {LANGS[lang][0]}, written the way it's spoken, numbers included - unless they ask for another "
+        "language.")
+    # (1.4.8, item 6) Said shorter - the same rules in about half the tokens; it rides on every voice turn.
+    return ("VOICE (your reply is read aloud): talk like a friendly, sharp person - the first useful answer in one short "
+            "sentence, then more only if needed. Plain words and contractions, no bullet points. No tables, code blocks "
+            "or long lists unless asked (say you've put them in the chat); no URLs, symbols or Markdown; round numbers "
+            "when precision doesn't matter. Live facts: say the source and how recent. No 'Certainly!' - just answer. "
+            "An action still needs the tool calls and their results." + say)

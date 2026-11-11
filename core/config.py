@@ -53,13 +53,18 @@ MAX_HISTORY_CHARS = 60_000      # cloud budget
 
 # A local reply may carry a whole script or file as a tool argument; 700
 # tokens cut those off mid-JSON. The history budget reserves the same room.
-LOCAL_MAX_TOKENS = 2048
+# (1.4.8) 8192, not 2048: a plain answer with a whole page in it (an HTML site is 3-8k tokens) was cut off mid-code at
+# every effort level. A model stops by itself when it is done, and llm_stream still cuts a runaway loop short.
+LOCAL_MAX_TOKENS = 8192
 
 
 # Extra reply room while the model may think (Thorough / Max): its
 # reasoning is generated inside the same max_tokens. See _local_reply_tokens.
 LOCAL_THINKING_TOKENS = 2048
-LOCAL_RESPONSE_RESERVE = LOCAL_MAX_TOKENS   # tokens kept free for the local model's reply (without thinking)
+# Tokens kept free for the local model's reply when the history is fitted. It stays 2048 (it was LOCAL_MAX_TOKENS):
+# reserving 8192 would drop ~6k tokens of the chat on a 16k model for replies that are rarely that long - a longer one
+# is continued instead (_continue_if_cut_off).
+LOCAL_RESPONSE_RESERVE = 2048
 MIN_KEPT_TURNS = 2
 IMAGES_KEPT_CLOUD = 2
 IMAGES_KEPT_LOCAL = 1
@@ -164,6 +169,10 @@ DEFAULT_SETTINGS = {
     "web_browser_fallback": True,       # read/search in the assistant's browser when a site refuses a direct request
     "browser_builtin": True,            # the assistant's browser runs hidden and shows in the app's Browser panel (D50)
     "llama_build": "auto",              # which llama.cpp runs local models: auto | latest | prism (llama_builds.py, D51)
+    # (1.4.8) Where chat models live: the main folder (new downloads go here; "" = <models home>\models, the installer's
+    # choice) and more folders Scan also looks in. Settings > Models picks them with Windows' own folder picker.
+    "models_folder": "",
+    "model_dirs": [],
     "web_auto_search": True,            # offer web_search / fetch_page to questions too, not only to read/action turns
     **system_messages.DEFAULT_SETTINGS, # Settings > Agent > System message
     **response_modes.DEFAULT_SETTINGS,  # Enhanced (the agent) or Raw (the model alone) - response_modes.py
@@ -336,10 +345,26 @@ def clean_privacy_settings(s: dict) -> dict:
     out["model_names"] = clean_model_names(s.get("model_names"))
     out["research_depth"] = s.get("research_depth") if s.get("research_depth") in RESEARCH_DEPTHS else "auto"
     out["llama_build"] = s.get("llama_build") if s.get("llama_build") in llama_builds.CHOICES else "auto"
+    out["models_folder"] = clean_folder(s.get("models_folder"))
+    out["model_dirs"] = list(dict.fromkeys(d for d in (clean_folder(x) for x in (s.get("model_dirs") or [])
+                                                        if isinstance(s.get("model_dirs"), list)) if d))[:12]
     contact = re.sub(r"[\r\n\t]", " ", str(s.get("sec_contact") or "")).strip()[:120]
     # SEC wants "Name email@domain"; anything else is dropped rather than sent.
     out["sec_contact"] = contact if re.fullmatch(r"[\w .,'&()-]{1,80}\s+[\w.+-]+@[\w-]+(\.[\w-]+)+", contact) else ""
     return out
+
+
+def clean_folder(value) -> str:
+    """(1.4.8) A models folder: an absolute local path (a drive or a network share), one line, or "" - never a
+    relative path or anything with control characters. Whether it exists is checked when it is chosen."""
+    if not isinstance(value, str):
+        return ""
+    p = value.strip().strip('"')
+    if not p or len(p) > 260 or re.search(r"[\x00-\x1f<>|?*]", p):
+        return ""
+    if not (re.match(r"^[A-Za-z]:[\\/]", p) or p.startswith("\\\\")):
+        return ""
+    return os.path.normpath(p)
 
 
 def clean_model_names(value) -> dict:

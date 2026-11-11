@@ -4,6 +4,17 @@ What changed in each version of FX Workspace, newest first. Each version links t
 
 Parts marked **Beta** work, but are still being finished.
 
+## 1.4.8 - 2026-11-11
+
+[Full notes](docs/releases/1.4.8.md)
+
+- **Speed:** setup and Diagnostics make sure the model engine really uses the graphics card (one PC ran at 4 tok/s instead of 63); models get a context that fits on it; a live tok/s readout; starts in 2.4 s instead of 6, closes in 3 s instead of 20.
+- **Starts and sets itself up:** a stuck earlier copy no longer stops the app from opening; setup installs Python by itself; the app repairs its own setup on start.
+- **Models:** choose the models folder and add files and folders with Windows' picker; add a vision file (.mmproj) to a model you have; a crashing model is set aside by name.
+- **Replies:** long answers (HTML pages) are no longer cut off; no more written-then-erased first sentences; 9-27% smaller requests to local models; "open Paint and draw a horse" works; one model call fewer before most replies.
+- **Chats:** long chats keep their start; a message can't land in the wrong chat; page settings survive a port change.
+- **Images:** no model loaded just by opening Images; a quick test is offered instead of run.
+
 ## 1.4.7 - 2026-11-05
 
 [Full notes](docs/releases/1.4.7.md)

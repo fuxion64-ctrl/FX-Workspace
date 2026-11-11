@@ -77,32 +77,92 @@ Say "App folder:   $App"
 Say "Models/tools: $HomeDir  (set AGENTIC_HOME to use another drive)"
 
 # ---- 1. Python ---------------------------------------------------------------------------------
+# (1.4.8) Setup no longer stops at "install Python, then run install.bat again": a missing Python was installed with
+# winget and then setup ended with an error anyway (the new Python isn't on this process's PATH), and a PC without
+# winget got only a link. Now Python is looked for everywhere it lands - the py launcher, PATH, the registry, the
+# usual folders - and when there is none, python.org's own installer is fetched, checked (its Python Software
+# Foundation signature), installed for this user only (no admin) and used straight away.
 Step 'Python'
-$Py = $null
-foreach ($v in '3.11', '3.12') {
-    try { & py "-$v" -c "import sys" 2>$null; if ($LASTEXITCODE -eq 0) { $Py = @('py', "-$v"); break } } catch {}
-}
-if (-not $Py) {
+function Test-Python($exe, [string[]]$pre = @()) {
+    # A real Python 3.11/3.12 - not the Microsoft Store stub (WindowsApps\python.exe opens the Store and prints nothing).
     try {
-        $ver = & python -c "import sys; print('%d.%d' % sys.version_info[:2])" 2>$null
-        if ($ver -in '3.11', '3.12') { $Py = @('python') }
-    } catch {}
+        if (-not $exe) { return $false }
+        if ($exe -like '*\WindowsApps\*') { return $false }
+        $ver = & $exe @pre -c "import sys, venv; print('%d.%d' % sys.version_info[:2])" 2>$null
+        return ($LASTEXITCODE -eq 0) -and ($ver -in '3.11', '3.12')
+    } catch { return $false }
 }
+function Find-Python {
+    foreach ($v in '3.11', '3.12') {
+        foreach ($py in @('py', (Join-Path $env:WINDIR 'py.exe'), (Join-Path $env:LOCALAPPDATA 'Programs\Python\Launcher\py.exe'))) {
+            if ((Get-Command $py -ErrorAction SilentlyContinue) -and (Test-Python $py @("-$v"))) { return @($py, "-$v") }
+        }
+    }
+    $cands = @()
+    foreach ($v in '3.11', '3.12') {
+        foreach ($root in 'HKCU:', 'HKLM:', 'HKLM:\SOFTWARE\WOW6432Node') {
+            $key = if ($root -eq 'HKLM:\SOFTWARE\WOW6432Node') { "$root\Python\PythonCore\$v\InstallPath" } else { "$root\SOFTWARE\Python\PythonCore\$v\InstallPath" }
+            try { $p = (Get-ItemProperty -Path $key -ErrorAction Stop).'(default)'; if ($p) { $cands += (Join-Path $p 'python.exe') } } catch {}
+        }
+        $n = $v -replace '\.', ''
+        $cands += (Join-Path $env:LOCALAPPDATA "Programs\Python\Python$n\python.exe"), (Join-Path $env:ProgramFiles "Python$n\python.exe")
+    }
+    $onPath = Get-Command python -ErrorAction SilentlyContinue
+    if ($onPath) { $cands = @($onPath.Source) + $cands }
+    foreach ($c in $cands) { if ((Test-Path -LiteralPath $c) -and (Test-Python $c)) { return @($c) } }
+    return $null
+}
+function Install-Python {
+    $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'amd64' }
+    $name = "python-3.11.9-$arch.exe"                      # the last 3.11 release with a Windows installer
+    $setup = Join-Path $env:TEMP $name
+    try {
+        Download "https://www.python.org/ftp/python/3.11.9/$name" $setup $null
+        $sig = Get-AuthenticodeSignature -FilePath $setup
+        if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch 'Python Software Foundation') {
+            Remove-Item -LiteralPath $setup -Force
+            throw "the downloaded installer isn't signed by the Python Software Foundation (deleted)"
+        }
+        Say '   Signed by the Python Software Foundation - verified.' 'Green'
+        Say '   Installing Python 3.11 for this user (no admin needed) ...'
+        $p = Start-Process -FilePath $setup -Wait -PassThru -ArgumentList @('/quiet', 'InstallAllUsers=0', 'PrependPath=0',
+            'Include_test=0', 'Include_doc=0', 'Include_launcher=1', 'InstallLauncherAllUsers=0', 'Shortcuts=0')
+        Remove-Item -LiteralPath $setup -Force -ErrorAction SilentlyContinue
+        if ($p.ExitCode -ne 0) { throw "the Python installer ended with code $($p.ExitCode)" }
+        return $true
+    } catch {
+        Say "   python.org's installer didn't work: $_" 'Yellow'
+    }
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        Say '   Trying winget instead ...'
+        winget install -e --id Python.Python.3.11 --scope user --silent --accept-package-agreements --accept-source-agreements
+        return ($LASTEXITCODE -eq 0)
+    }
+    return $false
+}
+$Py = Find-Python
 if (-not $Py) {
     Say 'Python 3.11 or 3.12 was not found.' 'Yellow'
-    if ((Get-Command winget -ErrorAction SilentlyContinue) -and (Ask 'Install Python 3.11 now with winget?')) {
-        winget install -e --id Python.Python.3.11 --accept-package-agreements
-        Say 'Python is installed. Close this window and run install.bat again.' 'Green'
-    } else {
-        Say 'Install Python 3.11 from https://www.python.org/downloads/ (tick "Add python.exe to PATH"), then run install.bat again.'
+    if (Ask 'Download and install Python 3.11 from python.org now (about 25 MB, for this user only)?') {
+        $null = Install-Python
+        $Py = Find-Python                                    # found by its folder or the registry - no restart needed
     }
-    exit 1
+    if (-not $Py) {
+        Say 'Python could not be installed automatically. Install Python 3.11 from https://www.python.org/downloads/' 'Yellow'
+        Say 'and run this setup again - nothing else is needed.' 'Yellow'
+        exit 1
+    }
 }
 Say "Using: $($Py -join ' ')" 'Green'
 
 # ---- 2. The environment ------------------------------------------------------------------------
 Step 'Python packages'
 $VenvPy = Join-Path $App '.venv\Scripts\python.exe'
+# (1.4.8) A .venv whose Python no longer runs (the Python it was made from was removed or moved) is made again.
+if ((Test-Path $VenvPy) -and -not (Test-Python $VenvPy)) {
+    Say 'The Python environment is broken (its Python was removed or moved) - making it again ...' 'Yellow'
+    Remove-Item -LiteralPath (Join-Path $App '.venv') -Recurse -Force
+}
 if (-not (Test-Path $VenvPy)) {
     Say 'Creating .venv ...'
     $PyArgs = @($Py | Select-Object -Skip 1)
@@ -111,7 +171,13 @@ if (-not (Test-Path $VenvPy)) {
 }
 & $VenvPy -m pip install --disable-pip-version-check --upgrade pip | Out-Null
 & $VenvPy -m pip install --disable-pip-version-check -r requirements.txt
-if ($LASTEXITCODE -ne 0) { throw 'Installing the packages failed (see above).' }
+if ($LASTEXITCODE -ne 0) {
+    # (1.4.8) A dropped connection or a busy mirror: once more before giving up.
+    Say 'Installing the packages failed - trying once more ...' 'Yellow'
+    Start-Sleep -Seconds 3
+    & $VenvPy -m pip install --disable-pip-version-check --retries 5 --timeout 60 -r requirements.txt
+}
+if ($LASTEXITCODE -ne 0) { throw 'Installing the packages failed (see above) - check the internet connection and run setup again.' }
 Say 'Packages installed.' 'Green'
 & $VenvPy update_cleanup.py packages          # what an older version needed and this one doesn't
 
@@ -138,9 +204,33 @@ function Find-LlamaBuild($kind) {
     }
     throw "No Windows $kind build found in the recent llama.cpp releases."
 }
-# Downloads and unpacks a build into $dest (empty), with llama-server.exe and its DLLs at its top level.
-function Get-LlamaInto($pick, $dest) {
+# (1.4.8) The GPUs a build can use. 10 Nov 2026: an update ran out of disk space while unpacking NVIDIA's runtime
+# (cudart/cublas), the new build still "started", and every model ran on the CPU at 4 tokens/s. A CUDA build must
+# list a CUDA device, or it isn't installed.
+function Get-LlamaDevices($exe) {
+    $ErrorActionPreference = 'Continue'
+    try { $out = & $exe --list-devices 2>&1 | ForEach-Object { "$_" } | Out-String } catch { return $null }
+    if ($out -notmatch 'Available devices') { return $null }       # an older build: can't tell
+    return @([regex]::Matches($out, '(?m)^\s*((?:CUDA|Vulkan)\d+:.*)$') | ForEach-Object { $_.Groups[1].Value })
+}
+function Test-NvidiaGpu {
+    if (-not (Get-Command nvidia-smi -ErrorAction SilentlyContinue)) { return $false }
+    & nvidia-smi -L 2>$null | Out-Null
+    return ($LASTEXITCODE -eq 0)
+}
+# Room for the downloads and what they unpack to (about 2.5 times the zips), on the drive they land on.
+function Assert-Room($pick, $where) {
+    $need = [long](($pick.zips | Measure-Object -Property size -Sum).Sum * 2.5)
+    $drive = (Get-Item -LiteralPath $where).PSDrive
+    if ($drive -and $drive.Free -lt $need) {
+        throw ("not enough disk space on {0}: (llama.cpp needs about {1:N1} GB free, there is {2:N1} GB)" -f
+               $drive.Name, ($need / 1GB), ($drive.Free / 1GB))
+    }
+}
+# Downloads release zips (checked by their SHA-256) and unpacks them into $dest, after checking there is room.
+function Get-ZipsInto($pick, $dest) {
     New-Item -ItemType Directory -Force -Path $dest | Out-Null
+    Assert-Room $pick (Split-Path -Parent $dest)
     foreach ($a in $pick.zips) {
         $zip = Join-Path $HomeDir $a.name
         $sha = if ($a.digest -match '^sha256:(.+)$') { $Matches[1] } else { $null }
@@ -148,10 +238,20 @@ function Get-LlamaInto($pick, $dest) {
         Expand-Archive -LiteralPath $zip -DestinationPath $dest -Force
         Remove-Item -LiteralPath $zip -Force
     }
+}
+# Downloads and unpacks a build into $dest (empty), with llama-server.exe and its DLLs at its top level.
+function Get-LlamaInto($pick, $dest) {
+    Get-ZipsInto $pick $dest
     # Some builds unpack into a subfolder: bring llama-server.exe and its DLLs up.
     $exe = Get-ChildItem -LiteralPath $dest -Recurse -Filter 'llama-server.exe' | Select-Object -First 1
     if ($exe -and $exe.DirectoryName -ne $dest) { Get-ChildItem -LiteralPath $exe.DirectoryName | Move-Item -Destination $dest -Force }
     if (-not (Test-Path (Join-Path $dest 'llama-server.exe'))) { throw 'llama-server.exe was not in the download.' }
+    if (($pick.zips | Where-Object { $_.name -like 'llama-*cuda*' }) -and (Test-NvidiaGpu)) {
+        $dev = Get-LlamaDevices (Join-Path $dest 'llama-server.exe')
+        if ($dev -ne $null -and -not ($dev | Where-Object { $_ -like 'CUDA*' })) {
+            throw 'the CUDA build cannot see the GPU (NVIDIA runtime files missing or damaged - is the disk full?)'
+        }
+    }
 }
 # The build number llama-server reports - "version: 0.6.0-dev (build 11541, commit ...)" now, "version: 6912
 # (abc123)" in older builds - or 0.
@@ -191,6 +291,30 @@ if (Test-Path $Server) {
         }
     } else {
         Say "Already installed in $LlamaDir." 'Green'
+    }
+    # (1.4.8) A CUDA build that can't see the GPU gets NVIDIA's runtime again - the one its own release ships.
+    if (-not $SkipLlama -and (Test-Path (Join-Path $LlamaDir 'ggml-cuda.dll')) -and (Test-NvidiaGpu)) {
+        $dev = Get-LlamaDevices $Server
+        if ($dev -ne $null -and -not ($dev | Where-Object { $_ -like 'CUDA*' })) {
+            Say 'llama.cpp cannot see the GPU (its NVIDIA runtime files are missing or damaged) - repairing ...' 'Yellow'
+            $fix = Join-Path $HomeDir 'llama.cpp.runtime'
+            try {
+                $b = Get-LlamaVersion $Server
+                $rel = Invoke-RestMethod -Uri "https://api.github.com/repos/ggml-org/llama.cpp/releases/tags/b$b" -Headers $Headers
+                $rt = $rel.assets | Where-Object { $_.name -eq 'cudart-llama-bin-win-cuda-12.4-x64.zip' } | Select-Object -First 1
+                if (-not $rt) { throw "release b$b has no CUDA runtime to repair it with" }
+                if (Test-Path $fix) { Remove-Item -LiteralPath $fix -Recurse -Force }
+                Get-ZipsInto @{ zips = @($rt) } $fix
+                Get-ChildItem -LiteralPath $fix -Recurse -Filter '*.dll' | Copy-Item -Destination $LlamaDir -Force
+                $dev = Get-LlamaDevices $Server
+                if ($dev | Where-Object { $_ -like 'CUDA*' }) { Say "Repaired: $($dev[0])" 'Green' }
+                else { Say 'The repair did not help - reinstall llama.cpp (delete local\llama.cpp and run setup again).' 'Yellow' }
+            } catch {
+                Say "Repair failed: $($_.Exception.Message)" 'Yellow'
+            } finally {
+                if (Test-Path $fix) { Remove-Item -LiteralPath $fix -Recurse -Force -ErrorAction SilentlyContinue }
+            }
+        }
     }
 } elseif (Ask 'Download the newest llama.cpp for this PC?' -Skip:$SkipLlama) {
     $nvidia = [bool](Get-Command nvidia-smi -ErrorAction SilentlyContinue)
@@ -235,7 +359,8 @@ if (Test-Path (Join-Path $ImagesDir 'manifest.json')) {
 
 # ---- 6. models.ini -----------------------------------------------------------------------------
 Step 'Model list (models.ini)'
-& $VenvPy -c "import model_scan, json; p = model_scan.ensure_ini(); r = model_scan.scan(); print('models.ini:', p); print('added:', ', '.join(a['name'] for a in r['added']) or 'nothing new')"
+# (1.4.8) core.modpath first: model_scan lives in llm\ since the folders split, and this step failed on every setup.
+& $VenvPy -c "import core.modpath, model_scan, json; p = model_scan.ensure_ini(); r = model_scan.scan(); print('models.ini:', p); print('added:', ', '.join(a['name'] for a in r['added']) or 'nothing new')"
 
 # ---- 7. Shortcut -------------------------------------------------------------------------------
 Step 'Shortcut'

@@ -113,13 +113,77 @@ function status(text) {
   if (win && !win.isDestroyed()) win.webContents.executeJavaScript(`window.setStatus && setStatus(${JSON.stringify(text)})`).catch(() => {});
 }
 
-async function startServer() {
+// ---- setting itself up (1.4.8) -------------------------------------------------------------------------------
+// No Python environment (setup was interrupted, Python was missing, it was removed or moved) used to end in a box
+// telling people to find install.bat and run it in a terminal. The app now runs the same setup itself, hidden, with
+// its steps on the start screen, and starts once it is done.
+function venvWorks(python) {
+  const exe = python.replace(/pythonw\.exe$/i, 'python.exe');
+  return new Promise(resolve => {
+    const p = spawn(exe, ['-c', 'import sys, encodings'], { windowsHide: true, stdio: 'ignore' });
+    const t = setTimeout(() => { try { p.kill(); } catch (e) {} resolve(false); }, 20000);
+    p.on('exit', code => { clearTimeout(t); resolve(code === 0); });
+    p.on('error', () => { clearTimeout(t); resolve(false); });
+  });
+}
+
+function runSetup(root) {
+  const script = path.join(root, 'install.ps1');
+  if (!fs.existsSync(script)) return Promise.resolve({ ok: false, message: `FX Workspace's setup script is missing (${script}).\n\nReinstall the app.` });
+  const logFile = path.join(root, 'data', 'logs', 'setup.log');
+  try { fs.mkdirSync(path.dirname(logFile), { recursive: true }); fs.appendFileSync(logFile, `\n--- set up by the app ${new Date().toISOString()}\n`); } catch (e) {}
+  status('Setting up FX Workspace (Python and its packages) - the first time takes a few minutes…');
+  return new Promise(resolve => {
+    const ps = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script,
+      '-Yes', '-SkipShortcut', '-SkipModel', '-Quiet'], { cwd: root, windowsHide: true, env: process.env });
+    const tail = [];
+    let buf = '';
+    const onData = chunk => {
+      buf += chunk.toString('utf8');
+      const lines = buf.split(/\r?\n/); buf = lines.pop();
+      for (const raw of lines) {
+        const line = raw.trim(); if (!line) continue;
+        try { fs.appendFileSync(logFile, line + '\n'); } catch (e) {}
+        tail.push(line); if (tail.length > 8) tail.shift();
+        if (line.startsWith('== ')) status(`Setting up: ${line.slice(3)}…`);
+      }
+    };
+    ps.stdout.on('data', onData); ps.stderr.on('data', onData);
+    ps.on('error', e => resolve({ ok: false, message: `Setup couldn't start PowerShell: ${e.message}` }));
+    ps.on('exit', code => resolve(code === 0 ? { ok: true } : { ok: false, message:
+      `Setting up FX Workspace didn't finish:\n\n${tail.join('\n')}\n\nCheck the internet connection and start the app again - ` +
+      `it carries on where it stopped.\n\nFull log: ${logFile}` }));
+  });
+}
+
+// An earlier copy of THIS install that hung while closing holds the one-copy lock and answers nothing (the launcher
+// exits with 3). It is this app's own process: end it, then start again.
+function endStuckCopies(root) {
+  const target = path.join(root, 'launcher.pyw').toLowerCase().replace(/'/g, "''");
+  const cmd = "Get-CimInstance Win32_Process -Filter \"Name like 'python%'\" | Where-Object { $_.ProcessId -ne " + process.pid +
+    " -and $_.CommandLine -and $_.CommandLine.ToLower().Contains('" + target + "') } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }";
+  return new Promise(resolve => {
+    const ps = spawn('powershell.exe', ['-NoProfile', '-Command', cmd], { windowsHide: true, stdio: 'ignore' });
+    ps.on('exit', () => setTimeout(resolve, 1500));
+    ps.on('error', () => resolve());
+  });
+}
+
+const STUCK_EXIT = 3;                        // launcher.pyw: an earlier copy holds the lock and doesn't answer
+
+async function startServer(retried = false) {
   const root = findRoot();
   if (root && await findServer(root)) return { ok: true };   // already running (run.bat console, an earlier start)
   if (!root && await ping()) return { ok: true };
   if (!root) return { ok: false, message: 'The FX Workspace files were not found next to the app.\n\nReinstall it, or set FX_ROOT to the folder with launcher.pyw.' };
-  const python = pythonFor(root);
-  if (!python) return { ok: false, message: `FX Workspace isn't set up yet: there is no Python environment in\n${path.join(root, '.venv')}\n\nRun the installer (or install.bat) first.` };
+  let python = pythonFor(root);
+  if (IS_WIN && (!python || !(await venvWorks(python)))) {
+    const setup = await runSetup(root);
+    if (!setup.ok) return setup;
+    python = pythonFor(root);
+    if (!python) return { ok: false, message: `Setup finished but there is still no Python environment in\n${path.join(root, '.venv')}\n\nFull log: ${path.join(root, 'data', 'logs', 'setup.log')}` };
+  }
+  if (!python) return { ok: false, message: `FX Workspace isn't set up yet: there is no Python environment in\n${path.join(root, '.venv')}\n\nRun install.sh first.` };
   status('Starting the server…');
   server = spawn(python, [path.join(root, 'launcher.pyw')], {
     cwd: root,
@@ -136,12 +200,19 @@ async function startServer() {
   while (Date.now() - started < START_TIMEOUT_MS) {
     if (await findServer(root)) return { ok: true };        // the port it chose is in data/run/ports.json
     if (exited !== null && !(await findServer(root))) {
-      return { ok: false, message: `The server stopped while starting (exit code ${exited}).\n\nDetails: ${path.join(root, 'data', 'logs', 'server.log')}` };
+      if (exited === STUCK_EXIT && !retried) {               // an earlier copy hung while closing (1.4.8)
+        status('Closing an earlier copy that got stuck…');
+        await endStuckCopies(root);
+        return startServer(true);
+      }
+      return { ok: false, message: exited === STUCK_EXIT
+        ? 'An earlier copy of FX Workspace is still running and doesn\'t answer, and it couldn\'t be closed.\n\nRestart Windows, then start the app again.'
+        : `The server stopped while starting (exit code ${exited}).\n\nDetails: ${path.join(root, 'data', 'logs', 'server.log')}` };
     }
     const secs = Math.round((Date.now() - started) / 1000);
     if (secs > 8 && hint === 0) { hint = 1; status('Checking Python packages and starting the local model server…'); }
     if (secs > 40 && hint === 1) { hint = 2; status('Still starting - the first start after an update takes longest…'); }
-    await new Promise(r => setTimeout(r, 600));
+    await new Promise(r => setTimeout(r, 200));      // (1.4.8) 600: the window opened up to 0.6 s after the server was up
   }
   return { ok: false, message: `The server didn't answer within ${START_TIMEOUT_MS / 1000} s.\n\nDetails: ${path.join(root, 'data', 'logs', 'server.log')}` };
 }

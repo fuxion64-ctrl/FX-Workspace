@@ -1040,7 +1040,14 @@ html.fx-desktop .sb-quit:hover { background: var(--hover); color: var(--danger-t
 .app.sidebar-collapsed .sb-label, .app.sidebar-collapsed .sb-section, .app.sidebar-collapsed .sb-user-text,
 .app.sidebar-collapsed .brand-name, .app.sidebar-collapsed .sb-user > .icon { display: none; }
 .app.sidebar-collapsed .sb-item .dot { position: absolute; top: 5px; right: 5px; }
-.app.sidebar-collapsed .sb-top { flex-direction: column; padding: 14px 0 8px; }
+.app.sidebar-collapsed .sb-top { flex-direction: column; padding: 14px 0 8px; gap: 6px; }
+/* (1.4.8) The rail's Fx mark sits on the icons' own axis: the brand is the rail's full width with the mark centred in it,
+   and the chevron no longer takes a share of the row - it tucks in under the mark (the menu is still there, and the
+   chevron still turns when it is open). */
+.app.sidebar-collapsed .brand { width: 100%; justify-content: center; padding: 4px 0 11px; gap: 0; }
+.app.sidebar-collapsed .brand-chev { position: absolute; left: 50%; bottom: 0; width: 12px; height: 12px; margin: 0 0 0 -6px; }
+.app.sidebar-collapsed .brand-by { left: 50%; transform: translate(-50%, -3px); }
+.app.sidebar-collapsed .brand:is(:hover, :focus-visible) .brand-by { transform: translate(-50%, 0); }
 .app.sidebar-collapsed .sb-item, .app.sidebar-collapsed .sb-user { justify-content: center; }
 
 .icon-btn { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; color: var(--muted); flex-shrink: 0; position: relative; }
@@ -1381,6 +1388,7 @@ html.fx-desktop .sb-quit:hover { background: var(--hover); color: var(--danger-t
 .iv-engine:not(:has(button)) { padding-right: 12px; }
 .iv-engine.err { color: var(--danger-text); }
 .iv-engine .btn.sm { height: 24px; border-radius: 999px; }
+.iv-engine.still .spinner { animation: none; }   /* (1.4.8) Images: the card in the grid moves, this only says the engine is busy */
 .iv-gen { background: var(--surface); border: 1px solid var(--border-strong); border-radius: 18px; box-shadow: var(--shadow); padding: 14px 14px 12px 16px; display: flex; flex-direction: column; gap: 10px; }
 .iv-gen:focus-within { border-color: color-mix(in srgb, var(--text) 28%, var(--border-strong)); }
 #iv-prompt, #vv-prompt { width: 100%; border: 0; outline: 0; resize: vertical; min-height: 48px; max-height: 240px; background: transparent; box-shadow: none; font-size: 15.5px; line-height: 1.5; color: var(--text); }
@@ -1464,6 +1472,18 @@ html.fx-desktop .sb-quit:hover { background: var(--hover); color: var(--danger-t
 .iv-job .bar > i { background: var(--accent); opacity: 1; }
 .iv-job .mono { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
 .iv-next { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); padding: 0 10px; }
+/* (1.4.8) The picture being made is the grid's first slot: a thumbnail-sized card with the look's own Creating image,
+   its step and percent, and Stop. It becomes the new picture when the grid refreshes. */
+.iv-tile.iv-making { cursor: default; background: var(--surface); outline-color: transparent; border: 1px solid var(--border); }
+.iv-making > .dc-fx { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.iv-making-stop { position: absolute; top: 6px; right: 6px; z-index: 2; }
+.iv-making-meta { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; display: flex; flex-direction: column; gap: 2px; padding: 6px 9px 8px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent); border-top: 1px solid var(--border); }
+.iv-making-meta b { font-size: 12px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.iv-making-step { font-size: 11px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.iv-making-meta .bar { height: 3px; margin-top: 3px; }
+.iv-making-meta .bar > i { background: var(--accent); opacity: 1; }
+.iv-grid.has-making > .place-empty { display: none; }
 .iv-gal { display: flex; flex-direction: column; gap: 12px; }
 .iv-gal-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .iv-gal-head h2 { margin: 0; font-size: 14px; font-weight: 600; }
@@ -2221,6 +2241,17 @@ body { font-size: calc(var(--base-size) * var(--text-scale, 1)); }
 .think.orb-mark > i { display: none !important; }
 .think.orb-mark > canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 :root:is([data-motion="reduced"], [data-motion="off"]) .act-line .think.orb-mark { display: inline-block; }   /* still, but it shows the work */
+/* (1.4.8) The thinking pill: a reply is being written and you have scrolled up from it - the reply's own mark floats
+   above the message box, the one moving signal while the reply is off screen. Click: back to the latest. Reduced
+   motion / Motion off: the mark is still (Orbs draws it once). */
+#composer-dock { position: relative; }
+.think-pill { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); z-index: 6; width: 44px; height: 44px; padding: 0; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center; background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); box-shadow: var(--shadow-lg); cursor: pointer; }
+.think-pill[hidden] { display: none; }
+.think-pill:hover { border-color: var(--accent); }
+.think-pill:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.think-pill:not([hidden]) { animation: think-pill-in .2s var(--ease-out); }
+@keyframes think-pill-in { from { opacity: 0; transform: translateX(-50%) translateY(6px); } }
 
 /* The AI-inspired looks' Immersive switch (top bar): a small pill, lit while on. */
 .immersive-btn { width: auto; gap: 6px; padding: 0 10px 0 8px; border-radius: 999px; font-size: 12.5px; font-weight: 500; color: var(--muted); }
@@ -3279,6 +3310,12 @@ span.tier.input { padding: 0; border: 0; width: 8px; height: 8px; min-height: 0;
 /* Live load chart (Operator only): CPU and VRAM over the last few minutes */
 .telemetry { display: none; margin: 0 14px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); padding: 10px 12px 8px; flex-shrink: 0; }
 .tele-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+/* (1.4.8) The pinned speed line: one quiet row under the tabs, on every tab. */
+.speed-pin { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin: 0 14px 8px; padding: 6px 10px;
+  border: 1px solid var(--border); border-radius: var(--radius); font-size: 12px; flex-shrink: 0; }
+.speed-pin .sp-label { color: var(--muted); }
+.speed-pin b { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.speed-pin b.muted { color: var(--text-2); font-weight: 500; }
 .tele-head b { font-weight: 500; color: var(--text-2); }
 .tele-legend { display: flex; gap: 12px; font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
 .tele-legend i { display: inline-block; width: 8px; height: 2px; margin-right: 5px; vertical-align: middle; }
@@ -5424,8 +5461,7 @@ html.voice-on .idle-screen { display: none !important; }
 .me-vlist, .me-vtips { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; font-size: 13px; }
 .me-vlist li { display: flex; justify-content: space-between; gap: 16px; } .me-vlist .mono { color: var(--muted); font-variant-numeric: tabular-nums; }
 .me-vtips { padding-left: 16px; list-style: disc; color: var(--text-2); margin-top: 4px; }
-.nt-when:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }   /* the Due field had none */
-.widget-wait { display: flex; align-items: center; gap: 10px; padding: 14px; color: var(--muted); font: 13px var(--sans); }
+.nt-when:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }   /* the Due field had none */.widget-wait { display: flex; align-items: center; gap: 10px; padding: 14px; color: var(--muted); font: 13px var(--sans); }
 .widget-wait.building { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); flex-direction: column; align-items: flex-start; gap: 2px; } .widget-wait.building span { color: var(--text-2); font-weight: 500; } .widget-wait.building small { font-size: 12px; }
 .md-choices { margin: .3em 0 .9em; }
 .md-choices .choice.picked { border-color: var(--accent); color: var(--text); opacity: 1; }
@@ -5438,6 +5474,8 @@ html.voice-on .idle-screen { display: none !important; }
 .tbl-tools .input { height: 28px; max-width: 220px; font: 12.5px var(--sans); }
 .tbl-count { font-size: 12px; color: var(--muted); }
 .va-line { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 12px; color: var(--text-2); }
+.mm-line { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 8px 0 2px; font-size: 12px; }   /* (1.4.8) */
+.mm-line .mono { max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .va-line.ok { color: var(--ok-text); }
 .va-line .af-link { font-size: 12px; }
 :root[data-skin="terminal"] :is(.widget, .chart-tip, .ch-legend .ch-key) { border-radius: 0; }
@@ -5986,6 +6024,7 @@ html.voice-on .idle-screen { display: none !important; }
     <aside class="read-rail" id="read-rail" hidden aria-label="Contents and sources of the reply you are reading"></aside>
 
     <div class="composer-wrap hidden" id="composer-dock">
+      <button type="button" class="think-pill" id="think-pill" hidden onclick="ScrollPill.jump()" aria-label="Reply in progress - jump to the latest" title="Reply in progress - jump to the latest"><span class="think" data-act="think" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span></button>
       <div class="nudge" id="nudge"></div>
       <div class="composer" id="composer">
         <div class="composer-chips" id="composer-chips" hidden aria-label="Tools and files for your next message"></div>
@@ -6028,6 +6067,9 @@ html.voice-on .idle-screen { display: none !important; }
         <button type="button" role="tab" data-ptab="all" class="pt-all" onclick="panelTab('all')" title="Every section at once">All</button>
       </div>
       <button class="icon-btn panel-close" onclick="togglePanel(false)" aria-label="Close panel"><svg class="icon"><use href="#i-x"/></svg></button></div>
+    <!-- (1.4.8) The model's writing speed, on every tab: live while it writes (tok/s over the last 3 s), "reading"
+         while it reads the prompt, the last reply's speed when idle. It used to show only once a reply ended. -->
+    <div class="speed-pin" id="speed-pin" aria-live="off"><span class="sp-label">Speed</span><b class="mono" id="speed-val">—</b></div>
     <div class="telemetry" aria-label="Live load">
       <div class="tele-head"><b>Live load</b><span class="tele-legend" id="tele-legend"></span></div>
       <canvas id="telemetry" height="64"></canvas>
@@ -6190,9 +6232,70 @@ const WEBRTC_OFF = (() => {
    =========================================================================== */
 const store = {
   get(k, d) { try { const v = localStorage.getItem('aw.' + k); return v === null ? d : JSON.parse(v); } catch (_) { return d; } },
-  set(k, v) { try { localStorage.setItem('aw.' + k, JSON.stringify(v)); } catch (_) {} },
-  del(k) { try { localStorage.removeItem('aw.' + k); } catch (_) {} },
+  set(k, v) { try { localStorage.setItem('aw.' + k, JSON.stringify(v)); } catch (_) {} UiSync.queue(k); },
+  del(k) { try { localStorage.removeItem('aw.' + k); } catch (_) {} UiSync.queue(k); },
 };
+/* (1.4.8) Page settings live on the server too (GET/POST /api/ui-state, per profile PC / phone; welcomed, toured and
+   seenVersion are install-wide), so a reinstall or a second window keeps them. localStorage stays the fast cache the
+   page reads at start; a change is written there at once and posted ~500 ms later. At start the server's values win
+   (the page reloads once if any differed from the cache); a key only this browser has is sent up once. An
+   unreachable server changes nothing - the page behaves as before. panelOpen2.<look> travels as one map. */
+const UiSync = (() => {
+  const KEYS = new Set(['welcomed', 'toured', 'seenVersion', 'mode', 'textScale', 'motion', 'contrast', 'sidebarW', 'sidebarCollapsed', 'sbCollapsed',
+    'sections', 'pinned', 'tools', 'preset', 'researchDepth', 'compareModel', 'animateReplies', 'notify', 'notifySound', 'panelOpen2', 'zoom']);
+  const PANEL = 'aw.panelOpen2.';
+  const pending = new Set(); let timer = null;
+  const baseOf = k => { k = String(k); if (k.startsWith('panelOpen2.')) return 'panelOpen2'; return KEYS.has(k) ? k : null; };
+  const raw = k => { try { return localStorage.getItem(k); } catch (_) { return null; } };
+  function panelMap() {
+    const o = {}; try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(PANEL)) o[k.slice(PANEL.length)] = JSON.parse(localStorage.getItem(k)); } } catch (_) {}
+    return o;
+  }
+  function localValue(b) {
+    if (b === 'panelOpen2') { const o = panelMap(); return Object.keys(o).length ? o : null; }
+    const r = raw('aw.' + b); if (r === null) return null;
+    try { return JSON.parse(r); } catch (_) { return null; }
+  }
+  async function post(state) {
+    if (!Object.keys(state).length) return;
+    try { await fetch('/api/ui-state', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ state }) }); } catch (_) { /* server unreachable: the cache still has it */ }
+  }
+  function flush() {
+    timer = null; const state = {};
+    pending.forEach(b => { state[b] = localValue(b); }); pending.clear();
+    post(state);
+  }
+  function queue(k) { const b = baseOf(k); if (!b) return; pending.add(b); if (!timer) timer = setTimeout(flush, 500); }
+  // (1.4.8) Read before the page draws - one quick synchronous request to this PC's own server - so the server's
+  // values are in place from the first paint. Read after it, a difference meant reloading the page: a flash on start,
+  // and the appearance audit's screenshots caught the page mid-reload.
+  function hydrate() {
+    let d;
+    try {
+      const x = new XMLHttpRequest(); x.open('GET', '/api/ui-state', false); x.send();
+      if (x.status !== 200) return;
+      d = JSON.parse(x.responseText);
+    } catch (_) { return; }
+    if (!d || !d.ok || !d.state) return;
+    const sv = d.state, up = {}; let changed = false;
+    KEYS.forEach(b => {
+      if (pending.has(b)) return;                              // changed here since the page opened: this browser is newer
+      const has = sv[b] !== undefined && sv[b] !== null;
+      if (b === 'panelOpen2') {
+        const loc = panelMap(), srv = has && typeof sv[b] === 'object' ? sv[b] : {};
+        Object.keys(srv).forEach(l => { const r = JSON.stringify(srv[l]); if (raw(PANEL + l) !== r) { try { localStorage.setItem(PANEL + l, r); changed = true; } catch (_) {} } });
+        if (Object.keys(loc).some(l => !(l in srv))) up[b] = { ...loc, ...srv };
+        return;
+      }
+      if (has) { const r = JSON.stringify(sv[b]); if (raw('aw.' + b) !== r) { try { localStorage.setItem('aw.' + b, r); changed = true; } catch (_) {} } }
+      else if (raw('aw.' + b) !== null) up[b] = localValue(b);
+    });
+    post(up);
+  }
+  hydrate();
+  addEventListener('pagehide', () => { if (timer) { clearTimeout(timer); flush(); } });
+  return { queue };
+})();
 // This browser tab only: a reload comes back to the open chat, while opening
 // the app (a new tab) starts on Home.
 const tabStore = {
@@ -7249,6 +7352,7 @@ const ImagesView = (() => {
     catch (e) { st.listErr = e.message; }
     if (st.sel && !find(st.sel)) st.sel = null;
     if (!st.sel && st.list && st.list.length && st.filter !== 'trash') st.sel = st.list[0].id;
+    st.landing = false;                                              // (1.4.8) the new picture is in the grid: the card steps aside
     if (S.view === 'images') { paintHead(); paintGallery(); paintInspector(); }
   }
 
@@ -7276,7 +7380,7 @@ const ImagesView = (() => {
       </div>`;
       st.mounted = true;
       $('iv-grid').addEventListener('keydown', gridKeys);
-      api('/api/images/warm', { quality: quality() }).catch(() => {});     // read the model in while you write
+      // (1.4.8) opening the tab no longer reads a model in; the quality picker still warms it when changed
     }
     paintHead(); paintGen(); paintRun(); paintGallery(); paintInspector();
     if (!st.list) load();
@@ -7287,7 +7391,7 @@ const ImagesView = (() => {
     const s = st.status || {}, j = s.job || {};
     const pill = !st.status ? `<span class="iv-engine"><span class="spinner"></span>Checking…</span>`
       : !s.engine ? `<span class="iv-engine err">${icon('i-alert', 'xs')}Not set up</span>`
-      : j.stage ? `<span class="iv-engine busy"><span class="spinner"></span>${esc(j.model || 'Drawing')}</span>`
+      : j.stage ? `<span class="iv-engine busy still"><span class="spinner"></span>${esc(j.model || 'Drawing')}</span>`   // still (1.4.8): the picture's own card in the grid is the moving signal
       : s.running ? `<span class="iv-engine on"><span class="dot on"></span>${esc(s.loaded)} ready<button type="button" class="btn sm ghost" onclick="ImagesView.unload()" title="Free its RAM and VRAM now">Unload</button></span>`
       : s.warm ? ''                                // one status at a time: the "Getting ready" bar says it (1.4.6)
       : `<span class="iv-engine"><span class="dot"></span>Engine idle</span>`;
@@ -7333,40 +7437,56 @@ const ImagesView = (() => {
         <button type="button" class="btn primary" id="iv-make" onclick="ImagesView.make()" ${st.busy ? 'disabled' : ''}>${st.busy ? '<span class="spinner"></span>Making…' : st.count > 1 ? `Make ${st.count}` : 'Make it'}<span class="kbd-hint">Ctrl+Enter</span></button></span></div>`);
   }
   // What is happening right now - from this page or a chat - and what went wrong last.
+  // (1.4.8) The picture being made is a card in the grid now (paintJob); this strip keeps what has no picture slot:
+  // the engine reading a model from disk, and errors.
   function paintRun() {
     const el = $('iv-run'); if (!el) return;
     const s = st.status || {}, j = s.job || {}, w = s.warm;
+    const running = !!(j.stage || st.busy);
     let html = '';
-    if (j.stage || st.busy) {
-      const pct = j.stage === 'warming' && j.total ? j.done / j.total : j.progress || 0;
-      const step = j.stage === 'drawing' && j.steps ? `${j.images > 1 ? `${j.image}/${j.images} · ` : ''}${j.step}/${j.steps}${j.left != null ? ` · ~${Math.round(j.left)} s` : ''}` : '';
-      el._target = j.stage === 'drawing' ? (j.progress || 0) : ['finishing', 'saving'].includes(j.stage) ? 1 : 0;   // DRAW_FX
-      // The card is built once per shape and then updated in place (1.4.7): rebuilt on every poll, its canvas was
-      // replaced by a blank one each time the step count or "~N s" changed, and the animation blinked out for a frame.
-      const shape = `${j.stage === 'warming' ? 'warm' : 'draw'}|${s.waiting ? 1 : 0}|${st.error && !j.stage && !st.busy ? 1 : 0}`;
-      const job = el.querySelector(':scope > .iv-job');
-      if (job && el.dataset.shape === shape) {
-        const b = job.querySelector('.grow > b'), bar = job.querySelector('.bar > i'), sp = job.querySelector('.iv-step'), next = el.querySelector('.iv-next');
-        const text = j.text || (st.busy ? 'Starting…' : 'Working…'), width = `${Math.round(Math.max(0.03, pct) * 100)}%`;
-        if (b && b.textContent !== text) b.textContent = text;
-        if (bar && bar.style.width !== width) bar.style.width = width;
-        if (sp && sp.textContent !== step) sp.textContent = step;
-        if (next) { const n = `${s.waiting} more waiting for the GPU`; if (next.lastChild && next.lastChild.textContent !== n) next.lastChild.textContent = n; }
-        if (job.querySelector('canvas.dc-fx')) DRAW_FX.play(el);
-        return;
-      }
-      el.dataset.shape = shape;
-      html = `<div class="iv-job">${j.stage === 'warming' ? icon('i-disk', '') : '<span class="iv-job-thumb"><canvas class="dc-fx" aria-hidden="true"></canvas></span>'}<div class="grow"><b>${esc(j.text || (st.busy ? 'Starting…' : 'Working…'))}</b><div class="bar"><i style="width:${Math.round(Math.max(0.03, pct) * 100)}%"></i></div></div><span class="mono iv-step">${esc(step)}</span><button type="button" class="btn sm ghost" onclick="ImagesView.stop()">${icon('i-stop', 'xs')}Stop</button></div>`
-        + (s.waiting ? `<div class="iv-next">${icon('i-clock', 'xs')}<span>${s.waiting} more waiting for the GPU</span></div>` : '');
-    } else if (w) {
-      html = `<div class="iv-job quiet">${icon('i-disk', '')}<div class="grow"><b>Getting ${esc(w.key || '')} ready - reading it from disk</b><div class="bar"><i style="width:${Math.round((w.done / (w.total || 1)) * 100)}%"></i></div></div></div>`;
-    }
-    if (!(j.stage || st.busy)) el.dataset.shape = '';                 // not a job card: the next job builds its own
-    if (st.error && !j.stage && !st.busy) html += errorCard(st.error);
+    if (!running && w) html = `<div class="iv-job quiet">${icon('i-disk', '')}<div class="grow"><b>Getting ${esc(w.key || '')} ready - reading it from disk</b><div class="bar"><i style="width:${Math.round((w.done / (w.total || 1)) * 100)}%"></i></div></div></div>`;
+    if (st.error && !running) html += errorCard(st.error);
     setHtmlIfChanged(el, html);
-    if (el.querySelector('canvas.dc-fx')) DRAW_FX.play(el);            // the look's own Creating image (1.4.6)
+    paintJob();
   }
-  function errorCard(e) {
+  // The first slot of the grid while a picture is being made: the look's own Creating image (DRAW_FX), step x/y and
+  // percent, "1 of 3" for a batch, how many wait behind it, and Stop. Built once and updated in place, so the canvas
+  // keeps drawing; it stays (as "Done") until the grid has reloaded with the new picture.
+  let jobEl = null, landT = 0, wasRun = false;
+  function paintJob() {
+    const grid = $('iv-grid'); if (!grid) return;
+    const s = st.status || {}, j = s.job || {};
+    const running = !!(j.stage || st.busy);
+    if (running) { st.landing = false; wasRun = true; }
+    else if (wasRun) { wasRun = false; if (!st.error) st.landing = true; if (st.landing) { clearTimeout(landT); landT = setTimeout(() => { st.landing = false; paintJob(); }, 5000); } }
+    const show = (running || st.landing) && S.view === 'images' && !st.openSeq && st.filter !== 'trash';
+    grid.classList.toggle('has-making', show);
+    if (!show) { if (jobEl) { jobEl.remove(); jobEl = null; } return; }
+    if (!jobEl) {
+      jobEl = document.createElement('div');
+      jobEl.className = 'iv-tile iv-making'; jobEl.setAttribute('role', 'group');
+      jobEl.innerHTML = `<canvas class="dc-fx" aria-hidden="true"></canvas><button type="button" class="ov-b iv-making-stop" onclick="ImagesView.stop()" aria-label="Stop drawing" title="Stop">${icon('i-stop', 'sm')}</button><div class="iv-making-meta"><b class="iv-making-text"></b><span class="mono iv-making-step"></span><div class="bar" role="progressbar" aria-label="Drawing progress" aria-valuemin="0" aria-valuemax="100"><i></i></div></div>`;
+    }
+    if (grid.firstElementChild !== jobEl) grid.insertBefore(jobEl, grid.firstChild);
+    const done = !running;
+    const pct = done ? 1 : j.stage === 'warming' && j.total ? j.done / j.total : j.progress || 0;
+    const base = done ? 'Done' : j.text || (st.busy ? 'Starting…' : 'Working…');
+    const text = !done && j.images > 1 ? `${j.image} of ${j.images} · ${base}` : base;
+    const bits = [];
+    if (!done && j.stage === 'drawing' && j.steps) bits.push(`${j.step}/${j.steps}`);
+    if (!done && pct > 0) bits.push(`${Math.round(Math.min(1, pct) * 100)}%`);
+    if (!done && j.stage === 'drawing' && j.left != null) bits.push(`~${Math.round(j.left)} s`);
+    if (!done && s.waiting) bits.push(`+${s.waiting} waiting`);
+    jobEl._target = done ? 1.15 : j.stage === 'drawing' ? (j.progress || 0) : ['finishing', 'saving'].includes(j.stage) ? 1.15 : 0;   // DRAW_FX
+    const put = (sel, v) => { const n = jobEl.querySelector(sel); if (n && n.textContent !== v) n.textContent = v; };
+    put('.iv-making-text', text); put('.iv-making-step', bits.join(' · '));
+    const bar = jobEl.querySelector('.bar'), width = Math.round(Math.max(0.03, Math.min(1, pct)) * 100);
+    if (bar) { bar.setAttribute('aria-valuenow', String(width)); const i = bar.firstElementChild; if (i && i.style.width !== width + '%') i.style.width = width + '%'; }
+    const label = `Picture being made: ${text}${bits.length ? ', ' + bits.join(', ') : ''}`;
+    if (jobEl.getAttribute('aria-label') !== label) jobEl.setAttribute('aria-label', label);
+    const el = jobEl;
+    if (el.querySelector('canvas.dc-fx')) DRAW_FX.play(el);          // the look's own Creating image (1.4.6)
+  }  function errorCard(e) {
     const kinds = {
       minors: ['danger', 'i-shield', "Can't make this", ''],
       filter: ['warn', 'i-shield', 'The image filter turned this down', `<button class="btn sm" onclick="$('iv-prompt').focus()">Change the prompt</button><button class="btn sm ghost" onclick="openSettings('images')">Filter settings</button>`],
@@ -7384,7 +7504,8 @@ const ImagesView = (() => {
     if (!t.model && !t.styles.length) return '';
     return `<span class="iv-tags">${t.model ? `<span class="iv-chip model" title="${esc(t.full)}">${esc(t.model)}</span>` : ''}${t.styles.map(s => `<span class="iv-chip">${esc(s)}</span>`).join('')}</span>`;
   }
-  function paintGallery() {
+  function paintGallery() { paintGalleryList(); paintJob(); }      // (1.4.8) the picture being made is the grid's first slot
+  function paintGalleryList() {
     const head = $('iv-gal-head'), grid = $('iv-grid'); if (!head || !grid) return;
     const f = (id, label) => `<button type="button" class="${st.filter === id ? 'on' : ''}" aria-pressed="${st.filter === id}" onclick="ImagesView.filterBy('${id}')">${label}</button>`;
     const folder = st.openSeq && st.list && st.list[0] && st.list[0].seq;
@@ -9693,6 +9814,24 @@ function scrollToBottom(force) {
   if (force) followReply = true;
   if (force || followReply) { sc.scrollTop = sc.scrollHeight; lastScrollTop = sc.scrollTop; }
 }
+// (1.4.8) The thinking pill: while a reply is written and you have scrolled up from it, the reply's thinking mark
+// floats above the message box (the same mark and the same kind of work as the reply's own - Orbs draws it, since it
+// is a .think). It is the one moving signal then, as the reply is off screen. Click: to the latest.
+const ScrollPill = (() => {
+  function update() {
+    const p = $('think-pill'); if (!p) return;
+    const sc = $('scroll');
+    const show = !!(S.busy && S.turn && S.view === 'chat' && sc && !sc.classList.contains('hidden') && sc.scrollHeight - sc.scrollTop - sc.clientHeight > 160);
+    if (p.hidden === show) p.hidden = !show;
+    if (!show) return;
+    const a = currentAct(S.turn), mark = p.querySelector('.think');
+    if (mark) setThinkAct(mark, (a && a.act) || 'think');
+  }
+  function jump() { scrollToBottom(true); const p = $('think-pill'); if (p) p.hidden = true; const pr = $('prompt'); if (pr && !pr.disabled) pr.focus({ preventScroll: true }); }
+  $('scroll').addEventListener('scroll', update, { passive: true });
+  setInterval(() => { if (S.busy || !$('think-pill').hidden) update(); }, 600);   // the kind of work changes, the reply ends
+  return { update, jump };
+})();
 
 /* ===========================================================================
    Composer
@@ -11192,13 +11331,15 @@ async function fetchLocalModels() {
    Transcript
    =========================================================================== */
 function persistTranscript() {
-  const drop = S.transcript.length - 80;
+  // (1.4.8) S.tCap: this page's window (80); it grows once earlier messages are loaded by scrolling up, until the chat is reopened.
+  const drop = S.transcript.length - (S.tCap || 80);
   if (drop > 0) {                             // the oldest leave this page's copy; the server keeps them (S.tOffset)
     S.transcript = S.transcript.slice(drop); S.tOffset += drop;
     document.querySelectorAll('#thread [data-ti]').forEach(el => { const ti = Number(el.dataset.ti) - drop; if (ti < 0) delete el.dataset.ti; else el.dataset.ti = ti; });
   }
   if (isTemp()) { store.del('transcript'); store.del('title'); store.del('tOffset'); return; }   // a temporary chat stays off disk
-  store.set('transcript', S.transcript); store.set('title', S.title); store.set('tOffset', S.tOffset);
+  const keep = Math.max(0, S.transcript.length - 80);   // (1.4.8) the saved copy stays the last 80 even while earlier ones are loaded
+  store.set('transcript', keep ? S.transcript.slice(keep) : S.transcript); store.set('title', S.title); store.set('tOffset', S.tOffset + keep);
 }
 // command: the slash command it was sent with ('plan' | 'design'), shown as a pill before the text.
 // meta: {files, tools} - its attached files (chips under it) and the Tools it was sent with (pills).
@@ -11555,7 +11696,12 @@ function openExportMenu(anchor) {
 async function exportChat(kind) {
   let chat = { title: S.title || 'Chat', transcript: S.transcript };
   if (S.chatId) { try { const r = await api(`/api/chats/${encodeURIComponent(S.chatId)}`); if (r.ok) chat = r.chat; } catch (_) {} }
-  const title = chat.title || 'Chat', entries = chat.transcript || [];
+  let entries = chat.transcript || [];
+  // (1.4.8) the server returns only the last 200: fetch the earlier pages so the export is the whole chat
+  for (let off = Number.isFinite(chat.offset) ? chat.offset : 0, guard = 0; S.chatId && off > 0 && guard < 500; guard++) {
+    try { const e = await api(`/api/chats/${encodeURIComponent(S.chatId)}/transcript?before=${off}&limit=200`); if (!e.ok || !(e.entries || []).length) break; entries = e.entries.concat(entries); off = e.offset; } catch (_) { break; }
+  }
+  const title = chat.title || 'Chat';
   if (kind === 'md') {
     const md = [`# ${title}`, ''];
     for (const m of entries) {
@@ -11622,6 +11768,34 @@ async function syncTranscript(chat) {
     if (r.ok && r.chat.id === S.chatId && !S.busy) { const atBottom = $('scroll').scrollHeight - $('scroll').scrollTop - $('scroll').clientHeight < 80; showChat(r.chat, true); if (!atBottom) scrollToBottom(false); }
   } catch (_) {}
 }
+// (1.4.8) Long chats are paged: scrolling to the top fetches the 200 messages before this page's first one and puts
+// them above, keeping what you were looking at where it was. The server numbers entries absolutely (S.tOffset = the
+// absolute index of S.transcript[0]); message actions add it back (messageAction).
+async function loadEarlier() {
+  if (loadEarlier.busy || S.tOffset <= 0 || !S.chatId || Peek.id || S.view !== 'chat') return;
+  const cid = S.chatId, thread = $('thread'), sc = $('scroll');
+  loadEarlier.busy = true;
+  const note = document.createElement('div');
+  note.className = 'earlier-note set-note'; note.style.textAlign = 'center'; note.textContent = 'Loading earlier messages…';
+  thread.prepend(note);
+  try {
+    const r = await api(`/api/chats/${encodeURIComponent(cid)}/transcript?before=${S.tOffset}&limit=200`);
+    note.remove();
+    if (!r.ok || cid !== S.chatId || !(r.entries || []).length) { if (r.ok && !(r.entries || []).length) S.tOffset = 0; return; }
+    const add = r.entries, n = add.length, h0 = sc.scrollHeight, top0 = sc.scrollTop;
+    thread.querySelectorAll('[data-ti]').forEach(el => { el.dataset.ti = Number(el.dataset.ti) + n; });
+    S.transcript = add.concat(S.transcript); S.tOffset = r.offset; S.tCap = Math.max(S.tCap || 80, S.transcript.length);
+    const last = thread.lastElementChild;                    // render at the end, then move the new rows above the old ones
+    renderEntries(add);
+    const fresh = []; for (let el = last ? last.nextElementSibling : thread.firstElementChild; el; el = el.nextElementSibling) fresh.push(el);
+    const first = thread.firstElementChild;
+    fresh.forEach(el => thread.insertBefore(el, first));
+    sc.scrollTop = top0 + (sc.scrollHeight - h0);
+    persistTranscript(); renderPins();
+  } catch (_) { note.remove(); }
+  finally { loadEarlier.busy = false; }
+}
+$('scroll').addEventListener('scroll', () => { if ($('scroll').scrollTop < 120 && S.tOffset > 0) loadEarlier(); }, { passive: true });
 
 /* ---- A message queued while the assistant is still answering ------------------------
    Enter while a task runs keeps the message; it is sent when the task finishes (put
@@ -11841,7 +12015,10 @@ function replyMeta(m) {
     tps && (tps.est ? 'Speed: tokens over the whole reply time (an older reply - its writing time wasn\'t recorded)' : `Generation speed: ${tps.v} tokens a second over ${m.gen_s} s of measured generation (including reasoning)`),
     m.ttft != null && `First token after ${m.ttft} s`, m.calls > 1 && `${m.calls} model calls`,
     m.searches && `${m.searches} web search${m.searches === 1 ? '' : 'es'}`, m.reads && `${m.reads} page${m.reads === 1 ? '' : 's'} read`].filter(Boolean).join(' · ');
-  return `<span class="msg-meta" title="${esc(tip)}">${esc(bits.join(' · '))}</span>`;
+  // (1.4.8) the cost line: prompt tokens the model read now and how many it took from its cache (only when recorded)
+  const cost = m.read != null || m.reused != null
+    ? ` · <span title="Prompt tokens the model read now, and how many it reused from its cache">read ${Number(m.read || 0).toLocaleString()} · reused ${Number(m.reused || 0).toLocaleString()}</span>` : '';
+  return `<span class="msg-meta" title="${esc(tip)}">${esc(bits.join(' · '))}${cost}</span>`;
 }
 
 /* ---- Web search: citations, sources and the search row ----------------------
@@ -12134,7 +12311,7 @@ function onStreamEvent(ev) {
   }
   if (ev.kind === 'delta') {
     c.n += Array.from(ev.text || '').length; if (c.tFirst === null) c.tFirst = performance.now(); // Characters survive SSE coalescing; messages are not tokens.
-    if (ev.n) c.tok = (c.tok || 0) + ev.n;          // the server's token count of the merged run (1.4.7): the speed is tok/s
+    if (ev.n) { c.tok = (c.tok || 0) + ev.n; SpeedPin.marks.push([performance.now(), ev.n]); }   // tok/s (1.4.7); the pin (1.4.8)
     if (ev.channel === 'content') {
       c.content += ev.text || '';
       if (c.t1 === null && splitThink(c.content).answer.trim()) c.t1 = performance.now();
@@ -12150,6 +12327,31 @@ function onStreamEvent(ev) {
   else if (ev.kind === 'end') { c.ended = true; c.hasTools = !!ev.has_tools; c.t2 = performance.now(); if (c.t1 === null) c.t1 = c.t2; }
   scheduleLivePaint();
 }
+/* (1.4.8) The pinned speed in the side panel: tokens in the last 3 s while the model writes, "reading Ns" before its
+   first token, the last reply's average after. Plain text updated once a second - no motion of its own. */
+const SpeedPin = { marks: [], last: null, shown: '' };
+function paintSpeedPin() {
+  const el = $('speed-val'); if (!el) return;
+  const now = performance.now(), c = Live.calls.get(Live.current);
+  SpeedPin.marks = SpeedPin.marks.filter(m => now - m[0] <= 3000);
+  let text, title, idle = false;
+  if (c && !c.ended && !c.tFirst) {
+    text = `reading ${Math.round((now - c.t0) / 1000)} s`; title = 'Reading the conversation before the first word';
+  } else if (c && !c.ended) {
+    const span = Math.min(3, Math.max(0.5, (now - c.tFirst) / 1000));
+    text = `${(SpeedPin.marks.reduce((s, m) => s + m[1], 0) / span).toFixed(1)} tok/s`; title = 'Writing speed right now (last 3 s)';
+  } else {
+    if (c && c.ended && c.tok && c.tFirst && c.t2 > c.tFirst) SpeedPin.last = c.tok / ((c.t2 - c.tFirst) / 1000);
+    idle = true;
+    text = SpeedPin.last ? `${SpeedPin.last.toFixed(1)} tok/s` : '—';
+    title = SpeedPin.last ? 'Writing speed of the last reply' : 'Shows while a local model writes';
+  }
+  if (text + idle !== SpeedPin.shown) {
+    SpeedPin.shown = text + idle; el.textContent = text; el.classList.toggle('muted', idle);
+    $('speed-pin').title = title;
+  }
+}
+setInterval(paintSpeedPin, 1000);
 function scheduleLivePaint() {
   if (Live.frame) return;
   // Whichever comes first: the next animation frame, or a short timer - a
@@ -13966,7 +14168,11 @@ function hasMeaningfulSteps(events) {
 function restoreTranscript(reveal = true) {
   if (!S.transcript.length) return;
   if (reveal) showThread(true);
-  S.transcript.forEach((m, i) => {
+  renderEntries(S.transcript);
+  scrollToBottom(true);
+}
+function renderEntries(list) {
+  list.forEach((m, i) => {
     let el = null;
     if (m.r === 'u') el = addUser(m.t, m.v, false, m.p || null, m.c || null, { files: m.f, tools: m.tl, raw: m.rm === 'raw' });
     else if (m.r === 'a') el = addAssistant(m.t, m.s, false, m.k ? { text: m.k, seconds: m.kt } : null, { src: m.src, w: m.w, m: m.m, cr: m.cr, cmp: m.cmp, rs: m.rs, au: m.au, ck: m.ck });
@@ -13974,7 +14180,6 @@ function restoreTranscript(reveal = true) {
     else if (m.r === 'e') addError(m.t, false, i);
     else if (m.r === 's') addStopped(m.t, false);
   });
-  scrollToBottom(true);
 }
 
 /* ---- steps (live tool use) ---------------------------------------------- */
@@ -14120,6 +14325,7 @@ function setBusy(b) {
   if (!b && was) desktopNotify('Reply ready', S.runningChatId || S.chatId);
   if (!b) S.runningChatId = null;
   if (b !== was) updateChatDots();
+  if (typeof ScrollPill !== 'undefined') ScrollPill.update();      // (1.4.8) the thinking pill follows the run
   if (b && !was && typeof ImagesView !== 'undefined') setTimeout(() => ImagesView.poll(), 1200);   // follow a picture drawn for this answer
 }
 /* The desktop app shows a Windows notification when it isn't in front (desktop/main.js decides) - a reply finished
@@ -14513,7 +14719,11 @@ async function sendPrompt(text, opts = {}) {
     // The server runs the turn in the background and answers at once with
     // its id; the result is collected with a long-poll (see waitForTurn).
     let retried = false;
-    const start = await apiRetry('/api/chat', { message, with_vision: withScreen, mode: S.mode, local_model: S.pinned, tools,
+    // (1.4.8) The message names the chat this page shows ('' = a new chat); the server refuses it when its open chat
+    // is another one (chat_changed), and then the server's chat is put where this page wants it and the message is
+    // sent again, once. The draft is kept when that fails (audit 2.1).
+    const sendIt = () => apiRetry('/api/chat', { message, with_vision: withScreen, mode: S.mode, local_model: S.pinned, tools,
+      chat_id: S.chatId || '',
       files: fileMeta.map(f => f.id),
       ...(isTemp() ? { temporary_chat: S.chatId } : {}),
       ...(S.searchMode ? { search_mode: S.searchMode } : {}),
@@ -14523,6 +14733,19 @@ async function sendPrompt(text, opts = {}) {
       ...(tools.includes('compare') && S.compareModel ? { compare_model: S.compareModel } : {}),
       ...(S.preset && S.preset.system ? { instructions: S.preset.system } : {}) },
       (n, of) => { retried = true; if (S.turn && S.turn.think) { S.turn.think.hidden = false; Thinking.label(S.turn.think, `Can't reach the server - retrying (${n} of ${of})…`, false); } });
+    let start = await sendIt();
+    if (start && start.chat_changed) {
+      let fixed = false;
+      try {
+        const r = S.chatId && !isTemp() ? await api(`/api/chats/${encodeURIComponent(S.chatId)}/open`, {}) : isTemp() ? { ok: false } : await api('/api/reset', {});
+        fixed = r.ok !== false && r.status !== 'error';
+      } catch (_) { /* the message below says what happened */ }
+      if (fixed) start = await sendIt();
+      if (start && start.chat_changed) {
+        start = { status: 'error', message: start.message || 'This chat was switched on another screen - your message was not sent.' };
+        if (fromBox && !promptEl.value) { promptEl.value = message; autoGrow(); updateSend(); }   // never lose the draft
+      }
+    }
     // A retry after the first send did arrive: follow that turn instead of reporting "busy".
     const running = retried && start.status === 'error' && /already running/i.test(start.message || '') ? (await api('/api/state').catch(() => ({}))).turn : null;
     if (running && running.status === 'running') data = await waitForTurn(running.id);
@@ -15635,7 +15858,7 @@ function paintModelRow(d) {
    =========================================================================== */
 function clearThread() {
   DesignPanel.close();                        // a preview belongs to the chat it came from
-  $('thread').innerHTML = ''; S.transcript = []; S.tOffset = 0; S.title = ''; persistTranscript();
+  $('thread').innerHTML = ''; S.transcript = []; S.tOffset = 0; S.tCap = 80; S.title = ''; persistTranscript();
   Drafts.switchTo(null);
   S.chatId = null; store.set('chatId', null); renderPins();
   S.approvalShown = null; S.activeClarification = null;
@@ -16509,6 +16732,41 @@ async function addModelFile() {
   try { const r = await api('/api/local-models/add', { path, restart: true }); if (r.status === 'success') box.value = ''; await modelsAdded(r, 'add'); }
   catch (e) { toast(e.message); }
 }
+// (1.4.8) Model folders and Browse (local_models folders / browse): the picker opens on the PC and can sit open for
+// minutes, so these calls have no timeout. A cancelled picker answers path "".
+async function pickPath(kind, btn) {
+  const label = btn && btn.innerHTML;
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Choosing…'; }
+  try {
+    const r = await api('/api/local-models/browse', { kind }, undefined, { timeout: 0 });
+    if (!r.ok) { toast(r.message || "Couldn't open the picker."); return ''; }
+    return r.path || '';
+  } catch (e) { toast(e.message); return ''; }
+  finally { if (btn && btn.isConnected) { btn.disabled = false; btn.innerHTML = label; } }
+}
+async function saveModelFolders(body) {
+  try {
+    const r = await api('/api/local-models/folders', body);
+    if (!r.ok) { toast(r.message || "Couldn't change the folders."); return false; }
+    S.modelFolders = { ...(S.modelFolders || {}), ...r }; renderModelsCached(); return true;
+  } catch (e) { toast(e.message); return false; }
+}
+async function chooseModelsFolder(btn) { const p = await pickPath('folder', btn); if (p && await saveModelFolders({ main: p })) toast('New models go to ' + p + '.'); }
+async function useDefaultModelsFolder() { if (await saveModelFolders({ main: '' })) toast('Back to the default models folder.'); }
+async function addExtraModelFolder(btn) {
+  const p = await pickPath('folder', btn); if (!p) return;
+  const cur = (S.modelFolders && S.modelFolders.extra) || [];
+  if (!cur.includes(p)) await saveModelFolders({ extra: [...cur, p] });
+}
+async function removeExtraModelFolder(i) {
+  const cur = ((S.modelFolders && S.modelFolders.extra) || []).slice(); cur.splice(i, 1);
+  await saveModelFolders({ extra: cur });
+}
+async function browseModelFile(btn) {
+  const p = await pickPath('file', btn); if (!p) return;
+  const box = $('add-model-path'); if (box) box.value = p;
+  addModelFile();                                            // the existing add flow
+}
 function openModelsFolder() {
   const folder = (S.modelFolders?.folders || [])[0];
   if (!folder) return;
@@ -16646,7 +16904,7 @@ function renderModelsCached() {
         <div class="field"><label for="cfg-ctx-${i}">Context</label><input class="input" type="number" min="512" step="512" id="cfg-ctx-${i}" value="${eff(c.ctx_size, d.ctx_size)}"></div>
         <div class="field"><label for="cfg-batch-${i}">Batch</label><input class="input" type="number" min="16" id="cfg-batch-${i}" value="${eff(c.batch_size, d.batch_size)}"></div>
         <div class="field"><label for="cfg-threads-${i}">CPU threads</label><input class="input" type="number" min="1" id="cfg-threads-${i}" value="${eff(c.threads, d.threads)}"></div>
-      </div>${ctxHelp(c, i)}<div class="cfg-actions"><button class="btn sm" ${S.bench.running ? 'disabled title="A benchmark is running"' : ''} onclick="saveModelConfig(${i}, true)">Save and load</button><button class="btn sm primary" onclick="saveModelConfig(${i}, false)">Save</button></div></div>`
+      </div>${mmprojLine(c)}${ctxHelp(c, i)}<div class="cfg-actions"><button class="btn sm" ${S.bench.running ? 'disabled title="A benchmark is running"' : ''} onclick="saveModelConfig(${i}, true)">Save and load</button><button class="btn sm primary" onclick="saveModelConfig(${i}, false)">Save</button></div></div>`
       : `<div class="model-cfg empty-note">Not in models.ini, so it loads with llama-server's defaults.</div>`;
     const br = (S.bench.results || {})[m.id];
     const missing = c && c.file_found === false;          // models.ini points at a file that isn't on disk
@@ -16675,9 +16933,11 @@ function renderModelsCached() {
       ${rowHtml('Get models ready while I type', 'Starts loading the chat model (and the picture model, when you ask for a picture) as soon as you type, so replies start sooner. Off: nothing loads until you send.', sw(s.chat_warmup !== false, `saveSettings({chat_warmup:${s.chat_warmup === false}, image_warmup:${s.chat_warmup === false}}).then(renderModelsCached)`))}
     </div>
     <div class="set-group add-models"><div class="gt">Add models <small>· any llama.cpp .gguf</small></div>
-      ${rowHtml('Models folder', `Put .gguf files here, then scan. <span class="mono">${esc((S.modelFolders?.folders || [])[0] || 'local\\models')}</span>`,
-        `<span class="row-acts"><button class="btn sm" onclick="openModelsFolder()">${icon('i-folder', 'xs')}Open</button><button class="btn sm primary" id="scan-models" onclick="scanModels(this)">${icon('i-search', 'xs')}Scan for models</button></span>`)}
-      <div class="add-model-file"><input class="input mono" id="add-model-path" placeholder="Or paste a model file's path - D:\\models\\my-model-Q4_K_M.gguf" aria-label="Path of a .gguf model file" onkeydown="if(event.key==='Enter')addModelFile()"><button class="btn sm" onclick="addModelFile()">${icon('i-plus', 'xs')}Add</button></div>
+      ${rowHtml('Models folder', `New models go here; put .gguf files here, then scan. <span class="mono">${esc((S.modelFolders?.main || (S.modelFolders?.folders || [])[0]) || 'local\\models')}</span>`,
+        `<span class="row-acts"><button class="btn sm" onclick="chooseModelsFolder(this)">${icon('i-folder', 'xs')}Change…</button>${S.modelFolders?.chosen ? `<button class="btn sm ghost" onclick="useDefaultModelsFolder()" title="Back to ${esc(S.modelFolders.default || 'the installer\'s folder')}">Use default</button>` : ''}<button class="btn sm" onclick="openModelsFolder()">${icon('i-folder', 'xs')}Open</button><button class="btn sm primary" id="scan-models" onclick="scanModels(this)">${icon('i-search', 'xs')}Scan for models</button></span>`)}
+      ${rowHtml('Also look in', (S.modelFolders?.extra || []).length ? `<span class="extra-folders">${S.modelFolders.extra.map((p, i) => `<span class="pill mono" title="${esc(p)}">${esc(p)}<button type="button" class="icon-btn" style="width:18px;height:18px;margin-left:4px" aria-label="Stop looking in ${esc(p)}" title="Remove" onclick="removeExtraModelFolder(${i})">${icon('i-x', 'xs')}</button></span>`).join(' ')}</span>` : 'More folders that already hold models (an external drive, say); a scan checks them too.',
+        `<span class="row-acts"><button class="btn sm" onclick="addExtraModelFolder(this)">${icon('i-plus', 'xs')}Add folder…</button></span>`)}
+      <div class="add-model-file"><input class="input mono" id="add-model-path" placeholder="Or paste a model file's path - D:\\models\\my-model-Q4_K_M.gguf" aria-label="Path of a .gguf model file" onkeydown="if(event.key==='Enter')addModelFile()"><button class="btn sm" onclick="browseModelFile(this)">${icon('i-folder', 'xs')}Browse…</button><button class="btn sm" onclick="addModelFile()">${icon('i-plus', 'xs')}Add</button></div>
       <p class="set-note">Each new model gets an entry in <span class="mono">models.ini</span> (named after the file; a vision model's mmproj file beside it is attached), and llama-server restarts so it shows up. Or find one below - it picks the file that fits this PC.</p></div>
     ${finderGroup()}
     <div class="set-group"><div class="gt">Cloud text models <small>· in Cloud and Auto; with favorites starred, Auto picks only from them</small></div>
@@ -16721,6 +16981,27 @@ function visionLine(id) {
   if (!offer) return '';
   const failed = st.model === id && st.state === 'failed' ? `<span class="err"> Last try: ${esc(st.error)}</span>` : '';
   return `<span class="va-line">${icon('i-image', 'xs')}Can see pictures with its vision file${failed} <button type="button" class="af-link" onclick="event.preventDefault();event.stopPropagation();getVisionFile('${jsArg(id)}')" title="${esc(offer.about)} - checked against its published SHA-256">Download ${offer.mb} MB</button></span>`;
+}
+/* (1.4.8) A vision file (mmproj) for a model already in the list - one downloaded by hand, which Find models never
+   offered: Windows' picker, then /api/local-models/mmproj writes it to models.ini (and reloads the model if loaded). */
+function mmprojLine(c) {
+  const k = jsArg(c.name), file = c.mmproj_path ? String(c.mmproj_path).split(/[\\/]/).pop() : '';
+  return `<div class="mm-line"><span class="muted">Vision file</span> ${file
+    ? `<span class="mono" title="${esc(c.mmproj_path)}">${esc(file)}</span><button type="button" class="af-link" onclick="pickMmproj('${k}')">Change…</button><button type="button" class="af-link" onclick="setMmproj('${k}', '')">Remove</button>`
+    : `<span class="muted">none - text only</span><button type="button" class="af-link" onclick="pickMmproj('${k}')">Add vision file…</button>`}</div>`;
+}
+async function pickMmproj(name) {
+  let r;
+  try { r = await api('/api/local-models/browse', { kind: 'mmproj' }, undefined, { timeout: 0 }); } catch (e) { toast(e.message); return; }
+  if (!r.ok) { toast(r.message || 'The file picker didn’t open.'); return; }
+  if (r.path) setMmproj(name, r.path);
+}
+async function setMmproj(name, path) {
+  try {
+    const r = await api('/api/local-models/mmproj', { model: name, path });
+    toast(r.message || (r.ok ? 'Done.' : 'That didn’t work.'));
+    if (r.ok) renderModelsTab();
+  } catch (e) { toast(e.message); }
 }
 async function getVisionFile(id) {
   try { const r = await api(`/api/models/assets/${encodeURIComponent(id)}`, {}); if (!r.ok) { toast(r.message); return; } }
@@ -17512,7 +17793,9 @@ async function addImageModel(form) {
     const r = await api('/api/images/models/add', { path });
     if (!r.ok) { out.textContent = r.message; out.classList.add('err'); return; }
     renderImages({ status: r.status });
-    testImageModel(r.model);
+    // (1.4.8) No test by itself (it loads the model): offer one.
+    toast(`${r.model.name} added. A quick test makes one small picture to check it works - it goes to the trash afterwards.`,
+      { ms: 12000, action: 'Run a quick test', run: () => testImageModel(r.model) });
   } catch (e) { out.textContent = e.message; out.classList.add('err'); }
 }
 /* A test picture right after adding (1.4.6, stage 3.2): proves the engine can really run the file. A small square
@@ -21468,8 +21751,11 @@ function adoptChat(chat) {
 function showChat(chat, reveal = true) {
   if (chat.id !== S.chatId) DesignPanel.close();
   $('thread').innerHTML = ''; S.approvalShown = null; S.activeClarification = null;
-  S.transcript = (chat.transcript || []).slice(-80); S.title = chat.title || '';
-  S.tOffset = Math.max(0, (chat.transcript || []).length - 80);
+  // (1.4.8) The server pages long chats: chat.transcript is its last <=200 entries, chat.offset the absolute index of the
+  // first one, chat.total the whole length. Earlier ones load when you scroll to the top (loadEarlier).
+  const got = chat.transcript || [], gotOff = Number.isFinite(chat.offset) ? chat.offset : 0;
+  S.tCap = 80; S.transcript = got.slice(-80); S.title = chat.title || '';
+  S.tOffset = gotOff + Math.max(0, got.length - 80);
   if (chat.id !== S.chatId) Drafts.switchTo(chat.id);
   if (chat.temporary && !S.temp) S.temp = { id: chat.id };
   S.chatId = chat.id; store.set('chatId', isTempId(chat.id) ? null : chat.id);

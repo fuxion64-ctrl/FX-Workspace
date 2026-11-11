@@ -1,7 +1,7 @@
 {
   "name": "fx-workspace",
   "productName": "FX Workspace",
-  "version": "1.4.7",
+  "version": "1.4.8",
   "description": "FX Workspace - a private, local-first AI assistant",
   "author": "Fuxion <fuxion64@gmail.com>",
   "license": "SEE LICENSE IN ../NOTICE",

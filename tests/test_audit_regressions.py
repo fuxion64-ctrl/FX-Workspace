@@ -227,11 +227,12 @@ class HistoryPersistenceTests(unittest.TestCase):
                      {'role': 'assistant', 'content': 'done'},
                      {'role': 'user', 'content': 'new'},
                      {'role': 'assistant', 'content': 'answer'}]
-        with tempfile.TemporaryDirectory() as root, patch.object(chat_store, 'MAX_CONVERSATION', 4):
+        # 1.4.8 (audit 2.8): nothing is cut on save any more, so no saved list can start mid-turn - all of it is kept.
+        with tempfile.TemporaryDirectory() as root:
             store = chat_store.ChatStore(root)
             cid = store.new_id()
             store.save({'id': cid, 'conversation': messages})
-            self.assertEqual(store.load(cid)['conversation'], messages[-2:])
+            self.assertEqual(store.load(cid)['conversation'], messages)
 
     def test_one_large_turn_is_kept_whole_including_synthetic_observations(self):
         messages = [{'role': 'user', 'content': 'task'},

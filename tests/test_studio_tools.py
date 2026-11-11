@@ -83,8 +83,11 @@ class PromptTests(unittest.TestCase):
 
     def test_the_write_access_line_survives_the_tool_filter(self):
         for base in (prompts.SYSTEM_PROMPT, prompts.SYSTEM_PROMPT_COMPACT):
-            for offered in ([], ["roblox_status"], ["mcp__roblox_studio__execute_luau"]):
+            for offered in (["roblox_status"], ["mcp__roblox_studio__execute_luau"]):
                 self.assertIn(prompts.STUDIO_WRITE_ACCESS, prompts.for_tools(base, offered, schemas.TOOL_NAMES))
+            # 1.4.8 (model-efficiency item 4): no Roblox rule at all in a turn with no Studio tool.
+            self.assertNotIn(prompts.STUDIO_WRITE_ACCESS, prompts.for_tools(base, [], schemas.TOOL_NAMES))
+            self.assertNotIn("Luau", prompts.for_tools(base, ["web_search"], schemas.TOOL_NAMES))
         # The compact prompt no longer tells a model to make one call per step for everything.
         self.assertNotIn("call one appropriate tool, wait for its observed result", prompts.SYSTEM_PROMPT_COMPACT)
 
